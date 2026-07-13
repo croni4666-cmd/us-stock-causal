@@ -146,12 +146,12 @@ def main() -> int:
     for d in r["details"]: print(d)
     print(f"  -> {r['ok']} OK / {r['fail']} fail, {r['rows']} rows, {r['elapsed_s']:.1f}s")
 
-    # 5. 商品现货 (optional, 缺则 warn)
-    print(f"\n[5/5] 商品现货 ({len(universe['commodities']['spot'])} ticker, 缺则 warn)")
-    r = fetch_layer("commodities_spot", universe["commodities"]["spot"], fetch_cfg, skip_on_fail=True)
+    # 5. 商品现货 ETF 代理 (1:1 跟踪商品价格)
+    print(f"\n[5/5] 商品现货 ETF ({len(universe['commodities']['spot_etf'])} ticker, 与 14 期货 1:1 配对)")
+    r = fetch_layer("commodities_spot_etf", universe["commodities"]["spot_etf"], fetch_cfg, skip_on_fail=True)
     grand_total["ok"] += r["ok"]; grand_total["fail"] += r["fail"]; grand_total["rows"] += r["rows"]
     for d in r["details"]: print(d)
-    print(f"  -> {r['ok']} OK / {r['fail']} skip, {r['rows']} rows, {r['elapsed_s']:.1f}s")
+    print(f"  -> {r['ok']} OK / {r['fail']} fail, {r['rows']} rows, {r['elapsed_s']:.1f}s")
 
     # 总结
     elapsed = time.time() - t0_all
