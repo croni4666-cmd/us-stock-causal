@@ -1,0 +1,26 @@
+# us-stock-causal dependencies
+# Locked versions for reproducibility; bump after testing
+
+# Core data platform (~300 MB with [ta] extra)
+openbb[ta]>=4.4.0
+
+# Plotting
+matplotlib>=3.7.0
+mplfinance>=0.12.10b0
+plotly>=5.18.0
+
+# Data
+pandas>=2.0.0
+numpy>=1.24.0
+pyarrow>=14.0.0
+
+# Technical analysis (kept from v0.2 for reference, OpenBB also provides)
+pandas-ta>=0.4.0
+
+# Utilities
+pyyaml>=6.0
+loguru>=0.7.0
+python-dotenv>=1.0.0
+
+# Dev / test (optional)
+pytest>=7.0.0
