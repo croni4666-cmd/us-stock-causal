@@ -8,10 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- v0.4.1: Phase 3.2 顶部市场情绪 1 行 (P3-3, VIX/10Y/DXY 当日 + 4 指数 1 行总结)
 - v0.4.2: Phase 3.3 事件标记叠加 (CPI/FOMC 垂直线在 K 线上)
 - Phase 4: 自分析工具 (pa export / pa notebook / sample notebooks)
 - Phase 5: 调度 (cron + 飞书 webhook,需 P3 跑稳后手动决定)
+
+## [0.4.1] - 2026-07-13
+
+### Added
+- **P3-3: 顶部市场情绪 1 行** — `src/macro.py`
+  - 3 源宏观: VIX (恐慌) / 10Y ^TNX (国债收益率) / DXY (美元)
+  - 4 指数 1 日 1 行: DIA / QQQ / RSP / QQQE
+  - VIX/DXY 用 % 变化, 10Y 用 bp (基点) 变化
+  - `topline()` 组合 2 行 = 顶部情绪 1 行 + 4 指数 1 行
+  - 集成进 `src/report.py` `render_full_report()`, 5 段报告顶部加 topline
+- **bug fix**: 初次跑 DXY 显示 N/A — `load_prices("DX-Y.NYB", "macro")` 找不到 cache
+  (cache 文件名是 `DXY.parquet`, yfinance alias 在 data.fetch 内部完成)。
+  改用 `load_prices("DXY", "macro")` 让 cache key 对齐 config/tickers.yaml 的原名
+
+### Verified (2026-07-13)
+- **顶部情绪 1 行生成**:
+  - VIX 16.40 (+9.12%) — **panic 急升 9%, 4 指数都小涨的显著分歧**
+  - 10Y 4.57% (+3bp) — 收益率略升
+  - DXY 100.97 (+0.03%) — 美元持平
+- **4 指数 1 日**: DIA +0.30% / QQQ +0.31% / RSP +0.37% / QQQE +0.03%
+- **报告生成 < 4s** (topline + 4 指数 5 段)
+
+### Key Insights
+- **VIX +9% vs 指数小涨 = 分歧**: 通常 VIX 急升伴随大跌, 今天是反的
+  - 可能是 hedge 仓位对冲 (VIX 期货投机盘) 而非现货市场恐慌
+  - 也可能是 macro snapshot 滞后 — 闭市后才发
+  - **报告不说"看多/看空", 只把这个分歧列出来给用户判断**
+- **顶部 1 行降低阅读门槛**: 30 秒看完 — VIX 急升 + 4 指数小涨 + 美元持平 + 明天 CPI
+  - 知道 CPI 之前 hedge 仓位变多也合理, 这是市场对冲成本
+
+### Phase 3 进度 (3/3 done 🎉)
+- P3-1 ✅ 5 段制报告 (v0.3.3)
+- P3-2 ✅ K 线图 (v0.4.0)
+- P3-3 ✅ 顶部情绪 1 行 (本版本)
+
+**Phase 3 (简洁呈现) 100% 完成 ✅** — 30s 顶部 + 5min K 线 + 15min 5 段 三档阅读建立
 
 ## [0.4.0] - 2026-07-13
 
