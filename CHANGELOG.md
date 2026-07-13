@@ -8,12 +8,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- v0.3.1: 残差深入分析 (P2-4) + 关键阈值检测 (P2-6)
 - v0.3.2: 历史模式匹配 (P2-5, DTW) + 财报日历 (P2-7)
 - v0.3.3: 信号矛盾胜率 (P2-8) + 5 段制报告生成 (P2-9, Phase 3 入口)
 - Phase 3: 简洁呈现 (K 线图 + 因果标注)
 - Phase 4: 自分析工具
 - Phase 5: 调度
+
+## [0.3.1] - 2026-07-13
+
+### Added
+- **P2-6: 关键阈值检测** — `src/thresholds.py`
+  - SMA20/50/200 + 位置 (above/below + %)
+  - 经典 floor trader pivot points (P/R1/R2/R3, S1/S2/S3)
+  - 52-week high/low + 当前在 52w 区间位置
+  - `get_thresholds(symbol, layer)` 主入口
+- **P2-4: 残差深入分析** — `src/residual.py`
+  - `compute_residual_timeseries(60d)` 时间序列
+  - `detect_anomalies(2σ)` 异常日
+  - `assess_weight_health()` t-test 评估 weights 是否需更新
+  - ok / watch / stale 三档健康度
+- **`examples/thresholds.py`** — Phase 2.1 demo
+  - 4 指数当前水平表 (价格 / SMA / pivot / 52w)
+  - 残差分析 (mean / std / t-test / anomalies)
+  - 1 张 4-subplot 图 (1y 价格 + SMA + pivot levels)
+  - Markdown 报告 `output/thresholds_<date>.md`
+
+### Verified (2026-07-13)
+- **4 指数当前水平** (2026-07-10):
+  - DIA $525.78, SMA200 +8.14%, 52w 93%
+  - QQQ $725.51, SMA200 +13.72%, 52w 88%
+  - RSP $214.30, SMA200 +8.36%, 52w 94%
+  - QQQE $120.61, SMA200 +13.50%, 52w 90%
+  - **结论: 4 指数全部 above 200 SMA, 52w 88-94% 位置,late cycle bull market**
+- **残差健康度** (60d t-test):
+  - DIA: mean -0.012% / std 0.45% / p=0.84 → **ok** ✅
+  - QQQ: mean +0.036% / std 0.45% / p=0.53 → **ok** ✅
+  - RSP: mean +0.045% / std 0.34% / p=0.30 → **ok** ✅
+  - QQQE: mean +0.110% / std 0.53% / p=0.12 → **watch** ⚠️
+  - **结论: 2026-Q2 sector weights 大部分健康,QQQE 等权 ETF 有轻微偏差,无需立即更新**
+- **异常日 (|z| > 2σ)**:
+  - QQQ 6/5 (-4.92%) 和 6/23 (-3.35%): 模型预测不够跌,真实市场超跌 → 可能是宏观事件 (FOMC / CPI 数据)
+  - DIA 6/4 / 6/16 / 7/2: 小幅正残差,市场比 sector 模型预测涨更多 → 大概率公司特定事件 (DIA 30 只成分股新闻)
+
+### Key Insights (新)
+- **200 SMA 全部 +8% 以上,52w 位置 88-94%**: 美股 4 主流指数都在"创新高"或"近创新高"位置
+- **Pivot R1 是关键阻力**: QQQ R1 $726.63 (现价 $725.51,差 0.15%) — 短期关键阻力
+- **残差分析证实 weights 有效**: 60d mean residual < 0.12% 且 p > 0.05,系统偏移不显著
+- **2026-Q2 weights 不需更新**: 健康度评估支持当前配置
+
+### Phase 2 进度 (4/9 done)
+- P2-1 ✅ 收益率计算
+- P2-2 ✅ 权重矩阵
+- P2-3 ✅ 归因分解
+- P2-4 ✅ 残差深入
+- P2-5 ⏳ 历史模式匹配 (Phase 2.2,DTW)
+- P2-6 ✅ 关键阈值
+- P2-7 ⏳ 财报日历 (Phase 2.2)
+- P2-8 ⏳ 信号矛盾胜率 (Phase 2.3)
+- P2-9 ⏳ 5 段制报告 (Phase 2.3)
 
 ## [0.3.0] - 2026-07-13
 
