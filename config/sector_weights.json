@@ -1,0 +1,64 @@
+{
+  "_meta": {
+    "as_of": "2026-Q2",
+    "source": "公开 GICS sector 权重 (SPDR 官网 / State Street 月报 / iShares 月报)",
+    "warning": "这是近似值,实际权重每季度变。Phase 2.1 加自动拉取 (openbb-etf) 替换",
+    "update_cadence": "quarterly (next: 2026-09)"
+  },
+  "DIA": {
+    "note": "Dow Jones Industrial Average 是 PRICE-WEIGHTED 30 只,不是市值加权。sector 权重是从 30 只成分股的 sector 推算的近似。",
+    "XLK": 0.27,
+    "XLF": 0.18,
+    "XLV": 0.16,
+    "XLY": 0.13,
+    "XLC": 0.07,
+    "XLE": 0.05,
+    "XLP": 0.05,
+    "XLI": 0.04,
+    "XLB": 0.03,
+    "XLU": 0.01,
+    "XLRE": 0.01
+  },
+  "QQQ": {
+    "note": "Nasdaq 100 (非金融,top 100 Nasdaq 大盘),科技 + 通信占比 ~50%",
+    "XLK": 0.52,
+    "XLC": 0.16,
+    "XLY": 0.13,
+    "XLV": 0.06,
+    "XLF": 0.04,
+    "XLP": 0.04,
+    "XLI": 0.02,
+    "XLE": 0.01,
+    "XLU": 0.01,
+    "XLB": 0.01,
+    "XLRE": 0.00
+  },
+  "RSP": {
+    "note": "S&P 500 EQUAL WEIGHT — 每个 sector 接近 1/11 (≈9.09%)",
+    "XLK": 0.10,
+    "XLF": 0.13,
+    "XLV": 0.13,
+    "XLY": 0.10,
+    "XLC": 0.09,
+    "XLP": 0.06,
+    "XLE": 0.04,
+    "XLI": 0.08,
+    "XLU": 0.03,
+    "XLB": 0.02,
+    "XLRE": 0.02
+  },
+  "QQQE": {
+    "note": "Nasdaq 100 EQUAL WEIGHT — Nasdaq 100 内 100 只等权,sector 比例跟 QQQ 类似但科技集中度低",
+    "XLK": 0.35,
+    "XLC": 0.16,
+    "XLY": 0.18,
+    "XLV": 0.09,
+    "XLF": 0.05,
+    "XLP": 0.05,
+    "XLI": 0.04,
+    "XLE": 0.03,
+    "XLU": 0.02,
+    "XLB": 0.02,
+    "XLRE": 0.01
+  }
+}
