@@ -8,11 +8,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- v0.2.1: 14 spot ETF 代理 (GLD/SLV/PPLT/PALL/CPER/USO/BNO/UNG/WEAT/CORN/SOYB/CANE/BAL/JO),补 =X 不可用的缺口
 - Phase 2: 因果分析 (归因分解 + 历史模式匹配 + 关键阈值)
 - Phase 3: 简洁呈现 (5 段制报告 + 1 张 K 线图)
 - Phase 4: 自分析工具 (`pa export` + `pa notebook` + sample notebook)
 - Phase 5: 调度 (cron + 飞书推送, gated on 1-4)
+
+## [0.2.1] - 2026-07-13
+
+### Added
+- **P1-9: 14 商品现货 ETF 代理** — `config/tickers.yaml` `commodities.spot_etf` 段
+  - 与 14 期货 (=F) 一一对应: GLD/SLV/PPLT/PALL/CPER/USO/BNO/UNG/WEAT/CORN/SOYB/CANE
+  - 基差 (basis) = futures - ETF,真正的市场预期信号
+- **`examples/data_quality.py`** — P1-10 数据质量 gate
+  - 8 项检查: 存在性 / 列名 / 无 NaN / 单调索引 / 无重复 / 价格合法 / 成交量合法 / 时效性
+  - 47/47 parquet 全 PASS
+  - 是 Phase 2 归因前的硬 gate
+
+### Verified
+- 47/47 parquet 数据质量: 全部无 NaN、单调索引、无重复、close > 0、volume >= 0、最新 < 7 天
+- 23,481 rows 总数据, ~1.1 MB parquet 缓存
+- 12/14 spot ETF 成功 (BAL/JO iPath ETN 2018 delisted,Phase 2 用期货代理)
+- 12/14 fetch < 2s/ticker, 47 全 41.8s (含 2 个 retry 8s × 3 = 24s 浪费)
+
+### Known Limitations
+- **BAL (cotton ETN) + JO (coffee ETN) iPath delisted 2018**: 1:1 ETF 代理不可用
+  - Phase 2 workaround: 直接用 CT=F / KC=F 期货作 spot 代理 (有展期噪音,但能用)
+  - 未来可选:换成 Invesco DB Agriculture Fund (DBA) 篮子型 ETF (覆盖 6 种农产品)
+- (继承 v0.2.0) 14 商品现货 =X yfinance 不可用 (已用 ETF 代理补完)
+
+### Phase 1 完成度
+**P1-1 ~ P1-10 全部 done** ✅
+- 数据层 100% complete
+- 47 个 ticker 干净数据
+- Phase 2 因果分析 可以安全开干
+
+## [0.2.0] - 2026-07-13
 
 ## [0.2.0] - 2026-07-13
 

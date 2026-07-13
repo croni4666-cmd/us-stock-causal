@@ -140,67 +140,83 @@ universe:
         name: Coffee (ICE)
         category: soft_commodity
 
-    # 14 现货 (=X) — 尽力拉,缺则 warn 跳过
-    # 已知 yfinance 现货 ticker 可用性:
-    #   ✅ GC=X SI=X PL=X PA=X HG=X CL=X NG=X (贵金属+能源+工业金属大概率有)
-    #   ❌ BZ=X ZW=X ZC=X ZS=X SB=X CT=X KC=X (谷物/软商品大概率没现货 ticker)
-    spot:
-      - symbol: GC=X
-        name: Gold Spot
+    # 14 现货 ETF 代理 (=X yfinance 不可用,改用 ETF 跟踪商品价格)
+    # 1:1 跟踪商品 + 流动性好 + 连续合约(无展期噪音,只 ETF 管理费 ~0.5%/y)
+    # 与 14 期货 (=F) 一一对应:
+    #   GC=F  -> GLD  (黄金)
+    #   SI=F  -> SLV  (白银)
+    #   PL=F  -> PPLT (铂)
+    #   PA=F  -> PALL (钯)
+    #   HG=F  -> CPER (铜)
+    #   CL=F  -> USO  (WTI 原油)
+    #   BZ=F  -> BNO  (Brent 原油)
+    #   NG=F  -> UNG  (天然气)
+    #   ZW=F  -> WEAT (小麦)
+    #   ZC=F  -> CORN (玉米)
+    #   ZS=F  -> SOYB (大豆)
+    #   SB=F  -> CANE (糖)
+    #   CT=F  -> BAL  (棉花, iPath ETN)
+    #   KC=F  -> JO   (咖啡, iPath ETN)
+    # 基差 (basis) = futures price - ETF price,真正的市场预期信号
+    spot_etf:
+      - symbol: GLD
+        name: SPDR Gold Shares
         category: precious_metal
-        optional: true
-      - symbol: SI=X
-        name: Silver Spot
+        paired_future: GC=F
+      - symbol: SLV
+        name: iShares Silver Trust
         category: precious_metal
-        optional: true
-      - symbol: PL=X
-        name: Platinum Spot
+        paired_future: SI=F
+      - symbol: PPLT
+        name: abrdn Physical Platinum Shares ETF
         category: precious_metal
-        optional: true
-      - symbol: PA=X
-        name: Palladium Spot
+        paired_future: PL=F
+      - symbol: PALL
+        name: abrdn Physical Palladium Shares ETF
         category: precious_metal
-        optional: true
-      - symbol: HG=X
-        name: Copper Spot
+        paired_future: PA=F
+      - symbol: CPER
+        name: United States Copper Index Fund
         category: industrial_metal
-        optional: true
-      - symbol: CL=X
-        name: WTI Crude Spot
+        paired_future: HG=F
+      - symbol: USO
+        name: United States Oil Fund
         category: energy
-        optional: true
-      - symbol: NG=X
-        name: Natural Gas Spot
+        paired_future: CL=F
+      - symbol: BNO
+        name: United States Brent Oil Fund
         category: energy
-        optional: true
-      - symbol: BZ=X
-        name: Brent Crude Spot
+        paired_future: BZ=F
+      - symbol: UNG
+        name: United States Natural Gas Fund
         category: energy
-        optional: true
-      - symbol: ZW=X
-        name: Wheat Spot
+        paired_future: NG=F
+      - symbol: WEAT
+        name: Teucrium Wheat Fund
         category: grain
-        optional: true
-      - symbol: ZC=X
-        name: Corn Spot
+        paired_future: ZW=F
+      - symbol: CORN
+        name: Teucrium Corn Fund
         category: grain
-        optional: true
-      - symbol: ZS=X
-        name: Soybeans Spot
+        paired_future: ZC=F
+      - symbol: SOYB
+        name: Teucrium Soybean Fund
         category: grain
-        optional: true
-      - symbol: SB=X
-        name: Sugar Spot
+        paired_future: ZS=F
+      - symbol: CANE
+        name: Teucrium Sugar Fund
         category: soft_commodity
-        optional: true
-      - symbol: CT=X
-        name: Cotton Spot
+        paired_future: SB=F
+      - symbol: BAL
+        name: iPath Cotton ETN (DELISTED 2018)
         category: soft_commodity
-        optional: true
-      - symbol: KC=X
-        name: Coffee Spot
+        paired_future: CT=F
+        optional: true  # yfinance 不可用,Phase 2 用 CT=F 期货代理
+      - symbol: JO
+        name: iPath Coffee ETN (DELISTED 2018)
         category: soft_commodity
-        optional: true
+        paired_future: KC=F
+        optional: true  # yfinance 不可用,Phase 2 用 KC=F 期货代理
 
 
 # ============================================================
