@@ -25,7 +25,7 @@ from src.report import render_full_report, five_segment_report, render_markdown
 
 def main() -> int:
     print("=" * 72)
-    print(f"us-stock-causal v0.3.3 - 5-segment report (Phase 2.3 P2-9)")
+    print(f"us-stock-causal v0.4.1 - 5-segment report + topline (Phase 3 P3-3)")
     print(f"Run time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Proxy active: {proxy.is_proxied()}")
     print("=" * 72)

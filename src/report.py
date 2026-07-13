@@ -35,6 +35,7 @@ from src.patterns import find_similar_patterns
 from src.events import next_event
 from src.returns import compute_returns, cumulative_return
 from src.signals import aggregate_signals
+from src.macro import topline as macro_topline, macro_snapshot, indices_1line
 
 
 def _segment_1_market(symbol: str, layer: str, lookback_days: int) -> str:
@@ -167,10 +168,13 @@ def render_full_report(symbols: list[str], layer: str = "indices") -> str:
     lines = [
         f"# 📊 美股每日分析报告 (5 段制) — {today}",
         f"\n**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"**模型**: Phase 2 全套 (归因 v0.3.0 + 阈值/残差 v0.3.1 + 模式/事件 v0.3.2 + 信号/5段 v0.3.3)",
+        f"**模型**: Phase 2 全套 + Phase 3 顶部情绪 (归因 v0.3.0 + 阈值/残差 v0.3.1 + 模式/事件 v0.3.2 + 信号/5段 v0.3.3 + 情绪 v0.4.1)",
         f"**字数**: 每标的 ~600 字,5 段结构 (行情 / 归因 / 阈值 / 相似 / 风险)",
         f"\n---\n",
     ]
+    # 顶部情绪 1 行 (Phase 3.2 P3-3)
+    lines.append(macro_topline())
+    lines.append("\n---\n")
     for sym in symbols:
         report = five_segment_report(sym, layer=layer)
         lines.append(render_markdown(report))
