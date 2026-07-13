@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+
+# Data (large, regenerable)
+data/raw/*.parquet
+data/cache/*.parquet
+*.parquet
+*.csv
+
+# Output (regenerable)
+output/*.png
+output/*.jpg
+output/*.html
+output/*.pdf
+# Keep .md reports
+!output/*.md
+
+# Logs
+logs/*.log
+logs/*.txt
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_temp/
+
+# Secrets (none expected, but be safe)
+.env
+.env.local
+*.pem
+*.key
+
+# OpenBB cache (regenerable)
+.openbb/
