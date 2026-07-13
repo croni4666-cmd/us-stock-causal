@@ -12,6 +12,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
 - v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
 
+## [0.5.2] - 2026-07-13
+
+### Fixed (诚实测试发现 1 个真实 bug + 1 个 SKILL.md 错)
+
+**诚实测试** = 系统跑完所有 examples + deep-test Phase 2 modules + 验证 SKILL.md API 准确性,发现:
+
+#### Bug 1: `assess_weight_health` API 不友好 (src/residual.py)
+- **之前**: `assess_weight_health(residuals: pd.DataFrame) -> dict`
+  - 用户必须先调 `compute_residual_timeseries(symbol)` 再传 DataFrame
+  - SKILL.md + CHANGELOG 都写 `assess_weight_health('QQQ')`,**用户实际调会 TypeError**
+- **修复**: 增加 symbol 便利 API
+  ```python
+  def assess_weight_health(arg, lookback_days: int = 60) -> dict:
+      if isinstance(arg, str):
+          residuals = compute_residual_timeseries(arg, lookback_days=lookback_days)
+      else:
+          residuals = arg
+      # ... 原有逻辑
+  ```
+- **向后兼容**: DataFrame 入口仍工作
+- **修后验证**: 4 指数 health 全部正确 (3 ok + 1 watch),跟 v0.3.1 CHANGELOG 数据一致
+
+#### Bug 2: SKILL.md 文档错 (mavis skill)
+- **之前**: `src.events.upcoming_events(n=30)`
+- **实际**: `upcoming_events(from_date=None, lookahead_days=30)`
+- **修复**: `upcoming_events(lookahead_days=30)`
+- **例子/events.py** 一直用 `lookahead_days=`,SKILL.md 是笔误
+
+### Added
+- **tests/test_smoke.py** — 10 个 smoke test
+  - 13 module import / VERSION match / 5 段制结构 / assess_weight_health 双 API
+  - events 参数 / 9 key functions 存在 / 数据快照 / SKILL.md 准确 / 无 TODO
+  - `python tests/test_smoke.py` 跑 < 5s, **10/10 pass**
+
+### Verified (2026-07-13, post-fix)
+- **`test_smoke.py`: 10/10 pass** (5.0s)
+- **examples 18 项全 pass** (test_all.py 旧版,已弃用)
+- **Phase 2 deep test 6/6 pass** (residual / thresholds / patterns / events / signals / 5-segment)
+- **3 个 sample notebook jupyter --execute 全过**
+- **5 段制 topline 真实数据**:
+  VIX 16.40 (+9.12%) / 10Y 4.57% (+3bp) / DXY 100.97 (+0.03%)
+  4 指数 1d: DIA +0.30% / QQQ +0.31% / RSP +0.37% / QQQE +0.03%
+- **4 指数 weights 健康度修后**:
+  DIA ok (mean -0.012% p=0.84) / QQQ ok (+0.036% p=0.53)
+  RSP ok (+0.045% p=0.30) / QQQE watch (+0.110% p=0.12)
+- **6 export 文件** (DIA+QQQ × csv/parquet/xlsx) 实际写出,47+ KB 总
+
+### Key Insights
+- **诚实测试 discipline 真有用**: 不跑就 commit,SKILL.md 错就过不去
+  - assess_weight_health API 错是 v0.3.1 引入,v0.4-0.5.1 都没测就 commit
+  - tests/ 目录的 smoke test 是 v0.3.x 缺失的"防护栏"
+- **API 设计原则**: 用户用 `function('symbol')` 调,比 `function(dataframe)` 直观
+  - v0.5.2 增加 `assess_weight_health(symbol)` 便利入口
+  - **保留 DataFrame 入口**给低层 (testing / pipeline) 用
+- **SKILL.md 跟代码同步**: 每次 commit 跑 smoke test 验证 SKILL.md API 没笔误
+
 ## [0.5.1] - 2026-07-13
 
 ### Added

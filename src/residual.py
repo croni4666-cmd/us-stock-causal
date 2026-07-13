@@ -75,14 +75,30 @@ def detect_anomalies(
     return anomalies
 
 
-def assess_weight_health(residuals: pd.DataFrame) -> dict:
+def assess_weight_health(
+    arg: "pd.DataFrame | str",
+    lookback_days: int = 60,
+) -> dict:
     """
     评估 weights 健康度:
       - mean residual: 接近 0 = 权重无系统偏移
       - std residual: 小 = 权重准
       - 残差 vs 0 的 t-test p-value: 大 = 残差均值与 0 无显著差异
+
+    Args:
+        arg: pd.DataFrame (residual timeseries) 或 str (ticker symbol)
+        lookback_days: 当 arg 是 symbol 时,回看天数 (默认 60)
+
+    Returns:
+        dict with mean_residual_pct, std_residual_pct, n_days, t_stat, p_value, health, advice
     """
     from scipy import stats
+
+    if isinstance(arg, str):
+        # Convenience API: 传 ticker symbol
+        residuals = compute_residual_timeseries(arg, lookback_days=lookback_days)
+    else:
+        residuals = arg
 
     mean = float(residuals["residual_pct"].mean())
     std = float(residuals["residual_pct"].std())
