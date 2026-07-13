@@ -8,10 +8,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Phase 2: 因果分析 (归因分解 + 历史模式匹配 + 关键阈值)
-- Phase 3: 简洁呈现 (5 段制报告 + 1 张 K 线图)
-- Phase 4: 自分析工具 (`pa export` + `pa notebook` + sample notebook)
-- Phase 5: 调度 (cron + 飞书推送, gated on 1-4)
+- v0.3.1: 残差深入分析 (P2-4) + 关键阈值检测 (P2-6)
+- v0.3.2: 历史模式匹配 (P2-5, DTW) + 财报日历 (P2-7)
+- v0.3.3: 信号矛盾胜率 (P2-8) + 5 段制报告生成 (P2-9, Phase 3 入口)
+- Phase 3: 简洁呈现 (K 线图 + 因果标注)
+- Phase 4: 自分析工具
+- Phase 5: 调度
+
+## [0.3.0] - 2026-07-13
+
+### Added
+- **P2-1: 收益率计算** — `src/returns.py`
+  - log return (可加,归因用) / simple return (显示用)
+  - cumulative_return / rolling_return helpers
+- **P2-2: 指数-行业权重矩阵** — `config/sector_weights.json`
+  - 4 指数 (DIA/QQQ/RSP/QQQE) × 11 GICS 行业
+  - DIA 价格加权,QQQ 科技集中,QQQE/RSP 等权不同
+  - 标注"季度更新",Phase 2.1 用 openbb-etf 自动拉
+- **P2-3: 归因分解** — `src/attribution.py`
+  - `attribute_index(symbol, date, lookback_days)` 主函数
+  - 直接 sector weight × sector return,残差 = actual - predicted
+  - 4 指数批量: `attribute_all_indices(lookback_days)`
+- **examples/attribute.py** — Phase 2 第一个真实可看的归因 demo
+  - 控制台表格 (4 指数 × 当日 / 5 日)
+  - 详细归因表 (每个指数 × 11 行业)
+  - 1 张 stacked bar 图 (English 标签, 4 subplot)
+  - Markdown 报告 `output/attribution_<date>.md`
+
+### Verified (2026-07-13)
+- **当日归因** (2026-07-10):
+  - DIA  实际 +0.30% / 预测 +0.24% / **残差 +0.06%** ✅
+  - QQQ  实际 +0.31% / 预测 +0.37% / **残差 -0.06%** ✅
+  - RSP  实际 +0.37% / 预测 +0.26% / 残差 +0.12% (可接受)
+  - QQQE 实际 +0.03% / 预测 +0.37% / 残差 -0.34% (等权 ETF 内部换手噪音)
+- **5 日累计归因**:
+  - DIA  -0.40% vs +0.65% (残差 -1.05%,DIA 价格加权特殊 + 权重近似值)
+  - QQQ  +1.79% vs +1.62% (残差 +0.17%,合理)
+  - RSP  -0.28% vs +0.16% (残差 -0.44%)
+  - QQQE +0.38% vs +1.10% (残差 -0.71%)
+- 全跑 < 1s (数据在缓存里)
+
+### Known Limitations
+- **Sector weights 是 2026-Q2 近似值**,不是实时数据。Phase 2.1 用 openbb-etf 自动拉
+- **DIA 价格加权**: sector 权重是从 30 只成分股推算的近似,可能与实际有 5-10% 误差
+- **5 日累计残差大**: 长期 lookback 时,权重变化 + 内部换手导致残差累积
+- **等权 ETF (RSP/QQQE)**: 内部换手/再平衡会引入残差
+
+### Phase 2 进度
+- P2-1 ✅ 收益率计算
+- P2-2 ✅ 权重矩阵
+- P2-3 ✅ 归因分解
+- P2-4 ⏳ 残差分析 (Phase 2.1)
+- P2-5 ⏳ 历史模式匹配 (Phase 2.2,DTW)
+- P2-6 ⏳ 关键阈值 (Phase 2.1)
+- P2-7 ⏳ 财报日历 (Phase 2.2,openbb.sec)
+- P2-8 ⏳ 信号矛盾胜率 (Phase 2.3)
+- P2-9 ⏳ 5 段制报告 (Phase 2.3)
 
 ## [0.2.1] - 2026-07-13
 
