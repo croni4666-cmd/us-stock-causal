@@ -8,9 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- v0.4.0: Phase 3 简洁呈现 (K 线图 + 因果标注 + 顶部市场情绪 1 行)
+- v0.4.1: Phase 3.2 顶部市场情绪 1 行 (P3-3, VIX/10Y/DXY 当日 + 4 指数 1 行总结)
+- v0.4.2: Phase 3.3 事件标记叠加 (CPI/FOMC 垂直线在 K 线上)
 - Phase 4: 自分析工具 (pa export / pa notebook / sample notebooks)
 - Phase 5: 调度 (cron + 飞书 webhook,需 P3 跑稳后手动决定)
+
+## [0.4.0] - 2026-07-13
+
+### Added
+- **P3-2: K 线图生成** — `src/kline.py` + `examples/kline.py`
+  - 1y daily K 线 (252 交易日),4 subplot 2×2 网格 (DIA/QQQ/RSP/QQQE)
+  - matplotlib 手画蜡烛 (mplfinance 自己管 figure,无法 2x2)
+  - 4 条关键线:
+    * 200 SMA 蓝实线 (长期趋势)
+    * 50 SMA 橙点线 (中期趋势,可选)
+    * R1 红虚线 (短期阻力, floor trader pivot)
+    * S1 绿虚线 (短期支撑, floor trader pivot)
+  - 输出: `output/kline_<date>.png` (~100 KB)
+
+### Verified (2026-07-13)
+- **4 指数 K 线图生成 < 3s**, 102 KB PNG
+- **视觉确认 late cycle bull market**:
+  - 4 指数全 above 200 SMA (DIA +8.14%, QQQ +13.72%, RSP +8.36%, QQQE +13.50%)
+  - QQQ/QQQE 在 5/2026 突破 200 SMA 后冲高,RSP/DIA 在 2026 初就 above
+  - R1/S1 在 K 线顶部紧贴(现价离 52w 高点 0.1-1.3%),**关键技术面: 突破 R1 才开新一轮**
+- **4 subplot 信息密度**: 一张图覆盖 4 指数 1y 全部关键水平
+
+### Key Insights
+- **K 线 + 阈值可视化比纯文字更直观**: 文字"QQQ 200 SMA +13.72%"需要读者心算位置,
+  K 线直接看到"价格在 SMA 上方多远"
+- **R1/S1 在 4 指数都贴顶**: 这从图上一眼能看出,文字报告无法表达
+- **200 SMA 蓝色实线在 QQQ/QQQE 显示明显"刚突破不久"**,这是技术派"金叉后回踩不破"的形态
+
+### Known Limitations
+- **50 SMA 是期权,可关**: 4 条线在右上角 legend 略密,5/4 指数可能觉得不够
+- **没有事件标记 (CPI/FOMC 垂直线)**: Phase 3.3 P3-2.5 计划
+- **没有成交量柱**: 4 subplot 加 volume 会变成 2×4 = 8 subplot,信息密度下降,Phase 3.4 评估
+- **没有 annotate 关键日期**: v0.3.3 5 段报告提的"明天 CPI"在 K 线上没标
+
+### Phase 3 进度 (1/3 done)
+- P3-1 ✅ 5 段制报告 (v0.3.3 P2-9 实现,移到这里)
+- P3-2 ✅ K 线图 (本版本)
+- P3-3 ⏳ 顶部市场情绪 1 行 (Phase 3.2)
 
 ## [0.3.3] - 2026-07-13
 
