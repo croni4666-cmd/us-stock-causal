@@ -1,0 +1,214 @@
+# us-stock-causal — ticker universe (v0.2.0)
+#
+# 总计 49 ticker (4 指数 + 11 行业 + 6 宏观 + 14 商品期货 + 14 商品现货尽力)
+# 命名规范:
+#   - 普通 ticker: DIA / QQQ / XLK / ^VIX / GC=F (OpenBB 会原样转发给 yfinance)
+#   - 文件名: ^VIX -> _VIX.parquet, GC=F -> GC_F.parquet (filesystem safe,见 src/cache.py safe_name)
+
+universe:
+
+  # ============================================================
+  # 1. 指数 (4) — 整体市场怎么走
+  # ============================================================
+  indices:
+    - symbol: DIA
+      name: SPDR Dow Jones Industrial Average ETF
+      purpose: 道指 30 工业平均
+    - symbol: QQQ
+      name: Invesco QQQ Trust
+      purpose: 纳斯达克 100
+    - symbol: RSP
+      name: Invesco S&P 500 Equal Weight ETF
+      purpose: "S&P 500 等权重 (道指等权重的最接近代理,S&P 500 含 30 只道指成分股)"
+    - symbol: QQQE
+      name: ProShares Nasdaq-100 Equal Weighted
+      purpose: 纳斯达克 100 等权重
+
+  # ============================================================
+  # 2. 行业 (11) — GICS 全 11 sector,State Street (XL*) 系列
+  # ============================================================
+  sectors:
+    - symbol: XLK
+      name: Technology Select Sector SPDR Fund
+      gics: "Information Technology"
+    - symbol: XLF
+      name: Financial Select Sector SPDR Fund
+      gics: "Financials"
+    - symbol: XLE
+      name: Energy Select Sector SPDR Fund
+      gics: "Energy"
+    - symbol: XLY
+      name: Consumer Discretionary Select Sector SPDR Fund
+      gics: "Consumer Discretionary"
+    - symbol: XLP
+      name: Consumer Staples Select Sector SPDR Fund
+      gics: "Consumer Staples"
+    - symbol: XLV
+      name: Health Care Select Sector SPDR Fund
+      gics: "Health Care"
+    - symbol: XLI
+      name: Industrials Select Sector SPDR Fund
+      gics: "Industrials"
+    - symbol: XLU
+      name: Utilities Select Sector SPDR Fund
+      gics: "Utilities"
+    - symbol: XLB
+      name: Materials Select Sector SPDR Fund
+      gics: "Materials"
+    - symbol: XLRE
+      name: Real Estate Select Sector SPDR Fund
+      gics: "Real Estate"
+    - symbol: XLC
+      name: Communication Services Select Sector SPDR Fund
+      gics: "Communication Services"
+
+  # ============================================================
+  # 3. 宏观 (6) — 恐慌 + 美元 + 完整 yield curve
+  # ============================================================
+  macro:
+    - symbol: ^VIX
+      name: CBOE Volatility Index
+      purpose: 恐慌指数
+    - symbol: DXY
+      name: U.S. Dollar Index
+      purpose: 美元强弱
+    - symbol: ^IRX
+      name: 13-Week Treasury Bill Yield
+      purpose: 国债 3M (短端)
+    - symbol: ^FVX
+      name: 5-Year Treasury Note Yield
+      purpose: 国债 5Y (中段)
+    - symbol: ^TNX
+      name: 10-Year Treasury Note Yield
+      purpose: 国债 10Y (长端,核心)
+    - symbol: ^TYX
+      name: 30-Year Treasury Bond Yield
+      purpose: 国债 30Y (超长)
+
+  # ============================================================
+  # 4. 大宗商品 (14 期货 + 14 现货尽力)
+  # ============================================================
+  commodities:
+
+    # 14 期货 (=F) — 连续合约,自动滚月
+    futures:
+      # 贵金属 4
+      - symbol: GC=F
+        name: Gold (COMEX)
+        category: precious_metal
+      - symbol: SI=F
+        name: Silver (COMEX)
+        category: precious_metal
+      - symbol: PL=F
+        name: Platinum (NYMEX)
+        category: precious_metal
+      - symbol: PA=F
+        name: Palladium (NYMEX)
+        category: precious_metal
+      # 工业金属 1
+      - symbol: HG=F
+        name: Copper (COMEX)
+        category: industrial_metal
+      # 能源 3
+      - symbol: CL=F
+        name: WTI Crude Oil (NYMEX)
+        category: energy
+      - symbol: BZ=F
+        name: Brent Crude Oil (ICE)
+        category: energy
+      - symbol: NG=F
+        name: Natural Gas (NYMEX)
+        category: energy
+      # 谷物 3
+      - symbol: ZW=F
+        name: Wheat (CBOT)
+        category: grain
+      - symbol: ZC=F
+        name: Corn (CBOT)
+        category: grain
+      - symbol: ZS=F
+        name: Soybeans (CBOT)
+        category: grain
+      # 软商品 3
+      - symbol: SB=F
+        name: Sugar (ICE)
+        category: soft_commodity
+      - symbol: CT=F
+        name: Cotton (ICE)
+        category: soft_commodity
+      - symbol: KC=F
+        name: Coffee (ICE)
+        category: soft_commodity
+
+    # 14 现货 (=X) — 尽力拉,缺则 warn 跳过
+    # 已知 yfinance 现货 ticker 可用性:
+    #   ✅ GC=X SI=X PL=X PA=X HG=X CL=X NG=X (贵金属+能源+工业金属大概率有)
+    #   ❌ BZ=X ZW=X ZC=X ZS=X SB=X CT=X KC=X (谷物/软商品大概率没现货 ticker)
+    spot:
+      - symbol: GC=X
+        name: Gold Spot
+        category: precious_metal
+        optional: true
+      - symbol: SI=X
+        name: Silver Spot
+        category: precious_metal
+        optional: true
+      - symbol: PL=X
+        name: Platinum Spot
+        category: precious_metal
+        optional: true
+      - symbol: PA=X
+        name: Palladium Spot
+        category: precious_metal
+        optional: true
+      - symbol: HG=X
+        name: Copper Spot
+        category: industrial_metal
+        optional: true
+      - symbol: CL=X
+        name: WTI Crude Spot
+        category: energy
+        optional: true
+      - symbol: NG=X
+        name: Natural Gas Spot
+        category: energy
+        optional: true
+      - symbol: BZ=X
+        name: Brent Crude Spot
+        category: energy
+        optional: true
+      - symbol: ZW=X
+        name: Wheat Spot
+        category: grain
+        optional: true
+      - symbol: ZC=X
+        name: Corn Spot
+        category: grain
+        optional: true
+      - symbol: ZS=X
+        name: Soybeans Spot
+        category: grain
+        optional: true
+      - symbol: SB=X
+        name: Sugar Spot
+        category: soft_commodity
+        optional: true
+      - symbol: CT=X
+        name: Cotton Spot
+        category: soft_commodity
+        optional: true
+      - symbol: KC=X
+        name: Coffee Spot
+        category: soft_commodity
+        optional: true
+
+
+# ============================================================
+# 数据拉取配置
+# ============================================================
+fetch:
+  proxy: auto               # Clash 代理:auto / off / clash:7897
+  lookback_days: 730        # 2 年 (满足 SMA_200 预热 + ML 样本)
+  interval: 1d              # 日线
+  retry_times: 3            # 单 ticker 重试
+  retry_delay_sec: 2
