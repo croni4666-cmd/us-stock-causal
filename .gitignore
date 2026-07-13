@@ -49,6 +49,7 @@ desktop.ini
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb_temp/
+*.executed.ipynb
 
 # Secrets (none expected, but be safe)
 .env

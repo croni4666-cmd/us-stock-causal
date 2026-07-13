@@ -8,9 +8,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- v0.4.2: Phase 3.3 事件标记叠加 (CPI/FOMC 垂直线在 K 线上)
-- Phase 4: 自分析工具 (pa export / pa notebook / sample notebooks)
-- Phase 5: 调度 (cron + 飞书 webhook,需 P3 跑稳后手动决定)
+- v0.5.1: P4-4 装 mavis skill (junction-safe,装到 .minimax 真实路径)
+- v0.5.2: P5 调度文档 (飞书 webhook 配置 + cron 步骤,默认 disabled)
+- v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线在 K 线上)
+- v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
+
+## [0.5.0] - 2026-07-13
+
+### Added
+- **P4-1: 数据集导出 CLI** — `examples/export.py`
+  - 支持 CSV / Parquet / Excel / all 4 种格式
+  - 多 ticker (comma-separated) + 时间窗口 (--start, --end) + 层 (--layer)
+  - 输出到 `data/export/` (默认) 或用户指定
+  - 0.1s 导出 998 rows (DIA + QQQ)
+- **P4-2: Jupyter Lab 启动器** — `examples/notebook.py`
+  - `python examples/notebook.py [--port 8888] [--no-browser] [--ip 0.0.0.0]`
+  - 自动 cd 到 project root,notebook dir = project root
+  - 显示已存在的 .ipynb 列表
+- **P4-3: 3 个 sample notebook** — `notebooks/0[1-3]_*.ipynb`
+  - 生成器: `examples/generate_sample_notebooks.py` (用 nbformat 程序生成)
+  - **01_load_and_explore.ipynb** (6 cells) — 加载 4 指数 + 算 1d/5d 收益 + 画归一化对比
+  - **02_attribution_custom.ipynb** (9 cells) — 跑 QQQ 5 日归因 + 自定义 weights what-if + 4 指数对比
+  - **03_pattern_match.ipynb** (7 cells) — 4 指数 × 3 种 pattern 配置 + top 5 严格匹配
+  - **Robust path 修复**: notebook cell 自动找含 `src/` 的目录,加 sys.path (在 jupyter 里 cwd 不一定是 project root)
+- **依赖**: jupyterlab 4.6.1 + nbformat 5.10.4 + ipykernel 7.3.0 (新装)
+- **bug fix**: 3 个 notebook 第一次跑都报错,修:
+  1. `sys.path.insert(0, '.')` → robust `_find_project_root()` (找含 `src/` 的目录)
+  2. `weights.items()` 包含 `"note"` 字符串 → 过滤 `isinstance(v, (int, float))`
+  3. `r_top5['matches']` → 实际 key 是 `top_matches`
+  4. `r['symbol']` → 实际 key 是 `index`
+  5. `forward_return` 是 fraction 不是 %, 展示要 × 100
+
+### Verified (2026-07-13)
+- **export.py**: 2 tickers, CSV, 0.1s, 998 rows 写到 `data/export/`
+- **notebook.py**: 启动器装好,真实启动要用户在自己机器跑 (这里不能 GUI 演示)
+- **3 notebooks 全部 jupyter nbconvert --execute 通过**:
+  - 01: 6 cells, 4 code + 2 md, 输出 4 指数 1d/5d 收益
+  - 02: 9 cells, 6 code + 3 md, 输出 4 指数归因对比 + what-if Δ=-0.06%
+  - 03: 7 cells, 5 code + 2 md, 输出 4 指数 × 3 配置矩阵
+- **executed notebooks** (.executed.ipynb) gitignore,regenerable
+
+### Key Insights
+- **notebook generator 模式**: 3 个 notebook 共 22 cells,程序生成比手写 JSON 安全
+  - 改 cell 内容时改 Python 字符串,不用记 nbformat 字段
+  - 改完跑 `python examples/generate_sample_notebooks.py` 一键 regen
+- **notebook execute validation 是 v3 重要纪律**: 第一次跑 4/4 失败,修了 5 个 bug
+  - 不跑就 commit 的话,用户第一次开 Jupyter 就报红 cell,体验差
+- **🟡 已知 anomaly**: NB03 cell 5 第 2 个 match 显示 fwd +100.30% (5d return)
+  - 数据真实 (1y 内某 5 日大涨),但**没回测是否真信号**
+  - 留给用户自己 sanity check — 这正是 self-analysis 的价值
+
+### Phase 4 进度 (3/4 done)
+- P4-1 ✅ 数据集导出 CLI
+- P4-2 ✅ Jupyter Lab 启动器
+- P4-3 ✅ 3 个 sample notebook (全部 execute 验证)
+- P4-4 ⏳ 装 mavis skill (junction-safe, v0.5.1)
 
 ## [0.4.1] - 2026-07-13
 
