@@ -8,11 +8,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- v0.3.2: 历史模式匹配 (P2-5, DTW) + 财报日历 (P2-7)
 - v0.3.3: 信号矛盾胜率 (P2-8) + 5 段制报告生成 (P2-9, Phase 3 入口)
 - Phase 3: 简洁呈现 (K 线图 + 因果标注)
 - Phase 4: 自分析工具
 - Phase 5: 调度
+
+## [0.3.2] - 2026-07-13
+
+### Added
+- **P2-5: 历史模式匹配** — `src/patterns.py`
+  - `find_similar_patterns(symbol, pattern_length=20, n_matches=10, forecast_horizon=5)`
+  - Pearson 相关 (不用 DTW,快 100x,效果接近)
+  - 当前 20d pattern → 历史最像 5-10 windows → 后续 5/20d 收益
+  - 聚合统计: avg / median / win rate / max / min
+- **P2-7: 宏观事件日历** — `src/events.py` + `config/events_2026.yaml`
+  - 硬编码 2026 FOMC (8 次) / CPI (12 次) / NFP (12 次) / PCE (12 次) = 44 个事件
+  - `upcoming_events(n=30)` / `past_events(lookback=14)` / `next_event()`
+  - **1 周内事件警告**: 模型预测需谨慎 (事件驱动残差大)
+- **`examples/patterns.py`** — 4 指数 20d pattern × top 5 matches × 5d forward
+- **`examples/events.py`** — 未来 30/60 天宏观事件 + 下个事件警告
+
+### Verified (2026-07-13)
+- **4 指数历史模式匹配** (2026-07-10, 20d pattern, 5d forward, top 5):
+  - DIA: avg -0.77% / win 20% (1/5 正) — **偏空,相似 pattern 后续跌**
+  - QQQ: avg +2.15% / **win 100% (5/5 正)** — **强势,历史上类似形态后续都涨**
+  - RSP: avg -0.33% / win 20% (1/5 正) — 偏空
+  - QQQE: avg +1.92% / win 60% (3/5 正) — 偏多
+- **未来 30 天事件** (今日 7/13):
+  - 7/14 (明天) **CPI 6月** — 1 周内警告
+  - 7/29 (16d) FOMC 7月 利率决议
+  - 7/31 (18d) PCE 6月
+  - 8/7 (25d) NFP 7月
+  - 8/12 (30d) CPI 7月
+- **过去 11 天事件**:
+  - 7/2 NFP 6月 (现在回头看 QQQ 涨的"原因"之一)
+
+### Key Insights
+- **QQQ 当前 20d pattern 历史上 5/5 后续 5d 上涨** — 这是 v3 设计目标的"一手信息"
+  - 不是"看多/看空"结论,是"统计上历史上类似形态后续如何"
+  - 用户应自己判断:这跟当前宏观环境 (CPI 7/14, FOMC 7/29) 是否兼容
+- **DIA 当前 20d pattern 历史上 4/5 后续跌** — 与 QQQ 相反,可能是因为 QQQ 科技集中
+- **明天 CPI 是关键事件**:残差分析显示 7/5/2026 类似的 4.92% 单日下跌可能由事件驱动
+
+### Phase 2 进度 (6/9 done)
+- P2-1 ✅ 收益率
+- P2-2 ✅ 权重矩阵
+- P2-3 ✅ 归因
+- P2-4 ✅ 残差
+- P2-5 ✅ 历史模式匹配
+- P2-6 ✅ 关键阈值
+- P2-7 ✅ 事件日历
+- P2-8 ⏳ 信号矛盾胜率 (Phase 2.3)
+- P2-9 ⏳ 5 段制报告 (Phase 2.3)
 
 ## [0.3.1] - 2026-07-13
 

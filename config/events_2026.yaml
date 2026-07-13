@@ -1,0 +1,180 @@
+# 2026 宏观事件日历 (FOMC / CPI / NFP)
+# 数据来源:
+#   FOMC: federalreserve.gov 公开议程 (1 年前公布)
+#   CPI / NFP: bls.gov 公开发布时间表
+#
+# 字段:
+#   date: YYYY-MM-DD (事件日,美东时间)
+#   kind: FOMC / CPI / NFP / PCE / PPI / GDP / JO
+#   description: 一句话说明
+#   impact: high (移动市场) / medium (关注) / low (背景)
+
+events:
+
+  # === 2026 Q1 ===
+  - date: 2026-01-09
+    kind: NFP
+    description: 12月非农就业
+    impact: high
+  - date: 2026-01-13
+    kind: CPI
+    description: 12月 CPI
+    impact: high
+  - date: 2026-01-28
+    kind: FOMC
+    description: 1月 FOMC 利率决议 (无 SEP,无 Powell 讲话)
+    impact: high
+  - date: 2026-02-11
+    kind: CPI
+    description: 1月 CPI
+    impact: high
+  - date: 2026-02-27
+    kind: PCE
+    description: 12月 PCE (Fed 偏好通胀指标)
+    impact: high
+  - date: 2026-03-06
+    kind: NFP
+    description: 2月非农就业
+    impact: high
+  - date: 2026-03-11
+    kind: CPI
+    description: 2月 CPI
+    impact: high
+  - date: 2026-03-18
+    kind: FOMC
+    description: 3月 FOMC + 经济预测 SEP
+    impact: high
+  - date: 2026-03-27
+    kind: PCE
+    description: 2月 PCE
+    impact: high
+
+  # === 2026 Q2 ===
+  - date: 2026-04-03
+    kind: NFP
+    description: 3月非农就业
+    impact: high
+  - date: 2026-04-10
+    kind: CPI
+    description: 3月 CPI
+    impact: high
+  - date: 2026-04-29
+    kind: FOMC
+    description: 4月 FOMC 利率决议
+    impact: high
+  - date: 2026-05-01
+    kind: NFP
+    description: 4月非农就业
+    impact: high
+  - date: 2026-05-12
+    kind: CPI
+    description: 4月 CPI
+    impact: high
+  - date: 2026-05-29
+    kind: PCE
+    description: 4月 PCE
+    impact: high
+  - date: 2026-06-05
+    kind: NFP
+    description: 5月非农就业
+    impact: high
+  - date: 2026-06-10
+    kind: CPI
+    description: 5月 CPI
+    impact: high
+  - date: 2026-06-17
+    kind: FOMC
+    description: 6月 FOMC + 经济预测 SEP
+    impact: high
+  - date: 2026-06-26
+    kind: PCE
+    description: 5月 PCE
+    impact: high
+
+  # === 2026 Q3 ===
+  - date: 2026-07-02
+    kind: NFP
+    description: 6月非农就业
+    impact: high
+  - date: 2026-07-14
+    kind: CPI
+    description: 6月 CPI
+    impact: high
+  - date: 2026-07-29
+    kind: FOMC
+    description: 7月 FOMC 利率决议
+    impact: high
+  - date: 2026-08-07
+    kind: NFP
+    description: 7月非农就业
+    impact: high
+  - date: 2026-07-31
+    kind: PCE
+    description: 6月 PCE
+    impact: high
+  - date: 2026-08-12
+    kind: CPI
+    description: 7月 CPI
+    impact: high
+  - date: 2026-08-28
+    kind: PCE
+    description: 7月 PCE
+    impact: high
+  - date: 2026-09-04
+    kind: NFP
+    description: 8月非农就业
+    impact: high
+  - date: 2026-09-11
+    kind: CPI
+    description: 8月 CPI
+    impact: high
+  - date: 2026-09-16
+    kind: FOMC
+    description: 9月 FOMC + 经济预测 SEP
+    impact: high
+  - date: 2026-09-25
+    kind: PCE
+    description: 8月 PCE
+    impact: high
+
+  # === 2026 Q4 ===
+  - date: 2026-10-02
+    kind: NFP
+    description: 9月非农就业
+    impact: high
+  - date: 2026-10-13
+    kind: CPI
+    description: 9月 CPI
+    impact: high
+  - date: 2026-10-28
+    kind: FOMC
+    description: 10月 FOMC 利率决议
+    impact: high
+  - date: 2026-10-30
+    kind: PCE
+    description: 9月 PCE
+    impact: high
+  - date: 2026-11-06
+    kind: NFP
+    description: 10月非农就业
+    impact: high
+  - date: 2026-11-12
+    kind: CPI
+    description: 10月 CPI
+    impact: high
+  - date: 2026-12-04
+    kind: NFP
+    description: 11月非农就业
+    impact: high
+  - date: 2026-12-11
+    kind: CPI
+    description: 11月 CPI
+    impact: high
+  - date: 2026-12-16
+    kind: FOMC
+    description: 12月 FOMC + 经济预测 SEP
+    impact: high
+  - date: 2026-12-23
+    kind: PCE
+    description: 10月 PCE
+    impact: high
