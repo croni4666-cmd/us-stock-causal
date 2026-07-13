@@ -8,10 +8,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- v0.3.3: 信号矛盾胜率 (P2-8) + 5 段制报告生成 (P2-9, Phase 3 入口)
-- Phase 3: 简洁呈现 (K 线图 + 因果标注)
-- Phase 4: 自分析工具
-- Phase 5: 调度
+- v0.4.0: Phase 3 简洁呈现 (K 线图 + 因果标注 + 顶部市场情绪 1 行)
+- Phase 4: 自分析工具 (pa export / pa notebook / sample notebooks)
+- Phase 5: 调度 (cron + 飞书 webhook,需 P3 跑稳后手动决定)
+
+## [0.3.3] - 2026-07-13
+
+### Added
+- **P2-8: 信号聚合 + 矛盾 score** — `src/signals.py`
+  - 3 源信号: pattern_match / threshold_pressure / event_proximity
+  - 每个信号分 bullish / bearish / neutral + confidence 0-1
+  - `contradiction_score` = 1 - 一致性比例 (0 = 全一致, 0.67 = 3 源各异)
+  - `verdict` = high_conf_bull / high_conf_bear / high_conf_neutral / mixed
+- **P2-9: 5 段制报告** — `src/report.py` + `examples/report.py`
+  - 每标的 5 段: ① 5 日行情 ② 5 日归因 ③ 关键阈值 ④ 历史相似 ⑤ 风险
+  - 字数 ~120/段 × 5 = ~600/标的 (目标达成)
+  - 4 指数完整报告 `output/report_<date>.md`
+  - 因果优先: 输出"驱动 + 阈值 + 历史 + 风险",**不输出"看多/看空"结论**
+
+### Verified (2026-07-13)
+- **4 指数 5 段制报告** (2026-07-13, 5 日 lookback):
+  - DIA: -0.40%, 信号矛盾 0.67(mixed), 1d 后 CPI
+  - QQQ: +1.81%, 信号部分一致 0.33, pattern win 80%, 1d 后 CPI, SMA200 +13.7% 距超买近
+  - RSP: -0.28%, 信号部分一致 0.33, 1d 后 CPI
+  - QQQE: +0.38%, 信号部分一致 0.33, pattern win 70%, 1d 后 CPI, SMA200 +13.5% 距超买近
+- **DIA 信号矛盾最高 (0.67)**: pattern 中性 (win 30%) + threshold bullish (above SMA) + event bearish (1d 后 CPI),3 源各异
+- **报告生成 < 3s** (4 指数 × 5 段,数据在缓存里)
+
+### Key Insights
+- **5 段制是 Phase 3 的预演**: 真实产出 ≤ 600 字/标的,跟 v0.2 的 3000+ 字报告比,信息密度提升 5 倍
+- **信号矛盾 score 是新维度**: 0-1 量化"信源意见分散度",> 0.5 时建议加注 ⚠️
+- **CPI 1d 后是 universal 风险**: 4/4 指数风险段都有"CPI"警告,这是 v0.3.2 event 检测自然产出的
+- **跟 v0.2.1 "看多看空"方向彻底切割**: 输出"机制 + 阈值 + 历史",用户自己判断,不做代理投票
+
+### Phase 2 进度 (9/9 done 🎉)
+- P2-1 ✅ 收益率
+- P2-2 ✅ 权重矩阵
+- P2-3 ✅ 归因
+- P2-4 ✅ 残差
+- P2-5 ✅ 历史模式匹配
+- P2-6 ✅ 关键阈值
+- P2-7 ✅ 事件日历
+- P2-8 ✅ 信号矛盾胜率
+- P2-9 ✅ 5 段制报告
+
+**Phase 2 (因果分析) 100% 完成 ✅**。下一阶段 Phase 3 (简洁呈现) 入口已打通。
 
 ## [0.3.2] - 2026-07-13
 
