@@ -8,10 +8,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- v0.5.1: P4-4 装 mavis skill (junction-safe,装到 .minimax 真实路径)
-- v0.5.2: P5 调度文档 (飞书 webhook 配置 + cron 步骤,默认 disabled)
 - v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线在 K 线上)
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
+- v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
+
+## [0.5.1] - 2026-07-13
+
+### Added
+- **P4-4: mavis skill 装好** — `C:\Users\project-user\.minimax\skills\us-stock-causal\`
+  - SKILL.md (6.9 KB) — 项目概览 + 三档阅读 + 模块快速参考 + 常用命令
+  - _meta.json — name / version / platform
+  - **junction-safe**: 用真实路径 `.minimax` 装,不走 `.mavis` junction
+  - **v1 教训应用**: 检查 `Get-Item` LinkType,确认 Junction,直接走真实路径
+- **P5-1 + P5-2 飞书推送脚本** — `examples/feishu_push.py`
+  - 从 .env 读 FEISHU_WEBHOOK_URL (gitignore,安全)
+  - 飞书 interactive card 格式 (header + 顶部情绪 + 5 段报告 + footer)
+  - `--dry-run` 看 payload 不真发
+  - **默认不自动跑** (P5-2 手动确认)
+- **P5-1/2/3/4 完整文档** — `docs/PHASE5.md`
+  - 4 步用户操作路径: 创建机器人 → dry-run → 真发一次 → 确认 cron 时间
+  - v1 教训应用: 不拍脑袋 17:00,等用户确认再注册 cron
+  - 已知限制列清楚: K 线图不发 / 30KB 截断 / 无重试 / timezone
+
+### Verified (2026-07-13)
+- **mavis skill 装好**: 2 文件 7 KB,真实路径,不被 junction 损坏
+- **feishu_push.py dry-run**: 3075 字符 payload,远低于 30KB 限制
+- **4 段元素**: header (title) → 顶部情绪 (VIX/10Y/DXY + 4 指数) → 5 段报告 (lark_md) → footer (note)
+- **Phase 5 gate 全开**: 等用户操作 4 步后才进 P5-4 cron
+
+### Key Insights
+- **junction 教训实战**: v1 时期因为 junction 走 Remove-Item 损失 5KB SKILL.md,
+  v3 这次主动用 `Get-Item | Select LinkType` 查清楚,直接走 `C:\Users\project-user\.minimax\skills\`
+  真实路径,**绝不从 junction 路径写**
+- **Phase 5 gate 严格**: 4 步 user action 走完才开 cron,不是 1 步
+  - 这是 v1 的关键教训 — 拍脑袋 cron 17:00 + webhook 配错 = spam 群 1 周
+- **dry-run 是必要的**: webhook 一旦发出去就收不回,先看 payload 再说
+
+### Phase 4 + 5 进度
+- P4-1 ✅ 数据集导出 CLI (v0.5.0)
+- P4-2 ✅ Jupyter Lab 启动器 (v0.5.0)
+- P4-3 ✅ 3 个 sample notebook (v0.5.0)
+- **P4-4 ✅ mavis skill 装好 (本版本)**
+- P5-1 ✅ 飞书 webhook 配置文档 (本版本)
+- P5-2 ✅ 手动推送脚本 (本版本)
+- P5-3 ⏳ 等用户确认 cron 时间
+- P5-4 ⏳ 等用户说"OK 跑"再注册 cron
+
+**Phase 4 4/4 done 🎉**
 
 ## [0.5.0] - 2026-07-13
 
