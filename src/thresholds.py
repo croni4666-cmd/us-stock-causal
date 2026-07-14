@@ -40,10 +40,13 @@ def load_prices(symbol: str, layer: str) -> pd.DataFrame:
 
 def compute_smas(close: pd.Series, windows: list[int] = None) -> dict[str, float]:
     """
-    计算 SMA,返回 {sma_20: float, sma_50: float, sma_200: float}
+    计算 SMA,返回 {sma_20, sma_50, sma_100, sma_150, sma_200}
+
+    v0.6.0 (P6-6): 默认 windows 从 [20, 50, 200] 扩到 [20, 50, 100, 150, 200]
+    100/150 是机构 Gann 周期线 (半年/季度),看图必备。
     """
     if windows is None:
-        windows = [20, 50, 200]
+        windows = [20, 50, 100, 150, 200]
     result = {}
     for w in windows:
         if len(close) >= w:

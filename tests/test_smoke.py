@@ -35,8 +35,9 @@ def test_version_match():
     """VERSION == CHANGELOG latest"""
     from pathlib import Path
     import re
-    version = Path('VERSION').read_text().strip()
-    changelog = Path('CHANGELOG.md').read_text(encoding='utf-8')
+    project_root = Path(__file__).resolve().parent.parent
+    version = (project_root / 'VERSION').read_text().strip()
+    changelog = (project_root / 'CHANGELOG.md').read_text(encoding='utf-8')
     m = re.search(r'## \[(\d+\.\d+\.\d+)\][^\n]*\n', changelog)
     assert m and m.group(1) == version, f"VERSION={version} != CHANGELOG={m.group(1) if m else 'missing'}"
 
@@ -131,6 +132,50 @@ def test_no_todo_or_stubs():
             for i, line in enumerate(py.read_text(encoding='utf-8').splitlines(), 1):
                 if bad.search(line):
                     raise AssertionError(f'{py}:{i}: {line.strip()[:80]}')
+
+
+def test_compute_smas_5_windows():
+    """v0.6.0 (P6-6): compute_smas 默认 5 windows (20/50/100/150/200)"""
+    import inspect
+    from src.thresholds import compute_smas
+    sig = inspect.signature(compute_smas)
+    # 默认 windows 应该包含 100, 150
+    import pandas as pd
+    s = pd.Series([100.0 + i * 0.1 for i in range(300)])
+    result = compute_smas(s)
+    for w in [20, 50, 100, 150, 200]:
+        assert f'sma_{w}' in result, f'compute_smas missing sma_{w} (default windows)'
+        assert result[f'sma_{w}'] is not None
+
+
+def test_kline_5_sma_colors():
+    """v0.6.0 (P6-6): kline.py 定义 5 SMA 颜色"""
+    from src import kline
+    for color_name in ['COLOR_SMA20', 'COLOR_SMA50', 'COLOR_SMA100', 'COLOR_SMA150', 'COLOR_SMA200']:
+        assert hasattr(kline, color_name), f'kline.{color_name} not defined'
+    # 200 SMA 必须是红色 (user 强调醒目)
+    assert kline.COLOR_SMA200.lower() in ['#d32f2f', '#dc143c', '#ff0000', '#e53935', '#c62828'], \
+        f'200 SMA color {kline.COLOR_SMA200} not red-ish'
+
+
+def test_kline_layer_param_bugfix():
+    """v0.6.0 (P6-6) bug fix: kline._draw_thresholds 接受 layer 参数"""
+    import inspect
+    from src.kline import _draw_thresholds
+    sig = inspect.signature(_draw_thresholds)
+    assert 'layer' in sig.parameters, '_draw_thresholds missing layer param (v0.6.0 bug fix)'
+
+
+def test_gold_kline_runs():
+    """v0.6.0 (P6-6) 端到端: GC=F 黄金 K 线图能跑 (代表非指数 layer)"""
+    import matplotlib
+    matplotlib.use('Agg')  # non-interactive backend
+    import matplotlib.pyplot as plt
+    from src.kline import plot_single
+    fig, ax = plt.subplots(1, 1, figsize=(8, 5))
+    plot_single('GC=F', ax, layer='commodities_futures', lookback_days=60)
+    # 不抛错就算过 (matplotlib render 错误会 raise)
+    plt.close(fig)
 
 
 if __name__ == "__main__":
