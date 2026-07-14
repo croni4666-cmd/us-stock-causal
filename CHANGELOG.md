@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
 - v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
 
+## [0.6.1] - 2026-07-14
+
+### Fixed (P6-6 hotfix: 真滑动平均, 不是 hlines 水平线)
+- **`src/kline.py` `_draw_thresholds`**: 5 SMA 改用 `ax.plot(close.rolling(w).mean())` 画**真滑动平均曲线**(v0.6.0 bug 是用 `ax.hlines` 画单值水平线, 看起来不动 — **完全不是滑动平均**)
+- **`examples/gold_chart.py`**: lookback 252 (1y) → 500 (2y), 让 SMA200 滑动平均有足够数据形成完整曲线
+- **`tests/test_smoke.py`**: 加 `test_sma_is_rolling_not_hline` 断言 — 找 `ax.lines` 里 label 含 "200 SMA" 的 line, 检查 y_data 有 >100 个不同 unique 值 (v0.6.0 此测试会 fail)
+- **`ROADMAP.md`**: 修正 P6-6 status `proposed` → `done` (v0.6.0) → 加 v0.6.1 hotfix 条目
+
+### Why this hotfix exists
+- **v0.6.0 P6-6 commit bbf8b07** 写了 "5 SMA 全套", 但用 `ax.hlines(sma_value, first_date, last_date)` 画的是 **1 根水平线** (像门槛/阻力线), 不是 SMA
+- **User 立刻发现** (2026-07-14): "你的均线怎么是这样的? 滑动平均知道吗?"
+- **诚实交底**: 是 v0.6.0 implementation 错误, v0.6.0 smoke test 只验"5 SMA 颜色定义"和"5 SMA 算出来" 但没验 "SMA 是不是画成曲线"
+- **Lesson**: smoke test 应该断言**视觉/行为特征** (line 有 N 个不同 y 值), 不是**机制存在** (有 hlines 调用)
+
+### Changed
+- `VERSION` 0.6.0 → 0.6.1
+
 ## [0.6.0] - 2026-07-14
 
 ### Added (P6-6: 5 SMA 全套 + 200 红色 + 高清晰度 K 线图)
