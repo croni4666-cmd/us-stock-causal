@@ -35,9 +35,11 @@ def main() -> None:
 
     # 单图 — 16x8 + DPI 200 (v0.6.0 清晰度提升)
     fig, ax = plt.subplots(1, 1, figsize=(16, 8))
-    plot_single(symbol, ax, layer=layer, lookback_days=lookback_days)
+    # v0.6.1: lookback 252 (1y) → 500 (2y) 让 SMA200 滑动平均有足够数据形成
+    # 1y 数据只够 SMA200 算 52 天,曲线太短
+    plot_single(symbol, ax, layer=layer, lookback_days=500)
 
-    # 标题 — 5 SMA 全显示
+    # 标题 — 5 SMA 全显示 (v0.6.1 改 "2y" 因为 lookback=500)
     t = get_thresholds(symbol, layer=layer)
     smas = t["smas"]
     vs = t["vs_sma"]
@@ -49,7 +51,7 @@ def main() -> None:
         if v is not None and p is not None and not pd.isna(v):
             parts.append(f"SMA{w} {p:+.1f}%")
     parts.append(f"52w {pos52w}%")
-    title = f"{symbol}  1y  |  " + "  ".join(parts)
+    title = f"{symbol}  2y  |  " + "  ".join(parts)
     ax.set_title(title, fontsize=11, fontweight="bold", loc="left", pad=10)
 
     # 写到项目根 output/ (不是 CWD),避免被 workspace 截走

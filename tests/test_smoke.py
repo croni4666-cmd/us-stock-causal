@@ -178,6 +178,37 @@ def test_gold_kline_runs():
     plt.close(fig)
 
 
+def test_sma_is_rolling_not_hline():
+    """v0.6.1 fix: SMA 是滑动平均曲线 (ax.plot), 不是 hlines 水平线
+
+    v0.6.0 bug: 用 ax.hlines 画 SMA, 视觉上像水平线, 不是真滑动平均
+    v0.6.1 fix: 改 ax.plot 画 close.rolling(w).mean() 时间序列
+
+    验证方法: 找 ax.lines 里 label 含 "200 SMA" 的 line, 检查 y_data 有多个不同值
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from src.kline import plot_single
+    fig, ax = plt.subplots(1, 1, figsize=(8, 5))
+    plot_single('GC=F', ax, layer='commodities_futures', lookback_days=500)
+    # 找 200 SMA line
+    sma_200 = None
+    for line in ax.get_lines():
+        if '200 SMA' in line.get_label():
+            sma_200 = line
+            break
+    assert sma_200 is not None, "200 SMA line not found in ax.lines"
+    y_data = sma_200.get_ydata()
+    # 真滑动平均: 至少 100 个不同 y 值 (500 交易日 - 200 SMA 前 200 天是 NaN)
+    y_clean = y_data[~np.isnan(y_data)] if len(y_data) > 0 else y_data
+    unique_y = len(set(y_clean))
+    assert unique_y > 100, \
+        f"200 SMA only has {unique_y} unique y values, looks like hline (v0.6.0 bug, fixed v0.6.1)"
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     # Run as script (not pytest)
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
