@@ -1,21 +1,24 @@
 """
-src/kline.py - K 线图生成 (Phase 3.1 P3-2 + Phase 6.6 P6-6)
+src/kline.py - K 线图生成 (Phase 3.1 P3-2 + Phase 6.6 P6-6 + v0.6.1 bug fix)
 
 设计:
-  - 1y daily K 线 (默认 252 交易日)
-  - 5 SMA + R1/S1 (v0.6.0 之后):
+  - 1y daily K 线 (默认 252 交易日;gold_chart 改 500d 让 SMA200 有足够数据)
+  - 5 SMA (v0.6.1 修复: ax.plot 滑动平均曲线,不是 hlines 单值) + R1/S1:
     * 200 SMA (长期趋势) — **红色实线粗**(核心,user 强调醒目)
     * 100 SMA (中周期) — 紫色实线
     * 150 SMA (中周期 / Gann 半年) — 青色实线
     * 50 SMA (中期) — 橙色点线
     * 20 SMA (短期) — 浅灰细线
-    * R1 (短期阻力) — 红色虚线
-    * S1 (短期支撑) — 绿色虚线
+    * R1 (短期阻力) — 红色虚线 (hlines,pivot 是常数)
+    * S1 (短期支撑) — 绿色虚线 (hlines,pivot 是常数)
   - 4 subplot 2×2 网格: DIA / QQQ / RSP / QQQE (plot_4_indices)
+
+v0.6.0 bug: 用 ax.hlines 画 SMA → 1 根水平线,不是真滑动平均
+v0.6.1 fix: 改用 ax.plot 画 close.rolling(w).mean() 时间序列
 
 为什么不用 mplfinance:
   mplfinance 自己管理 figure,无法直接放 2x2 subplot。
-  改用 matplotlib 手画蜡烛 + hlines,代码多 ~50 行但完全可控。
+  改用 matplotlib 手画蜡烛 + plot,代码多 ~50 行但完全可控。
 
 输出: output/kline_<date>.png (~300-500 KB)
 """
@@ -81,72 +84,59 @@ def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
 
 
 def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bool = True, layer: str = "indices") -> None:
-    """在 ax 上画 5 SMA + R1/S1 (v0.6.0 P6-6 重设计)"""
+    """在 ax 上画 5 SMA (滑动平均曲线) + R1/S1 (v0.6.1 P6-6 bug fix)
+
+    v0.6.0 错误: 用 ax.hlines 画 SMA → 画成 1 根水平线,不是真滑动平均
+    v0.6.1 修: 用 ax.plot 画 close.rolling(w).mean() 时间序列
+
+    R1/S1 仍是 hlines (pivot 是不变的常数,不是时间序列)
+    """
     t = get_thresholds(symbol, layer=layer)
 
-    # 实际 SMA 值在 t["smas"],vs_sma 只有百分比
-    s200 = t["smas"]["sma_200"]
-    s150 = t["smas"].get("sma_150")
-    s100 = t["smas"].get("sma_100")
-    s50 = t["smas"].get("sma_50")
-    s20 = t["smas"].get("sma_20")
-    r1 = t["pivots"]["r1"]
-    s1 = t["pivots"]["s1"]
-
+    smas_last = t["smas"]  # {sma_20: float, sma_50: float, ...} 最近值
     first_date = df.index[0]
     last_date = df.index[-1]
 
-    # 200 SMA — 红实线粗 (主,user 强调醒目)
-    ax.hlines(
-        s200, first_date, last_date,
-        colors=COLOR_SMA200, linestyles="-", linewidth=2.4,
-        label=f"200 SMA ${s200:.2f}",
-        zorder=5,
-    )
-    # 150 SMA — 青实线
-    if s150 is not None and not pd.isna(s150):
-        ax.hlines(
-            s150, first_date, last_date,
-            colors=COLOR_SMA150, linestyles="-", linewidth=1.6,
-            label=f"150 SMA ${s150:.2f}",
-            alpha=0.85,
+    # SMA 样式表: (color, linewidth, linestyle, alpha, zorder)
+    sma_styles = [
+        ("sma_200", COLOR_SMA200, 2.4, "-", 1.0, 5),  # 红粗实线,最上层
+        ("sma_150", COLOR_SMA150, 1.6, "-", 0.85, 3),
+        ("sma_100", COLOR_SMA100, 1.6, "-", 0.85, 3),
+        ("sma_50",  COLOR_SMA50,  1.2, ":", 0.7, 2),
+        ("sma_20",  COLOR_SMA20,  0.8, ":", 0.5, 1),
+    ]
+
+    close = df["close"]
+    for key, color, lw, ls, alpha, zorder in sma_styles:
+        last_val = smas_last.get(key)
+        if last_val is None or pd.isna(last_val):
+            continue
+        # 跳过 50 SMA 如果 show_50sma=False
+        if key == "sma_50" and not show_50sma:
+            continue
+        w = int(key.split("_")[1])
+        sma_series = close.rolling(w).mean()
+        # 滑动平均曲线 — 每天的均值,不是单值
+        ax.plot(
+            df.index, sma_series,
+            color=color, linewidth=lw, linestyle=ls, alpha=alpha,
+            label=f"{w} SMA ${last_val:.2f}",
+            zorder=zorder,
         )
-    # 100 SMA — 紫实线
-    if s100 is not None and not pd.isna(s100):
-        ax.hlines(
-            s100, first_date, last_date,
-            colors=COLOR_SMA100, linestyles="-", linewidth=1.6,
-            label=f"100 SMA ${s100:.2f}",
-            alpha=0.85,
-        )
-    # R1 — 红虚线
+
+    # R1 / S1 仍是 hlines (pivot 是常数)
+    r1 = t["pivots"]["r1"]
+    s1 = t["pivots"]["s1"]
     ax.hlines(
         r1, first_date, last_date,
         colors=COLOR_R1, linestyles="--", linewidth=1.2,
         label=f"R1 ${r1:.2f}",
     )
-    # S1 — 绿虚线
     ax.hlines(
         s1, first_date, last_date,
         colors=COLOR_S1, linestyles="--", linewidth=1.2,
         label=f"S1 ${s1:.2f}",
     )
-    # 50 SMA — 橙点线 (可选)
-    if show_50sma and s50 is not None and not pd.isna(s50):
-        ax.hlines(
-            s50, first_date, last_date,
-            colors=COLOR_SMA50, linestyles=":", linewidth=1.2,
-            label=f"50 SMA ${s50:.2f}",
-            alpha=0.7,
-        )
-    # 20 SMA — 灰细线 (最弱)
-    if s20 is not None and not pd.isna(s20):
-        ax.hlines(
-            s20, first_date, last_date,
-            colors=COLOR_SMA20, linestyles=":", linewidth=0.8,
-            label=f"20 SMA ${s20:.2f}",
-            alpha=0.5,
-        )
 
 
 def plot_single(
