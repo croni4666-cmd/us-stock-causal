@@ -12,6 +12,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
 - v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
 
+## [0.6.0] - 2026-07-14
+
+### Added (P6-6: 5 SMA 全套 + 200 红色 + 高清晰度 K 线图)
+- **`src/thresholds.py`**: `compute_smas` 默认 windows `[20, 50, 200]` → `[20, 50, 100, 150, 200]`,100/150 是机构 Gann 周期线 (季度/半年),`vs_sma` 自动扩展
+- **`src/kline.py`**: 5 SMA 颜色编码 — 200 红粗实线 (核心,user 强调醒目) / 100 紫实线 / 150 青实线 / 50 橙点线 / 20 灰细线,legend 简化
+- **`examples/gold_chart.py`**: DPI 140 → 200,figsize 14×6 → 16×8,output 路径锁死项目根,标题 5 SMA 全显示
+- **`tests/test_smoke.py`**: 加 3 个新断言 (5 windows / 5 colors / layer param / gold K-line 端到端)
+- **`ROADMAP.md`**: 加 P6-6 (Phase 6 第 6 个 item, Phase 0-5 之后第一个真功能)
+
+### Fixed (3 个真 bug, v0.5.2 smoke test 漏掉)
+- `kline._draw_thresholds` / `plot_single` 没把 `layer` 传给 `get_thresholds`,非指数类(黄金/商品/宏观)画 K 线直接 FileNotFoundError。User 测黄金图触发
+- matplotlib mathtext 把 `$725.51` 里的 `$` 当 LaTeX 解析,某些版本崩。改用 `USD 725.51`
+- example script 相对路径 `output/...`,CWD 在 workspace 时文件落错地方。改 `Path(__file__).parent.parent` 锁死
+- `tests/test_smoke.py` `test_version_match` 用相对路径 `VERSION`,CWD 不在项目根时挂。改绝对路径
+
+### Changed
+- `VERSION` 0.5.2 → 0.6.0
+- `ROADMAP.md` update log 追加 v0.6.0 条目
+
 ## [0.5.2] - 2026-07-13
 
 ### Fixed (诚实测试发现 1 个真实 bug + 1 个 SKILL.md 错)
