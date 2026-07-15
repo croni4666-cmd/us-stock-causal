@@ -64,6 +64,56 @@ COLOR_SMA20 = "#9e9e9e"  # 20 SMA 灰 (细线) — 短期
 COLOR_R1 = "#d32f2f"     # 阻力红虚线
 COLOR_S1 = "#388e3c"     # 支撑绿虚线
 
+# v0.6.4 (P6-1) 事件线颜色: FOMC 红 / CPI 蓝 / NFP 绿 / 其他灰
+COLOR_EVENT_FOMC = "#d32f2f"   # FOMC 红 (跟 200 SMA 同色, 区分靠线型)
+COLOR_EVENT_CPI = "#1976d2"    # CPI 蓝
+COLOR_EVENT_NFP = "#388e3c"    # NFP 绿 (跟 S1 同色)
+COLOR_EVENT_OTHER = "#757575"  # PCE/PPI 等灰
+
+EVENT_COLOR_MAP = {
+    "FOMC": COLOR_EVENT_FOMC,
+    "CPI": COLOR_EVENT_CPI,
+    "NFP": COLOR_EVENT_NFP,
+}
+
+
+def _draw_events(ax: plt.Axes, df: pd.DataFrame, events: Optional[list] = None) -> int:
+    """v0.6.4 (P6-1): 在 K 线上叠加 CPI/FOMC 事件垂直线
+
+    events: list[MacroEvent] from src.events
+    如果 events=None, 自动 load_calendar() 过滤
+    返回画的线条数 (测试用)
+    """
+    from src.events import load_calendar, MacroEvent  # 避免循环 import
+    if events is None:
+        events = load_calendar()
+    if not events:
+        return 0
+
+    first_date = df.index[0]
+    last_date = df.index[-1]
+    n_drawn = 0
+    seen_kinds: set[str] = set()  # 避免图例重复
+    for ev in events:
+        # 事件日期转 Timestamp, 检查是否在图表范围内
+        ev_ts = pd.Timestamp(ev.date)
+        if ev_ts < first_date or ev_ts > last_date:
+            continue
+        color = EVENT_COLOR_MAP.get(ev.kind, COLOR_EVENT_OTHER)
+        # v0.6.4: 区分 FOMC (实线, 最关键) vs CPI (虚线) vs NFP (点线)
+        linestyle_map = {"FOMC": "-", "CPI": "--", "NFP": ":"}
+        ls = linestyle_map.get(ev.kind, ":")
+        # 用 axvline 返回的 Line2D 加到 legend (只第一次画该 kind 时)
+        line_label = f"{ev.kind} event" if ev.kind not in seen_kinds else None
+        seen_kinds.add(ev.kind)
+        ax.axvline(
+            ev_ts, color=color, linestyle=ls, linewidth=1.2, alpha=0.7,
+            zorder=2,  # 在 grid 之上, 蜡烛之下
+            label=line_label,
+        )
+        n_drawn += 1
+    return n_drawn
+
 
 def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
     """在 ax 上画 OHLC 蜡烛"""
@@ -174,6 +224,8 @@ def plot_single(
     _draw_candles(ax, df)
     # 阈值线
     _draw_thresholds(ax, df, symbol, show_50sma=show_50sma, layer=layer)
+    # v0.6.4 (P6-1) 事件线: FOMC / CPI / NFP 垂直线
+    _draw_events(ax, df)
 
     # 标题 — 5 SMA 全显示 (v0.6.0) + 实际 lookback period (v0.6.3 fix)
     t = get_thresholds(symbol, layer=layer)
