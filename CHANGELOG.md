@@ -12,6 +12,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
 - v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
 
+## [0.6.3] - 2026-07-15
+
+### Fixed (跑 4 指数时抓到 3 个真问题)
+
+User 让跑下指数, 跑 `plot_4_indices(lookback_days=500)` 出来看到 3 个问题:
+
+1. **`matplotlib 3.11.0 + loc="left"` 让 title 消失** (v0.6.0 起的隐藏 bug)
+   - 复现: `ax.set_title("...", loc="left")` 立即 `ax.get_title()` 返回 ''
+   - 原因: matplotlib 3.11 改了 loc 行为, "left"/"right" 在某些情况下 title 不显示
+   - fix: 改 `loc="center"` (默认) — `compact_title` 4-subplot 模式 + 全显示模式都用 center
+   - 验证: 跑 indices_chart.py 后 DIA/QQQ/RSP/QQQE 4 个 subplot 标题都正常显示
+
+2. **period 字符串 500d 算成 1y** (v0.6.0/v0.6.1/v0.6.2 一直都有)
+   - bug: `lookback_days // 252` 对 500d 算成 1, 不是 2 (整除向下)
+   - fix: 改 `round(lookback_days / 252)` — 500d→2y, 252d→1y, 126d→6mo
+   - 验证: `test_kline_period_string_500d_2y` 断言 "2y" 出现 + "1y" 不出现
+
+3. **4-subplot 标题太长被截** ("DIA 1y | close USD 525.78 SMA20 +1.0% ... | 52w 93.0%" 在 subplot 边界外被截)
+   - fix: `compact_title` 模式 — 4-subplot 时只显 `close + SMA200 + 52w`, 不再列 5 SMA
+   - 单 subplot (gold_chart.py) 保留全显示模式, 信息密度高
+
+### Added
+- **`plot_single(compact_title=False)`** 新参数, plot_4_indices 默认 True
+- **`examples/indices_chart.py`** 跑 4 指数 2y K 线, 输出 PNG + SVG
+- **`tests/test_smoke.py`** +2 断言 (20/20 pass):
+  - `test_kline_compact_title` — 验证 `compact_title` 参数存在
+  - `test_kline_period_string_500d_2y` — 验证 period 字符串计算正确
+
+### Fixed (配套)
+- `examples/gold_chart.py` + `examples/indices_chart.py` 注释中 `src.xxx` 含 "xxx" 触发 `test_no_todo_or_stubs` 误报 → 改 `src 子包`
+
+### Changed
+- `VERSION` 0.6.2 → 0.6.3
+- 4-subplot 标题格式: `{symbol} {period} | close USD XXX | SMA20 X% | SMA50 X% | ... | 52w X%` (会截)
+  → `{symbol} {period} | USD XXX | SMA200 X% | 52w X%` (紧凑, 全显)
+- 单 subplot 标题保留全 5 SMA (信息密度高)
+
 ## [0.6.2] - 2026-07-15
 
 ### Added (P6-2 prep: 图表清晰度提升 — 矢量 + 高 DPI + 抗锯齿)

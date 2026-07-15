@@ -255,6 +255,31 @@ def test_kline_antialiasing_enabled():
     assert mpl.rcParams['text.antialiased'] is True, "text.antialiased not True"
 
 
+def test_kline_compact_title():
+    """v0.6.3 fix: plot_single 支持 compact_title, 4-subplot 用防标题挤"""
+    import inspect
+    from src.kline import plot_single
+    sig = inspect.signature(plot_single)
+    assert 'compact_title' in sig.parameters, "plot_single missing compact_title param (v0.6.3)"
+    # default False (backward compat)
+    assert sig.parameters['compact_title'].default is False
+
+
+def test_kline_period_string_500d_2y():
+    """v0.6.3 fix: lookback 500d → '2y' (v0.6.2 bug: // 算出来 1y)"""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from src.kline import plot_single
+    fig, ax = plt.subplots(1, 1, figsize=(8, 5))
+    plot_single('DIA', ax, layer='indices', lookback_days=500)
+    title = ax.get_title()
+    # 必须显示 "2y", 不能是 "1y"
+    assert " 2y " in title or "2y  " in title, f"500d should show 2y, got: {title}"
+    assert "1y" not in title, f"500d should NOT show 1y, got: {title}"
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     # Run as script (not pytest)
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

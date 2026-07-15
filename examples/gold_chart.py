@@ -22,7 +22,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-# 把项目根加进 path, 避免 import src.xxx 找不到
+# 把项目根加进 path, 避免 import src 子包找不到
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.kline import plot_single, savefig_multi_format, DEFAULT_DPI
