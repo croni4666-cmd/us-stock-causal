@@ -8,9 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线在 K 线上)
+- v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线在 K 线上) — **P6-1 done in v0.6.4**
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
 - v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
+
+## [0.6.4] - 2026-07-15
+
+### Added (P6-1 done: K 线上叠加 CPI/FOMC 事件线)
+
+跑 report 验证 pipeline 数据真实性后, 顺手做 P6-1 事件标记叠加。
+
+- **`src/kline.py`**:
+  - 新增 `_draw_events(ax, df, events=None)` 函数
+    - 事件日期过滤: 只画 [first_date, last_date] 内的
+    - 颜色编码: FOMC 红 / CPI 蓝 / NFP 绿 / 其他 (PCE/PPI) 灰
+    - 线型区分: FOMC 实线 / CPI 虚线 / NFP 点线 (3 种主事件一目了然)
+    - zorder=2 (在 grid 之上, 蜡烛之下)
+  - 颜色常量 + 映射表: `COLOR_EVENT_FOMC` / `COLOR_EVENT_CPI` / `COLOR_EVENT_NFP` / `COLOR_EVENT_OTHER` + `EVENT_COLOR_MAP`
+  - `plot_single` 自动调用 `_draw_events`, `gold_chart.py` + `indices_chart.py` 直接受益
+- **`tests/test_smoke.py`** +2 断言 (22/22 pass):
+  - `test_kline_event_lines_drawn` — 验证 `axvline` 实际画出 (>= 1)
+  - `test_kline_event_color_map_defined` — 验证 4 颜色定义 + 3 事件映射 + 颜色不同
+- **`ROADMAP.md`** P6-1 status: `proposed` → `done`
+
+### 设计决策
+- **不画 inline 文字标签**: 试过 `ax.text` 在事件线顶端写字, 但跟 subplot 标题挤/重叠。
+  改用 `axvline(label="X event")` 让 legend 自动收 4 种事件图例, 干净很多。
+- **3 种主事件 + 1 个 "其他" 兜底**: 未来加 PPI/PCE/Jackson Hole 等不用改代码
+- **zorder 考虑**: grid (1) → 蜡烛 (默认 2) → 事件线 (2) → SMA (3-5) — 蜡烛盖住事件线主体, 事件线点缀
+
+### 报告 A 跑通 (v0.6.3 commit 时跑 examples/report.py)
+- 5 段 × 4 指数, 1.7s, ~2400 字
+- 顶部情绪: VIX 16.40 (+9.12%) | 10Y 4.57% (+3bp) | DXY 100.97 (+0.03%)
+- 4 指数 1 日: DIA +0.30% | QQQ +0.31% | RSP +0.37% | QQQE +0.03%
+- 5 日累计: DIA -0.40% | QQQ +1.81% | RSP -0.28% | QQQE +0.38%
+- 残差已知 anomaly: DIA -1.05% / QQQE -0.71% / RSP -0.44% (2026-Q2 weights 近似, P7-1 真修)
+
+### Changed
+- `VERSION` 0.6.3 → 0.6.4
 
 ## [0.6.3] - 2026-07-15
 
