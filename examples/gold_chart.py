@@ -1,17 +1,18 @@
 """
-examples/gold_chart.py - 黄金 (GC=F) 1y K 线图 (单标的深度看图演示)
+examples/gold_chart.py - 黄金 (GC=F) 2y K 线图 (单标的深度看图演示, v0.6.2 quality boost)
 
 用途:
   - 测试 commodities_futures layer 的 K 线渲染
-  - v0.6.0 (P6-6) 5 SMA 全套 + 200 SMA 红色 + 高清晰度 (DPI 200)
-  - user 黄金深度分析
+  - v0.6.0 (P6-6) 5 SMA 全套 + 200 SMA 红色
+  - v0.6.1 fix: SMA 是真滑动平均 (ax.plot), 不是 hlines
+  - v0.6.2 quality: PNG@300dpi + SVG (矢量) + anti-aliasing
 
 设计:
   - figsize 16x8 (大图清晰)
-  - DPI 200 (高清晰度)
+  - lookback 500 (2y) 让 SMA200 滑动平均有足够数据
+  - 双输出: PNG (高 DPI 兼容) + SVG (矢量清晰)
   - 5 SMA 全显示 + R1/S1 (kline._draw_thresholds 自动画)
-  - 200 SMA 红色粗实线 (核心,user 强调醒目)
-  - 标题显示全部 5 个 SMA 的 vs SMA%
+  - 200 SMA 红色粗实线 (核心)
 """
 from __future__ import annotations
 
@@ -24,22 +25,20 @@ import pandas as pd
 # 把项目根加进 path, 避免 import src.xxx 找不到
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.kline import plot_single
+from src.kline import plot_single, savefig_multi_format, DEFAULT_DPI
 from src.thresholds import get_thresholds
 
 
 def main() -> None:
     symbol = "GC=F"
     layer = "commodities_futures"
-    lookback_days = 252  # ~1y 交易日
+    lookback_days = 500  # 2y (SMA200 滑动平均需要数据)
 
-    # 单图 — 16x8 + DPI 200 (v0.6.0 清晰度提升)
+    # 单图
     fig, ax = plt.subplots(1, 1, figsize=(16, 8))
-    # v0.6.1: lookback 252 (1y) → 500 (2y) 让 SMA200 滑动平均有足够数据形成
-    # 1y 数据只够 SMA200 算 52 天,曲线太短
-    plot_single(symbol, ax, layer=layer, lookback_days=500)
+    plot_single(symbol, ax, layer=layer, lookback_days=lookback_days)
 
-    # 标题 — 5 SMA 全显示 (v0.6.1 改 "2y" 因为 lookback=500)
+    # 标题 — 5 SMA 全显示
     t = get_thresholds(symbol, layer=layer)
     smas = t["smas"]
     vs = t["vs_sma"]
@@ -56,11 +55,16 @@ def main() -> None:
 
     # 写到项目根 output/ (不是 CWD),避免被 workspace 截走
     project_root = Path(__file__).resolve().parent.parent
-    output_path = project_root / "output" / "gold_1y_2026-07-13.png"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_path, dpi=200, bbox_inches="tight", facecolor="white")
+    output_base = project_root / "output" / "gold_1y_2026-07-13"
+    written = savefig_multi_format(
+        fig, output_base,
+        formats=("png", "svg"),  # 双输出
+        png_dpi=DEFAULT_DPI,     # 300 dpi (v0.6.2 quality boost)
+    )
     plt.close(fig)
-    print(f"[gold_chart] saved: {output_path}")
+    print(f"[gold_chart] saved {len(written)} formats:")
+    for p in written:
+        print(f"  - {p}")
     print(f"[gold_chart] last close: USD {t['last_close']:.2f}")
     print(f"[gold_chart] 52w range: {t['range_52w']['low']:.2f} - {t['range_52w']['high']:.2f}  (now at {pos52w}%)")
     print(f"[gold_chart] SMAs: {smas}")
