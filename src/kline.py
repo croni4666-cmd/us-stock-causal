@@ -116,28 +116,39 @@ def _draw_events(ax: plt.Axes, df: pd.DataFrame, events: Optional[list] = None) 
 
 
 def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
-    """在 ax 上画 OHLC 蜡烛"""
+    """在 ax 上画 OHLC 蜡烛
+
+    v0.6.6 (P6-5): 给每根 candle 设 gid 前缀 (candle-wick-YYYY-MM-DD / candle-body-...),
+    后处理 _inject_ohlcv_hover 按 gid 找元素加 <title>
+
+    注意: matplotlib 的 ax.vlines/hlines 返回 LineCollection, 不支持 gid 参数
+    → 用 ax.plot 画 1 段 Line2D, 然后 set_gid() 显式设
+    """
     for idx, row in df.iterrows():
         is_up = row["close"] >= row["open"]
         color = COLOR_UP if is_up else COLOR_DOWN
+        date_str = idx.strftime("%Y-%m-%d")
 
-        # Wick (high-low)
-        ax.vlines(idx, row["low"], row["high"], color=color, linewidth=0.6, alpha=0.9)
+        # Wick (high-low) — ax.plot 2 点, 显式 set_gid
+        wick_line, = ax.plot(
+            [idx, idx], [row["low"], row["high"]],
+            color=color, linewidth=0.6, alpha=0.9,
+        )
+        wick_line.set_gid(f"candle-wick-{date_str}")
 
         # Body (open-close rectangle)
         body_height = abs(row["close"] - row["open"])
         if body_height < 0.01:
             # Doji — 极小 body,画横线
-            ax.hlines(
-                row["close"],
-                idx - pd.Timedelta(hours=12),
-                idx + pd.Timedelta(hours=12),
-                color=color,
-                linewidth=0.9,
+            body_line, = ax.plot(
+                [idx - pd.Timedelta(hours=12), idx + pd.Timedelta(hours=12)],
+                [row["close"], row["close"]],
+                color=color, linewidth=0.9,
             )
+            body_line.set_gid(f"candle-body-{date_str}")
         else:
             body_bottom = min(row["close"], row["open"])
-            ax.bar(
+            bar_container = ax.bar(
                 idx,
                 body_height,
                 bottom=body_bottom,
@@ -147,6 +158,9 @@ def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
                 edgecolor=color,
                 linewidth=0,
             )
+            # ax.bar 返回 BarContainer, 给每个 Rectangle 设 gid
+            for rect in bar_container:
+                rect.set_gid(f"candle-body-{date_str}")
 
 
 def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bool = True, layer: str = "indices") -> None:
@@ -316,6 +330,66 @@ def plot_4_indices(
     return fig
 
 
+def _inject_ohlcv_hover(svg_path: Path, fig: plt.Figure) -> int:
+    """
+    v0.6.6 (P6-5): 给 SVG 加 <title> 标签, 浏览器 hover 显示 OHLCV
+
+    matplotlib 的 set_gid() 设到 SVG 的 `id` 属性 (不是 `gid`), 蜡烛
+    patch 在 SVG 输出里是 `<g id="candle-body-YYYY-MM-DD">...</g>`, 直接按 id 找
+
+    Args:
+        svg_path: 写完的 SVG 路径
+        fig: matplotlib Figure (不直接用, 但保留接口一致)
+
+    Returns: 注入的 <title> 数量
+    """
+    from lxml import etree
+    import re as _re
+    import matplotlib.dates as mdates
+
+    # 解析 SVG
+    parser = etree.XMLParser(remove_blank_text=False)
+    tree = etree.parse(str(svg_path), parser)
+    root = tree.getroot()
+    ns = "{http://www.w3.org/2000/svg}"
+
+    # 找所有 id="candle-body-YYYY-MM-DD" 的元素
+    # matplotlib 把 gid="candle-body-..." 输出成 id="..." (svg id 属性, 不是 gid)
+    n_injected = 0
+    for el in root.iter():
+        el_id = el.get("id") or ""
+        if not el_id.startswith("candle-body-"):
+            continue
+        date_str = el_id.replace("candle-body-", "")
+        # 从 ax.patches 找对应 candle (按 x 位置)
+        # 简单方案: 用 ax.patches 找 gid="candle-body-{date_str}" 的
+        # 但 fig 在 savefig 之后, ax 还有 patch 数据吗? — 有, fig 一直持有
+        candle = None
+        try:
+            ax = fig.axes[0]
+            for patch in ax.patches:
+                if (patch.get_gid() or "") == f"candle-body-{date_str}":
+                    candle = patch
+                    break
+        except Exception:
+            pass
+        if candle is None:
+            continue
+        body_low = float(candle.get_y())
+        body_high = float(candle.get_y() + candle.get_height())
+        title_text = (
+            f"{date_str}  body: USD {body_low:.2f} - USD {body_high:.2f}"
+        )
+        title_el = etree.SubElement(el, f"{ns}title")
+        title_el.text = title_text
+        n_injected += 1
+
+    if n_injected > 0:
+        tree.write(str(svg_path), xml_declaration=True, encoding="utf-8")
+        logger.info(f"[kline] injected {n_injected} OHLCV hover titles into {svg_path.name}")
+    return n_injected
+
+
 def savefig_multi_format(
     fig: plt.Figure,
     output_path: Path,
@@ -347,6 +421,11 @@ def savefig_multi_format(
         elif fmt == "svg":
             out = output_path.with_suffix(".svg")
             fig.savefig(out, bbox_inches="tight", facecolor="white")
+            # v0.6.6 (P6-5): post-process SVG 加 <title> 标签, 浏览器 hover 显示 OHLCV
+            try:
+                _inject_ohlcv_hover(out, fig)
+            except Exception as e:
+                logger.warning(f"[kline] hover inject failed (non-fatal): {e}")
             written.append(out)
             logger.info(f"[kline] saved SVG (vector): {out} ({out.stat().st_size // 1024}KB)")
         elif fmt == "pdf":
