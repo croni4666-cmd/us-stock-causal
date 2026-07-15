@@ -322,6 +322,35 @@ def test_kline_event_color_map_defined():
     assert EVENT_COLOR_MAP["CPI"] != EVENT_COLOR_MAP["NFP"]
 
 
+def test_report_html_renders():
+    """v0.6.5 (P6-2): 5 段制报告 + K 线 SVG 合并为 1 HTML"""
+    from src.report import render_full_report
+    from src.report_html import render_html_report
+    import tempfile
+    from pathlib import Path
+    md = render_full_report(["DIA", "QQQ"])
+    # 测试 1: 无 SVG 也能渲染 (report-only 模式)
+    html = render_html_report(md, kline_svg_paths=None)
+    assert html.startswith("<!DOCTYPE html>"), "HTML 缺 DOCTYPE"
+    assert "DIA" in html and "QQQ" in html, "HTML 缺 5 段内容"
+    assert "kline-section" not in html, "无 SVG 时不该有 kline-section"
+    # 测试 2: 有 SVG 时 inline 嵌入
+    # 用一个最小 fake SVG 测试
+    fake_svg = Path(tempfile.gettempdir()) / "fake_test.svg"
+    fake_svg.write_text(
+        '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect/></svg>',
+        encoding="utf-8",
+    )
+    try:
+        html2 = render_html_report(md, kline_svg_paths=[fake_svg])
+        assert "kline-section" in html2, "有 SVG 时该有 kline-section"
+        assert "fake_test" in html2, "SVG 文件名该出现在 HTML"
+        assert "<svg" in html2, "SVG 内容该 inline 嵌入 (不是 <img>)"
+        assert "<?xml" not in html2, "inline SVG 该去 XML decl"
+    finally:
+        fake_svg.unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
     # Run as script (not pytest)
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
