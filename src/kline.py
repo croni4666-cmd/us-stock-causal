@@ -161,8 +161,12 @@ def plot_single(
     layer: str = "indices",
     lookback_days: int = 252,
     show_50sma: bool = True,
+    compact_title: bool = False,
 ) -> plt.Axes:
-    """Plot single symbol K-line on given axes"""
+    """Plot single symbol K-line on given axes
+
+    compact_title (v0.6.3): 4-subplot 时用紧凑模式, 只显示 SMA200 + 52w
+    """
     df = load_prices(symbol, layer)
     df = df.iloc[-lookback_days:].copy()
 
@@ -171,21 +175,39 @@ def plot_single(
     # 阈值线
     _draw_thresholds(ax, df, symbol, show_50sma=show_50sma, layer=layer)
 
-    # 标题 — 5 SMA 全显示 (v0.6.0)
+    # 标题 — 5 SMA 全显示 (v0.6.0) + 实际 lookback period (v0.6.3 fix)
     t = get_thresholds(symbol, layer=layer)
     smas = t["smas"]
     vs = t["vs_sma"]
     pos52w = t["range_52w"]["position_pct"]
-    # 拼标题,所有可用的 SMA 都显示 vs SMA%
-    parts = [f"close USD {t['last_close']:.2f}"]
-    for w in [20, 50, 100, 150, 200]:
-        v = smas.get(f"sma_{w}")
-        p = vs.get(f"sma_{w}", {}).get("pct")
-        if v is not None and p is not None and not pd.isna(v):
-            parts.append(f"SMA{w} {p:+.1f}%")
-    parts.append(f"52w {pos52w}%")
-    title = f"{symbol}  1y  |  " + "  ".join(parts)
-    ax.set_title(title, fontsize=10, fontweight="bold", loc="left", pad=8)
+    # period 字符串: 252d → 1y, 500d → 2y, 126d → 6m (v0.6.3 用 round 不用 //)
+    if lookback_days >= 252:
+        period = f"{round(lookback_days / 252)}y"
+    elif lookback_days >= 21:
+        period = f"{round(lookback_days / 21)}mo"
+    else:
+        period = f"{lookback_days}d"
+    # 拼标题
+    # - compact_title (4-subplot 模式): 只显示 close + SMA200 + 52w
+    # - 全显示模式 (单 subplot): close + 5 SMA + 52w
+    if compact_title:
+        s200_pct = vs.get("sma_200", {}).get("pct")
+        if s200_pct is not None and not pd.isna(s200_pct):
+            title = f"{symbol}  {period}  |  USD {t['last_close']:.2f}  |  SMA200 {s200_pct:+.1f}%  |  52w {pos52w}%"
+        else:
+            title = f"{symbol}  {period}  |  USD {t['last_close']:.2f}  |  52w {pos52w}%"
+        # v0.6.3 fix: matplotlib 3.11.0 + loc="left" 让 title 消失, 改默认 (center)
+        ax.set_title(title, fontsize=10, fontweight="bold", pad=8)
+    else:
+        parts = [f"close USD {t['last_close']:.2f}"]
+        for w in [20, 50, 100, 150, 200]:
+            v = smas.get(f"sma_{w}")
+            p = vs.get(f"sma_{w}", {}).get("pct")
+            if v is not None and p is not None and not pd.isna(v):
+                parts.append(f"SMA{w} {p:+.1f}%")
+        parts.append(f"52w {pos52w}%")
+        title = f"{symbol}  {period}  |  " + "  ".join(parts)
+        ax.set_title(title, fontsize=10, fontweight="bold", pad=8)
     ax.set_ylabel("Price (USD)", fontsize=8)
     ax.legend(loc="upper left", fontsize=7, framealpha=0.85, ncol=2)
     ax.grid(True, alpha=0.3, linestyle="-", linewidth=0.5)
@@ -220,7 +242,8 @@ def plot_4_indices(
     )
 
     for ax, sym in zip(axes.flat, symbols):
-        plot_single(sym, ax, layer=layer, lookback_days=lookback_days)
+        # v0.6.3: 4-subplot 用 compact_title (只显 SMA200 + 52w, 避免标题挤/截)
+        plot_single(sym, ax, layer=layer, lookback_days=lookback_days, compact_title=True)
 
     plt.tight_layout(rect=[0, 0, 1, 0.99])
 
