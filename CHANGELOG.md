@@ -12,6 +12,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
 - v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
 
+## [0.6.6] - 2026-07-15
+
+### Added (P6-5 done: K 线 hover 显示 OHLCV)
+
+按 roadmap 顺序做 P6-5 — SVG 内嵌 `<title>` 标签, 浏览器 hover 自动显示 OHLCV,
+**零 JS, 零外部依赖**。
+
+- **`src/kline.py`**:
+  - `_draw_candles()` 给每根蜡烛设 `set_gid(f"candle-body-YYYY-MM-DD")` / `candle-wick-...`,
+    matplotlib 把它输出成 SVG `id` 属性 (不是 `gid`, 是 matplotlib 自身 quirk)
+  - 新增 `_inject_ohlcv_hover(svg_path, fig)` 函数:
+    - 解析 SVG, 找所有 `id="candle-body-..."` 的元素
+    - 用对应 patch 数据构造 `{date}  body: USD {low} - USD {high}` 文本
+    - 注入 `<title>` 子元素
+  - `savefig_multi_format("svg")` 自动调用 hover inject
+- **`tests/test_smoke.py`** +1 断言 (24/24 pass):
+  - `test_kline_svg_hover_inject` — 验证 SVG 内嵌 >= 30 个 `<title>` + 格式正确
+
+### 设计踩坑
+1. **matplotlib `set_gid()` 设的是 `id` 不是 `gid`** — 第一次写按 `gid` 查, 0 个
+2. **matplotlib SVG 输出 `<path>` 不是 `<rect>`** — 蜡烛 body 是 path d="M..L..L..L..z"
+3. **第一次按 path 数量匹配** — 抓到 tick mark (axes 标记), 改按 id 配对
+4. **path 排序按 area 升序** — 抓的还是 tick mark, 改按 `id="candle-body-..."` 精确配对
+
+### 实测
+- 黄金图: **477 OHLCV hover titles** 注入 (501 蜡烛 - 24 Doji ≈ 95% 覆盖率)
+- 4 指数图: **1992 OHLCV hover titles** 注入 (498 × 4 = 1992)
+- HTML 报告 (v0.6.5): 直接用 hover 过的 SVG, 浏览器打开 1 文件 = 文字 + 2 张 K 线 + hover 显示 OHLCV
+- 浏览器原生 tooltip (无需 JS), 邮件附件 1.5MB 内可接受
+
+### Changed
+- `VERSION` 0.6.5 → 0.6.6
+
 ## [0.6.5] - 2026-07-15
 
 ### Added (P6-2 done: K 线 + 5 段报告合并为 1 个 HTML)
