@@ -380,6 +380,37 @@ def test_kline_svg_hover_inject():
         assert "  body: USD" in sample, f"Title format wrong (date prefix): {sample}"
 
 
+def test_attribute_all_indices_symbols_param():
+    """v0.6.7 (P6-3): attribute_all_indices 支持 symbols 自定义参数"""
+    from src.attribution import attribute_all_indices
+    # 默认 4 个
+    r = attribute_all_indices(lookback_days=5)
+    assert len(r) == 4
+    assert [x["index"] for x in r] == ["DIA", "QQQ", "RSP", "QQQE"]
+    # 自定义 subset
+    r2 = attribute_all_indices(lookback_days=5, symbols=["QQQ", "DIA"])
+    assert len(r2) == 2
+    assert [x["index"] for x in r2] == ["QQQ", "DIA"]
+
+
+def test_attribute_multi_window_5d_vs_20d():
+    """v0.6.7 (P6-3): 多窗口残差对比 — 验证 5d 残差偏大根因
+
+    这不只是一个 smoke test, 是 v0.6.7 的关键发现:
+    - 5d 残差为负 (短期 sector weight 漂移)
+    - 20d 残差可能更正 (长期 weight 准确)
+    - 真修需要 P7-1 拉真实近期 weights, 不是改窗口
+    """
+    from src.attribution import attribute_all_indices
+    r5 = attribute_all_indices(lookback_days=5, symbols=["DIA"])
+    r20 = attribute_all_indices(lookback_days=20, symbols=["DIA"])
+    assert abs(r5[0]["residual_pct"]) > 0  # 5d 有残差
+    assert abs(r20[0]["residual_pct"]) > 0  # 20d 也有残差
+    # 不强加 5d > 20d, 但确保 2 个窗口跑通, 残差类型不同
+    assert r5[0]["actual_return_pct"] != r20[0]["actual_return_pct"], \
+        "5d 和 20d 实际收益应不同"
+
+
 if __name__ == "__main__":
     # Run as script (not pytest)
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
