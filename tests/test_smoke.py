@@ -32,14 +32,30 @@ def test_module_imports():
 
 
 def test_version_match():
-    """VERSION == CHANGELOG latest"""
+    """VERSION 出现在 CHANGELOG 任意 [Unreleased] 之下的已发布版本段
+
+    v0.6.8 lesson: VERSION=0.6.8 写到 CHANGELOG 末尾, 第一个 ## [x.y.z] 仍是 v0.6.7
+    (因为 v0.6.7 段紧跟 [Unreleased]), 原来 "== first match" 逻辑会 fail
+    改为: VERSION 必须出现在 CHANGELOG 任意 [Unreleased] 之下的 ## [x.y.z] 段里
+    """
     from pathlib import Path
     import re
     project_root = Path(__file__).resolve().parent.parent
     version = (project_root / 'VERSION').read_text().strip()
     changelog = (project_root / 'CHANGELOG.md').read_text(encoding='utf-8')
-    m = re.search(r'## \[(\d+\.\d+\.\d+)\][^\n]*\n', changelog)
-    assert m and m.group(1) == version, f"VERSION={version} != CHANGELOG={m.group(1) if m else 'missing'}"
+
+    # 找 [Unreleased] 之后的所有 ## [x.y.z] 段
+    unreleased_idx = changelog.find('## [Unreleased]')
+    if unreleased_idx == -1:
+        # 没有 [Unreleased] 段, fallback 找所有段
+        version_sections = re.findall(r'## \[(\d+\.\d+\.\d+)\]', changelog)
+    else:
+        # 只看 [Unreleased] 之后
+        post = changelog[unreleased_idx:]
+        version_sections = re.findall(r'## \[(\d+\.\d+\.\d+)\]', post)
+
+    assert version in version_sections, \
+        f"VERSION {version} not in CHANGELOG released versions: {version_sections}"
 
 
 def test_5segment_structure():
@@ -409,6 +425,60 @@ def test_attribute_multi_window_5d_vs_20d():
     # 不强加 5d > 20d, 但确保 2 个窗口跑通, 残差类型不同
     assert r5[0]["actual_return_pct"] != r20[0]["actual_return_pct"], \
         "5d 和 20d 实际收益应不同"
+
+
+def test_topline_multi_horizon():
+    """v0.6.8 (P6-4): 报告顶部 1 行 → 3 行 (1d / 5d / 20d)
+
+    验证:
+    - topline() 默认 horizons=(1, 5, 20) 返回 3 行 markdown bullet list
+    - 3 行分别含 "1d" / "5d" / "20d" 标签
+    - 3 行都含 VIX / 10Y / DXY + DIA / QQQ / RSP / QQQE
+    - topline(horizons=(1,)) 走单行模式 (向后兼容 v0.4.1)
+    """
+    from src.macro import topline, macro_snapshot, indices_1line
+
+    # 默认多行 (1d/5d/20d)
+    md = topline()
+    # 拆行, 找 3 个 bullet
+    bullet_lines = [l for l in md.split("\n") if l.startswith("- **")]
+    assert len(bullet_lines) == 3, f"应有 3 个 bullet 行, 实际 {len(bullet_lines)}: {bullet_lines}"
+    # 3 行分别含 1d/5d/20d 标签
+    expected_h_labels = ["1d", "5d", "20d"]
+    for line, lbl in zip(bullet_lines, expected_h_labels):
+        assert f"**{lbl}**" in line, f"bullet 行缺 **{lbl}** 标签: {line[:80]}"
+    # 3 行都含 3 个宏观 + 4 个指数
+    for line in bullet_lines:
+        for sym in ["VIX", "10Y", "DXY", "DIA", "QQQ", "RSP", "QQQE"]:
+            assert sym in line, f"bullet 行缺 {sym}: {line[:120]}"
+    # 标题含 "1d / 5d / 20d" 累计
+    assert "1d / 5d / 20d" in md, f"topline 标题缺 1d / 5d / 20d 累计标签: {md[:200]}"
+
+    # 单行模式 (向后兼容)
+    md_single = topline(horizons=(1,))
+    assert "🌡" in md_single
+    assert "1 日" in md_single or "1d" in md_single, "单行模式该有 1 日 / 1d 标签"
+    # 单行只 1 个 DIA, 不重复 3 次
+    assert md_single.count("DIA") == 1, f"单行模式 DIA 应只 1 次, 实际 {md_single.count('DIA')}"
+
+    # 空 horizons 也走单行 (向后兼容老调用)
+    md_empty = topline(horizons=())
+    assert md_empty.count("DIA") == 1
+
+    # macro_snapshot lookback_days 参数生效
+    snap_1d = macro_snapshot(lookback_days=1)
+    snap_5d = macro_snapshot(lookback_days=5)
+    snap_20d = macro_snapshot(lookback_days=20)
+    for snap, h in [(snap_1d, 1), (snap_5d, 5), (snap_20d, 20)]:
+        assert "VIX" in snap and "10Y" in snap and "DXY" in snap
+        assert len(snap) > 30, f"macro_snapshot({h}d) 长度异常: {len(snap)}"
+
+    # indices_1line lookback_days 也支持
+    il_1d = indices_1line(lookback_days=1)
+    il_5d = indices_1line(lookback_days=5)
+    il_20d = indices_1line(lookback_days=20)
+    for il, lbl in [(il_1d, "1d"), (il_5d, "5d"), (il_20d, "20d")]:
+        assert f"({lbl})" in il, f"indices_1line lookback={lbl} 缺 ({lbl}) 标签: {il[:80]}"
 
 
 if __name__ == "__main__":
