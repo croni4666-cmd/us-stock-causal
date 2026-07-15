@@ -1,5 +1,5 @@
 """
-src/kline.py - K 线图生成 (Phase 3.1 P3-2 + Phase 6.6 P6-6 + v0.6.1 bug fix)
+src/kline.py - K 线图生成 (Phase 3.1 P3-2 + Phase 6.6 P6-6 + v0.6.1 bug fix + v0.6.2 quality boost)
 
 设计:
   - 1y daily K 线 (默认 252 交易日;gold_chart 改 500d 让 SMA200 有足够数据)
@@ -15,25 +15,41 @@ src/kline.py - K 线图生成 (Phase 3.1 P3-2 + Phase 6.6 P6-6 + v0.6.1 bug fix)
 
 v0.6.0 bug: 用 ax.hlines 画 SMA → 1 根水平线,不是真滑动平均
 v0.6.1 fix: 改用 ax.plot 画 close.rolling(w).mean() 时间序列
+v0.6.2 quality boost:
+  - DPI 200 → 300 (PNG 清晰度)
+  - 加 SVG 输出选项 (矢量,任意缩放清晰,文件小)
+  - 加 anti-aliasing rcParams (text/lines 边缘更平滑)
+  - pil_kwargs={'optimize': True} (PNG 压缩无质量损失)
 
 为什么不用 mplfinance:
   mplfinance 自己管理 figure,无法直接放 2x2 subplot。
   改用 matplotlib 手画蜡烛 + plot,代码多 ~50 行但完全可控。
 
-输出: output/kline_<date>.png (~300-500 KB)
+输出: output/kline_<date>.{png,svg} (PNG 200-400KB@300dpi, SVG 20-60KB)
 """
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from loguru import logger
 
 from src.thresholds import get_thresholds, load_prices
+
+
+# v0.6.2: 强制开 anti-aliasing (栅格化输出的边缘更平滑)
+# 默认 text.antialiased=True 但 lines.antialiased 偶发被覆盖
+mpl.rcParams['lines.antialiased'] = True
+mpl.rcParams['text.antialiased'] = True
+mpl.rcParams['patch.antialiased'] = True
+
+# v0.6.2: 默认 DPI 200 → 300 (PNG 像素密度提升 2.25x)
+DEFAULT_DPI = 300
 
 
 # 颜色 (Plotly 风格,跟 5 段报告配色一致)
@@ -211,8 +227,11 @@ def plot_4_indices(
     if output_path:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_path, dpi=120, bbox_inches="tight", facecolor="white")
-        logger.info(f"[kline] saved: {output_path}")
+        savefig_multi_format(
+            fig, output_path,
+            formats=("png", "svg"),
+            png_dpi=DEFAULT_DPI,
+        )
 
     if show:
         plt.show()
@@ -220,6 +239,50 @@ def plot_4_indices(
         plt.close(fig)
 
     return fig
+
+
+def savefig_multi_format(
+    fig: plt.Figure,
+    output_path: Path,
+    formats: tuple[str, ...] = ("png", "svg"),
+    png_dpi: int = DEFAULT_DPI,
+) -> list[Path]:
+    """
+    v0.6.2 quality boost: 多格式输出, 兼顾清晰度 (SVG) + 兼容性 (PNG)
+
+    PNG: DPI 300 + pil_kwargs={'optimize': True} 压缩
+    SVG: 矢量, 任意缩放清晰, 文件 20-60KB
+    PDF: 同矢量, 适合印刷
+
+    写多文件: chart.png + chart.svg 同 stem
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+
+    for fmt in formats:
+        if fmt == "png":
+            out = output_path.with_suffix(".png")
+            fig.savefig(
+                out, dpi=png_dpi, bbox_inches="tight", facecolor="white",
+                pil_kwargs={"optimize": True},
+            )
+            written.append(out)
+            logger.info(f"[kline] saved PNG@{png_dpi}dpi: {out} ({out.stat().st_size // 1024}KB)")
+        elif fmt == "svg":
+            out = output_path.with_suffix(".svg")
+            fig.savefig(out, bbox_inches="tight", facecolor="white")
+            written.append(out)
+            logger.info(f"[kline] saved SVG (vector): {out} ({out.stat().st_size // 1024}KB)")
+        elif fmt == "pdf":
+            out = output_path.with_suffix(".pdf")
+            fig.savefig(out, bbox_inches="tight", facecolor="white")
+            written.append(out)
+            logger.info(f"[kline] saved PDF (vector): {out} ({out.stat().st_size // 1024}KB)")
+        else:
+            logger.warning(f"[kline] unknown format: {fmt}, skipped")
+
+    return written
 
 
 if __name__ == "__main__":
