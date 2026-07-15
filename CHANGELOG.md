@@ -12,6 +12,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
 - v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
 
+## [0.6.5] - 2026-07-15
+
+### Added (P6-2 done: K 线 + 5 段报告合并为 1 个 HTML)
+
+User 让继续做 P6-2, 1 文件 = 完整体验, 邮件可发。
+
+- **`src/report_html.py`** (新文件, 4.6KB):
+  - `render_html_report(md_content, kline_svg_paths, title, css_path)` 函数
+  - Markdown → HTML 转换 (用 `markdown` lib, extensions: extra + sane_lists)
+  - SVG 文件 → inline XML 嵌入 (去 `<?xml?>` 和 `<!DOCTYPE>`)
+  - 内置响应式 CSS: max-width 1200px, 字体栈, h1/h2/h3 蓝边, kline-block 卡片样式
+  - footer 免责声明
+- **`examples/report_html.py`** (新文件, 2.4KB):
+  - 跑 `render_full_report` 拿 MD
+  - 自动找 `output/` 下最新的 `indices_2y_*.svg` + `gold_1y_*.svg` (按 mtime 倒序)
+  - 合并为 `output/report_<date>.html`
+  - 1.3s 跑完, **单文件 1.5MB** (含 2 个 SVG, 邮件附件可接受)
+- **`tests/test_smoke.py`** +1 断言 (23/23 pass):
+  - `test_report_html_renders` — 验证 HTML 结构 (DOCTYPE / 5 段内容 / SVG inline / 去 XML decl)
+
+### 设计决策
+- **SVG inline 而非 base64**: SVG 本身是 XML 文本, inline 浏览器识别最稳; base64 +33% 体积; grep 也能找内容
+- **用 `markdown` lib 而非自写 regex**: PyPI 标准 (3.10.2 已装), 5 段制结构虽然简单但 lib 处理列表/链接/转义更稳
+- **按 mtime 找最新 SVG 而非固定日期**: 数据可能 07-13 生成但今天 07-15 跑, 不能 hardcode 日期
+- **footer 免责声明硬编码**: 跟 .md 报告一致, "**不构成投资建议**"
+
+### Files
+- `output/report_2026-07-15.html` (1.5MB) — 1 文件 = 文字 + 2 张 SVG K 线
+- 邮件附件: `python examples/report_html.py` 后直接 attach, 浏览器打开看完整内容
+
+### Changed
+- `VERSION` 0.6.4 → 0.6.5
+
 ## [0.6.4] - 2026-07-15
 
 ### Added (P6-1 done: K 线上叠加 CPI/FOMC 事件线)
