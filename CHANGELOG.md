@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线在 K 线上) — **P6-1 done in v0.6.4**
+- v0.6.x: 报告顶部 1 行 → 3 行 (1d/5d/20d) — **P6-4 done in v0.6.8**
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
 - v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
 
@@ -45,6 +46,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `VERSION` 0.6.6 → 0.6.7
 - `attribute_all_indices()` 新增 `symbols` 参数 (向后兼容, 默认值不变)
+
+## [0.6.8] - 2026-07-15
+
+### Added (P6-4 done: 报告顶部 1 行 → 3 行 1d/5d/20d)
+
+按 roadmap 跑 P6-4, 顶部 1 行扩成 3 行 markdown bullet list, 1d/5d/20d 短期/中期/长期。
+
+- **`src/macro.py`** (~50 lines 改):
+  - `macro_snapshot(lookback_days=1)` 加新参数 (默认 1, 兼容老调用, 改 `iloc[-lookback_days-1]` 算 N 日累计)
+  - `topline(horizons=(1, 5, 20))` 加新参数, 默认 3 行 markdown bullet list
+  - 单行模式 (horizons=() 或 (1,)) 向后兼容 v0.4.1, 老调用零改动
+- **`tests/test_smoke.py`** +1 断言 (27/27 pass):
+  - `test_topline_multi_horizon` — 3 行 bullet 验证 (按行 split, 避免 QQQ/QQQE 子串冲突) + 单行向后兼容 + macro_snapshot/indices_1line lookback_days 参数
+
+### 设计决策
+- **不挤 5 段** (5 段默认 5d 不变), 顶部扩成 3 行 (短/中/长) — user 拿到的还是 5 段 5d 详细分析
+- **P6-3 配套**: P6-3 多窗口归因已经显示 5d 残差是 sector weight 短期漂移, 跟 1d/5d/20d 顶部对齐, 让用户 1 眼看清楚"短期变化 vs 中期趋势"
+- **用 `||` 分隔 macro 和 indices**, 不挤在一行 (比纯 `|` 更醒目, markdown 渲染对齐更稳)
+- **markdown bullet list** (`- **1d**: ...`) 比纯 1 行密 3 倍, 但视觉更清晰 (3 行可分别读, 不会一眼扫过漏信息)
+- **数据驱动 5/20d 跟 P6-3 同源**: P6-3 1d/5d/20d 残差对比 + P6-4 1d/5d/20d 顶部, 给用户一致 3 档时间窗体验
+
+### 实测 (2026-07-15)
+
+| 档 | VIX | 10Y | DXY | DIA | QQQ | RSP | QQQE |
+|----|------|------|------|------|------|------|------|
+| 1d | +9.12% | +3bp | +0.03% | +0.30% | +0.31% | +0.37% | +0.03% |
+| 5d | +5.33% | +8bp | +0.11% | -0.40% | +1.81% | -0.28% | +0.38% |
+| 20d | **-15.64%** | +3bp | +1.02% | +5.10% | +4.59% | +3.76% | +5.25% |
+
+**信息密度提升**: 3 行内同时看短期/中期/长期 VIX/4 指数:
+- **VIX 反转信号**: 1d 急升 +9% (panic 飙升) vs 20d 累计 -16% (月线降)
+- **指数 vs VIX 分歧**: 1d 4 指数 +0.03~+0.37% 小涨 + VIX 急升 = 隐藏分歧
+- **中期趋势**: 4 指数 20d 累计 +3.76~+5.25% 一致上涨, 配合 VIX 20d -16% = 中期向上趋势
+- 这 3 行说清楚的故事, 老 1 行需要 30s 反复对照才看得到
+
+### Changed
+- `VERSION` 0.6.7 → 0.6.8
+
+### Lesson (v0.6.8 hotfix): smoke test 自己也可能错
+- **触发**: 跑 smoke test, `test_version_match` fail — VERSION=0.6.8 但 CHANGELOG first `## [x.y.z]` 还是 0.6.7
+- **原因**: v0.6.8 段加在 v0.6.7 段后, [Unreleased] 之后的第一个段仍是 v0.6.7
+- **原 test 逻辑**: `re.search(r'## \[(\d+\.\d+\.\d+)\]')` first match — 错,因为 [Unreleased] 之后才是已发布版本
+- **新 test 逻辑**: VERSION 必须出现在 [Unreleased] 之下的任意 `## [x.y.z]` 段里 (找所有段,断言包含)
+- **教训**: smoke test 不是"一次写好就完", 它自身也跟代码一起演化 — 这次 VERSION 跳号 + CHANGELOG 加新段暴露了"first match"的脆弱性
+
+### Phase 6 进度: 6/6 done 🎉
+- P6-1 ✅ (v0.6.4) 事件线 | P6-2 ✅ (v0.6.5) HTML 合并 | P6-3 ✅ (v0.6.7) 多窗口归因
+- P6-4 ✅ (v0.6.8) 顶部 3 行 | P6-5 ✅ (v0.6.6) hover OHLCV | P6-6 ✅ (v0.6.0-2) 5 SMA + SVG
+
+### Next Phase
+- Phase 7: 真实 sector weights (P7-1 装 openbb-etf) — v0.6.7 P6-3 诊断的真修路径
 
 ## [0.6.6] - 2026-07-15
 
