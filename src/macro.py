@@ -1,13 +1,19 @@
 """
-src/macro.py - 宏观情绪 1 行 (Phase 3.2 P3-3)
+src/macro.py - 宏观情绪 顶部多档 (Phase 3.2 P3-3 + Phase 6 P6-4 v0.6.8)
 
 设计:
-  - 顶部 1 行: VIX / 10Y (^TNX) / DXY (DX-Y.NYB) 当日值 + 1 日变化
+  - 顶部 1 行 (v0.4.1 P3-3) → 顶部 3 行 (v0.6.8 P6-4): 1d / 5d / 20d 累计
   - 30 秒读完的整体市场情绪
   - 跟 5 段报告 + K 线组合 = 30s/5min/15min 三档阅读
 
+P6-4 升级动机:
+  - P6-3 多窗口归因 (v0.6.7) 显示 5d 残差根因是 sector weight 短期漂移
+  - 顶部也跟 5 段报告对齐: 5 段默认 5d, 顶部 1d/5d/20d 3 档
+  - 不挤 5 段 (5 段默认 5d 不变), 顶部扩成 3 行
+  - 1d 看每日, 5d 看短期, 20d 看中期趋势
+
 数据来源: src.cache / data/raw/macro/<safe_name>.parquet
-计算: 简单 % change, 不做平滑
+计算: 简单 % change / bp change, 不做平滑
 """
 from __future__ import annotations
 
@@ -52,12 +58,19 @@ def _format_value(symbol_label: str, value: float, decimals: int = 2) -> str:
     return f"{symbol_label} {value:.{decimals}f}"
 
 
-def macro_snapshot(macro_tickers: Optional[list[tuple[str, str, str]]] = None) -> str:
+def macro_snapshot(
+    macro_tickers: Optional[list[tuple[str, str, str]]] = None,
+    lookback_days: int = 1,
+) -> str:
     """
-    顶部情绪 1 行: VIX / 10Y / DXY 当日
+    顶部情绪 1 行: VIX / 10Y / DXY (v0.6.8 P6-4: 支持 lookback_days)
 
-    例子输出:
+    例子输出 (lookback_days=1):
       VIX 14.32 (-2.10%) | 10Y 4.25% (-1bp) | DXY 104.50 (+0.30%)
+
+    Args:
+        macro_tickers: 3 元组 (ticker, label, kind) 列表
+        lookback_days: 1 (1 日变化) / 5 (5 日累计) / 20 (20 日累计)
 
     Returns:
         1 行字符串 (~80 字符)
@@ -69,11 +82,12 @@ def macro_snapshot(macro_tickers: Optional[list[tuple[str, str, str]]] = None) -
     for ticker, label, kind in macro_tickers:
         try:
             df = load_prices(ticker, "macro")
-            if len(df) < 2:
+            # need at least lookback_days+1 rows to compute change
+            if len(df) < lookback_days + 1:
                 parts.append(f"{label} N/A")
                 continue
             curr = float(df["close"].iloc[-1])
-            prev = float(df["close"].iloc[-2])
+            prev = float(df["close"].iloc[-lookback_days - 1])
 
             # 收益率用 bp, 其他用 %
             if kind == "yield":
@@ -127,18 +141,53 @@ def indices_1line(symbols: Optional[list[str]] = None, lookback_days: int = 1) -
     return " | ".join(parts)
 
 
-def topline(macro: Optional[str] = None, indices: Optional[str] = None) -> str:
+def topline(
+    macro: Optional[str] = None,
+    indices: Optional[str] = None,
+    horizons: tuple[int, ...] = (1, 5, 20),
+) -> str:
     """
-    顶部 1 行: 宏观情绪 + 4 指数 1 日
+    顶部 1 行 → 顶部 N 行 (Phase 6 P6-4, v0.6.8)
+
+    短期/中期/长期 1 眼看全。
+
+    例子输出 (horizons=(1, 5, 20) 默认):
+      **🌡️ 顶部情绪** (1d / 5d / 20d 累计, 短期/中期/长期):
+      - **1d**: VIX 16.40 (+9.12%) | 10Y 4.57% (+3bp) | DXY 100.97 (+0.03%)  ||  DIA +0.30% | QQQ +0.31% | RSP +0.37% | QQQE +0.03%
+      - **5d**: VIX 16.40 (-3.20%) | 10Y 4.57% (-2bp) | DXY 100.97 (-0.50%)  ||  DIA -0.40% | QQQ +1.81% | RSP -0.28% | QQQE +0.38%
+      - **20d**: VIX 16.40 (+2.10%) | 10Y 4.57% (-5bp) | DXY 100.97 (+1.20%)  ||  DIA +1.50% | QQQ +4.20% | RSP +2.10% | QQQE +3.30%
+
+    Args:
+        macro: 预生成 macro 字符串 (单行模式生效, 多行模式忽略 — 必须按 horizon 重算)
+        indices: 预生成 indices 字符串 (单行模式生效, 多行模式忽略)
+        horizons: 时间窗元组, 默认 (1, 5, 20) 短期/中期/长期
+                  传 () 或 (1,) 走单行模式 (向后兼容 v0.4.1)
 
     Returns:
-        多行字符串 (宏观 1 行 + 指数 1 行)
+        单行 (旧): `**🌡️ 顶部情绪**: ... \n\n**📈 4 指数 1 日**: ...`
+        多行 (新, 默认): markdown bullet list 3 行
+
+    P6-4 设计动机:
+      - P6-3 多窗口归因已经显示 5d 残差根因是 sector weight 短期漂移, 不是窗口问题
+      - 顶部跟 5 段报告对齐: 5 段默认 5d, 顶部 1d/5d/20d 3 档, 让用户 1 眼看短期/中期/长期
+      - 不挤 5 段 (5 段默认 5d 不变), 顶部扩成 3 行
     """
-    if macro is None:
-        macro = macro_snapshot()
-    if indices is None:
-        indices = indices_1line()
-    return f"**🌡️ 顶部情绪**: {macro}\n\n**📈 4 指数 1 日**: {indices}\n"
+    if not horizons or len(horizons) <= 1:
+        # 单行模式 (向后兼容)
+        h = horizons[0] if horizons else 1
+        if macro is None:
+            macro = macro_snapshot(lookback_days=h)
+        if indices is None:
+            indices = indices_1line(lookback_days=h)
+        return f"**🌡️ 顶部情绪**: {macro}\n\n**📈 4 指数 {h} 日**: {indices}\n"
+
+    # 多行模式 (P6-4 v0.6.8 新)
+    lines = [f"**🌡️ 顶部情绪** ({' / '.join(f'{h}d' for h in horizons)} 累计, 短期/中期/长期):"]
+    for h in horizons:
+        macro_str = macro_snapshot(lookback_days=h)
+        indices_str = indices_1line(lookback_days=h)
+        lines.append(f"- **{h}d**: {macro_str}  ||  {indices_str}")
+    return "\n".join(lines) + "\n"
 
 
 if __name__ == "__main__":
