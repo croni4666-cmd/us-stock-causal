@@ -12,6 +12,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
 - v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
 
+## [0.6.2] - 2026-07-15
+
+### Added (P6-2 prep: 图表清晰度提升 — 矢量 + 高 DPI + 抗锯齿)
+
+User 反馈 v0.6.0/v0.6.1 K 线图"还是有点糊", 跑 GitHub + 论坛 5 层尽调, 结论: **栅格化 PNG 边际收益递减, 矢量 (SVG) 才是无解的清晰度提升**。实施 3 个升级:
+
+- **`src/kline.py`**:
+  - 新增 `savefig_multi_format(fig, output_path, formats=("png", "svg"), png_dpi=300)` — 一次保存多格式
+    - PNG: DPI 300 + `pil_kwargs={'optimize': True}` (压缩无质量损失)
+    - SVG: 矢量, 任意缩放清晰, 适合 Inkscape 编辑 / 邮件嵌入
+    - PDF: 矢量, 适合印刷
+  - `DEFAULT_DPI = 300` (v0.6.0/v0.6.1 用的 200)
+  - 模块顶部设 `mpl.rcParams['lines.antialiased']=True` `text.antialiased=True` `patch.antialiased=True` (默认开, 但偶发被覆盖, 强制保险)
+  - `plot_4_indices` 改用 `savefig_multi_format`, 默认输出 PNG + SVG
+- **`examples/gold_chart.py`**: 改用 `savefig_multi_format`, 同时生成 PNG (300dpi) + SVG
+- **`tests/test_smoke.py`** + 3 个新断言 (18/18 pass):
+  - `test_kline_svg_output` — 验证 SVG 实际生成且为有效 XML
+  - `test_kline_default_dpi_300` — 验证默认 DPI 升级到 300
+  - `test_kline_antialiasing_enabled` — 验证 anti-aliasing rcParams 开
+
+### Changed
+- `VERSION` 0.6.1 → 0.6.2
+- `gold_chart.py` 输出格式: 单 PNG → PNG + SVG 双格式
+- `plot_4_indices` 内部: `dpi=120, savefig 1次` → `dpi=300, savefig_multi_format 多格式`
+
+### 5 层尽调参考 (github + 论坛)
+- Layer 2: matplotlib 官方 docs + 3 个 CSDN 实战文章 + 1 个 Zhihu 实战
+- Layer 3: mplfinance (matplotlib 团队金融子包) / plotly (交互) / finplot (高性能) — 都满足 250+ star
+- Layer 4: 1 个 mplfinance issue + 1 个 stackoverflow (PDF 背景)
+- Layer 5 production insight: ① SVG/PDF 矢量无解 ② DPI 边际递减 ③ `pil_kwargs={'optimize':True}` 压缩无质量损失 ④ matplotlib 默认 AA 开但偶发被覆盖 ⑤ mplfinance `make_mpf_style` 是 1 行专业金融图样式
+- **不推荐立即切 plotly** — 静态报告用 HTML 反而麻烦, SVG 已能解决清晰度问题
+
 ## [0.6.1] - 2026-07-14
 
 ### Fixed (P6-6 hotfix: 真滑动平均, 不是 hlines 水平线)

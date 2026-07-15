@@ -209,6 +209,52 @@ def test_sma_is_rolling_not_hline():
     plt.close(fig)
 
 
+def test_kline_svg_output():
+    """v0.6.2 quality boost: kline 支持 SVG 矢量输出
+
+    SVG 任意缩放清晰, 文件 20-60KB, 是 PNG 的根本性清晰度提升方案
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from pathlib import Path
+    from src.kline import plot_single, savefig_multi_format, DEFAULT_DPI
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 5))
+    plot_single('GC=F', ax, layer='commodities_futures', lookback_days=120)
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir) / "test_kline"
+        written = savefig_multi_format(fig, base, formats=("png", "svg"), png_dpi=DEFAULT_DPI)
+        plt.close(fig)
+        # 至少 PNG + SVG 2 个文件
+        assert len(written) == 2, f"expected 2 files, got {len(written)}"
+        # PNG 和 SVG 路径都存在
+        suffixes = {p.suffix for p in written}
+        assert ".png" in suffixes and ".svg" in suffixes, \
+            f"missing png/svg in {suffixes}"
+        # PNG size > 0, SVG size > 0
+        for p in written:
+            assert p.stat().st_size > 1000, f"{p} too small: {p.stat().st_size} bytes"
+        # SVG 必须是有效 XML (开头 <svg)
+        svg = next(p for p in written if p.suffix == ".svg")
+        head = svg.read_text(encoding="utf-8")[:200]
+        assert "<svg" in head, f"SVG file invalid: {head[:80]}"
+
+
+def test_kline_default_dpi_300():
+    """v0.6.2 quality: 默认 DPI 升级到 300"""
+    from src.kline import DEFAULT_DPI
+    assert DEFAULT_DPI == 300, f"DEFAULT_DPI should be 300 for v0.6.2, got {DEFAULT_DPI}"
+
+
+def test_kline_antialiasing_enabled():
+    """v0.6.2 quality: anti-aliasing rcParams 默认开"""
+    import matplotlib as mpl
+    assert mpl.rcParams['lines.antialiased'] is True, "lines.antialiased not True"
+    assert mpl.rcParams['text.antialiased'] is True, "text.antialiased not True"
+
+
 if __name__ == "__main__":
     # Run as script (not pytest)
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
