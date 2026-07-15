@@ -141,11 +141,17 @@ def attribute_index(
     }
 
 
-def attribute_all_indices(date: str | None = None, lookback_days: int = 1) -> list[dict]:
-    """4 指数全部归因"""
+def attribute_all_indices(
+    date: str | None = None,
+    lookback_days: int = 1,
+    symbols: list[str] | None = None,
+) -> list[dict]:
+    """多指数归因 (v0.6.7 P6-3: symbols 参数支持自定义列表)"""
+    if symbols is None:
+        symbols = ["DIA", "QQQ", "RSP", "QQQE"]
     return [
         attribute_index(idx, date=date, lookback_days=lookback_days)
-        for idx in ["DIA", "QQQ", "RSP", "QQQE"]
+        for idx in symbols
     ]
 
 

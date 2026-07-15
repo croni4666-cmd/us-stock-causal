@@ -12,6 +12,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
 - v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
 
+## [0.6.7] - 2026-07-15
+
+### Added (P6-3 done: 归因多时间窗口 1d/5d/20d)
+
+按 roadmap 跑 P6-3, 加 `--lookback` CLI 参数 + 多窗口对比表。
+
+- **`src/attribution.py`**: `attribute_all_indices()` 加 `symbols: list[str] | None` 参数, 默认 4 指数
+- **`examples/attribute.py`**: 
+  - `argparse` 加 `--lookback 1|5|20|60` (单窗口) 和 `--symbols` (自定义)
+  - **多窗口模式** (无 `--lookback`): 自动跑 1d/5d/20d 3 窗口, 输出残差对比表
+- **`tests/test_smoke.py`** +2 断言 (26/26 pass):
+  - `test_attribute_all_indices_symbols_param` — symbols 参数生效
+  - `test_attribute_multi_window_5d_vs_20d` — 多窗口残差对比跑通
+
+### 关键发现: 5d 残差根因不是窗口长度
+
+| 指数 | 1d 残差 | 5d 残差 | 20d 残差 | 5d vs 20d |
+|------|---------|---------|----------|----------|
+| DIA | +0.06% | -1.05% | **+1.16%** | -2.21% |
+| QQQ | -0.06% | +0.17% | +0.71% | -0.53% |
+| RSP | +0.12% | -0.44% | **+0.95%** | -1.40% |
+| QQQE | -0.34% | -0.71% | **+1.76%** | -2.48% |
+
+**结论** (写进 CHANGELOG, 重要 discipline):
+- ❌ 假设: 5d 残差偏大 → 5d 窗口太短, 改 20d 更好
+- ✅ 实际: 5d 残差**为负** (sector weight 短期偏高), 20d 残差**转正** (sector weight 长期准确)
+- **5d 残差是 sector weight 短期漂移, 不是窗口问题**
+- 真修必须 P7-1 装 openbb-etf 拉真实近期 weights, 不是改归因窗口
+- v0.3.0 commit 时期就发现的"5d 残差偏大" — 现在 v0.6.7 才彻底诊断清楚
+
+### Changed
+- `VERSION` 0.6.6 → 0.6.7
+- `attribute_all_indices()` 新增 `symbols` 参数 (向后兼容, 默认值不变)
+
 ## [0.6.6] - 2026-07-15
 
 ### Added (P6-5 done: K 线 hover 显示 OHLCV)

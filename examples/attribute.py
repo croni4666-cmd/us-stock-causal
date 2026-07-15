@@ -107,54 +107,101 @@ def render_stacked_bar(results: list[dict], path: Path) -> None:
 
 
 def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="归因分析 v0.6.7 (P6-3: 多时间窗口)")
+    parser.add_argument(
+        "--lookback", type=int, default=None,
+        help="单窗口分析 (1/5/20/60). 不传 = 跑多窗口对比 1d+5d+20d",
+    )
+    parser.add_argument(
+        "--symbols", nargs="+", default=["DIA", "QQQ", "RSP", "QQQE"],
+        help="要分析的指数 (默认 4 个)",
+    )
+    args = parser.parse_args()
+
     print("=" * 72)
-    print(f"us-stock-causal v0.3.0 — attribution (Phase 2 demo)")
+    print(f"us-stock-causal v0.6.7 — attribution (Phase 2 + P6-3 多时间窗口)")
     print(f"Run time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Proxy active: {proxy.is_proxied()}")
     print("=" * 72)
 
     t0 = time.time()
 
-    # 当日归因 (4 指数)
-    print("\n[1/2] 4 指数当日归因...")
-    daily_results = attribute_all_indices(lookback_days=1)
+    if args.lookback is not None:
+        # 单窗口模式
+        results = attribute_all_indices(symbols=args.symbols, lookback_days=args.lookback)
+        print(f"\n## 4 指数 {args.lookback} 日归因 (lookback {args.lookback}d)\n")
+        print(render_console_table(results))
+        for r in results:
+            print(render_one_index_detail(r))
+    else:
+        # v0.6.7 P6-3: 多窗口对比 (1d / 5d / 20d)
+        # 验证 5d 残差偏大根因 — 短窗口 vs 长窗口
+        windows = [1, 5, 20]
+        all_results: dict[int, list[dict]] = {}
+        for w in windows:
+            print(f"\n[{w}d] 4 指数 {w} 日归因...")
+            all_results[w] = attribute_all_indices(symbols=args.symbols, lookback_days=w)
 
-    # 5 日累计归因 (QQQ 详细展示)
-    print("[2/2] 4 指数 5 日累计归因...")
-    weekly_results = attribute_all_indices(lookback_days=5)
+        # 对比表: 残差随窗口长度的变化
+        print(f"\n## 残差对比 (验证 5d 残差偏大根因)\n")
+        print("| 指数 | 1d 残差 | 5d 残差 | 20d 残差 | 5d vs 20d 差 |")
+        print("|------|---------|---------|----------|--------------|")
+        for i, sym in enumerate(args.symbols):
+            r1 = all_results[1][i]["residual_pct"]
+            r5 = all_results[5][i]["residual_pct"]
+            r20 = all_results[20][i]["residual_pct"]
+            diff = r5 - r20
+            print(f"| {sym} | {r1:+.2f}% | {r5:+.2f}% | {r20:+.2f}% | {diff:+.2f}% |")
 
-    # 控制台输出
-    print(render_console_table(daily_results))
-    for r in daily_results:
-        print(render_one_index_detail(r))
+        # 控制台完整输出 (1d 主, 5d 跟 20d 简表)
+        print(f"\n## 1 日归因 (主)\n")
+        print(render_console_table(all_results[1]))
+        for r in all_results[1]:
+            print(render_one_index_detail(r))
 
-    # 控制台输出 5 日
-    print(f"\n## 4 指数 5 日累计归因 (lookback 5d)\n")
-    print(render_console_table(weekly_results))
-
-    # 画图
+    # 画图 (用 1d 数据, 跟 v0.6.6 一致)
     output_dir = PROJECT_ROOT / "output"
     output_dir.mkdir(exist_ok=True)
-    chart_path = output_dir / f"attribution_{daily_results[0]['date']}.png"
-    render_stacked_bar(daily_results, chart_path)
+    base_results = all_results[1] if args.lookback is None else results
+    chart_path = output_dir / f"attribution_{base_results[0]['date']}.png"
+    render_stacked_bar(base_results, chart_path)
 
     # 写 Markdown 报告
     md_lines = [
-        f"# 📊 归因报告 — {daily_results[0]['date']}",
+        f"# 📊 归因报告 — {base_results[0]['date']}",
         f"\n**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"**模型**: sector weights (config/sector_weights.json, 2026-Q2 近似值)",
         f"\n**4 指数**: DIA / QQQ / RSP / QQQE",
         f"\n**归因方法**: 直接 sector weight × sector return,残差 = actual - predicted",
         f"\n---\n",
     ]
-    md_lines.append(render_console_table(daily_results))
-    for r in daily_results:
-        md_lines.append(render_one_index_detail(r))
-    md_lines.append(f"\n## 5 日累计归因\n")
-    md_lines.append(render_console_table(weekly_results))
-    md_lines.append(f"\n---\n\n*图: sector 贡献 stacked bar 见 `output/attribution_{daily_results[0]['date']}.png`*\n")
+    if args.lookback is not None:
+        # 单窗口报告
+        md_lines.append(f"\n## {args.lookback} 日归因 (lookback {args.lookback}d)\n")
+        md_lines.append(render_console_table(results))
+        for r in results:
+            md_lines.append(render_one_index_detail(r))
+    else:
+        # v0.6.7 P6-3: 多窗口对比报告
+        md_lines.append(f"\n## 残差对比 (验证 5d 残差偏大根因)\n")
+        md_lines.append("| 指数 | 1d 残差 | 5d 残差 | 20d 残差 | 5d vs 20d 差 |")
+        md_lines.append("|------|---------|---------|----------|--------------|")
+        for i, sym in enumerate(args.symbols):
+            r1 = all_results[1][i]["residual_pct"]
+            r5 = all_results[5][i]["residual_pct"]
+            r20 = all_results[20][i]["residual_pct"]
+            diff = r5 - r20
+            md_lines.append(f"| {sym} | {r1:+.2f}% | {r5:+.2f}% | {r20:+.2f}% | {diff:+.2f}% |")
+        md_lines.append(f"\n*解读*: 短窗口残差大说明 sector weights 短期不匹配; 20d 残差 < 5d 说明长周期更稳 (Q7-1 真修残差)")
+        md_lines.append(f"\n## 1 日归因 (主)\n")
+        md_lines.append(render_console_table(all_results[1]))
+        for r in all_results[1]:
+            md_lines.append(render_one_index_detail(r))
 
-    md_path = output_dir / f"attribution_{daily_results[0]['date']}.md"
+    md_lines.append(f"\n---\n\n*图: sector 贡献 stacked bar 见 `output/attribution_{base_results[0]['date']}.png`*\n")
+
+    md_path = output_dir / f"attribution_{base_results[0]['date']}.md"
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
 
     elapsed = time.time() - t0
