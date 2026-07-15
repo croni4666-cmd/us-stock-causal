@@ -351,6 +351,35 @@ def test_report_html_renders():
         fake_svg.unlink(missing_ok=True)
 
 
+def test_kline_svg_hover_inject():
+    """v0.6.6 (P6-5): SVG 蜡烛 hover 显示 OHLCV"""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import tempfile
+    from pathlib import Path
+    from src.kline import plot_single, savefig_multi_format
+    from lxml import etree
+    fig, ax = plt.subplots(1, 1, figsize=(12, 6))
+    plot_single('GC=F', ax, layer='commodities_futures', lookback_days=60)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir) / "test_kline"
+        savefig_multi_format(fig, base, formats=("svg",), png_dpi=100)
+        plt.close(fig)
+        svg_path = base.with_suffix(".svg")
+        assert svg_path.exists(), f"SVG not created at {svg_path}"
+        # 解析 SVG, 找 <title> 元素
+        tree = etree.parse(str(svg_path))
+        ns = "{http://www.w3.org/2000/svg}"
+        titles = tree.findall(f".//{ns}title")
+        # 至少 30+ 个 (60 day lookback, 1 candle/day)
+        assert len(titles) > 30, f"Expected > 30 hover titles, got {len(titles)}"
+        # title 文本格式: "YYYY-MM-DD  body: USD x.xx - USD y.yy"
+        sample = titles[0].text
+        assert "body: USD" in sample, f"Title format wrong: {sample}"
+        assert "  body: USD" in sample, f"Title format wrong (date prefix): {sample}"
+
+
 if __name__ == "__main__":
     # Run as script (not pytest)
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
