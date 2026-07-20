@@ -46,7 +46,12 @@ class MacroEvent:
 
 
 def load_calendar() -> list[MacroEvent]:
-    """读 config/events_2026.yaml"""
+    """读 config/events_2026.yaml (向后兼容包装, 内部用 _load_yaml_events)"""
+    return _load_yaml_events()
+
+
+def _load_yaml_events() -> list[MacroEvent]:
+    """读 config/events_2026.yaml (v0.6.8c 内部 helper)"""
     if not CALENDAR_PATH.exists():
         logger.warning(f"{CALENDAR_PATH} 不存在,返回空")
         return []
@@ -72,38 +77,84 @@ def load_calendar() -> list[MacroEvent]:
 def upcoming_events(
     from_date: Optional[date] = None,
     lookahead_days: int = 30,
+    providers: Optional[list[str]] = None,
 ) -> list[MacroEvent]:
-    """未来 N 天内的事件,按日期排序"""
+    """
+    未来 N 天内的事件,按日期排序 (v0.6.8c 加 providers 参数)
+
+    Args:
+        from_date: 起始日期 (默认今天)
+        lookahead_days: 看未来 N 天
+        providers: 数据源列表, 默认 ["yaml"]
+          - "yaml": config/events_2026.yaml (硬编码 44 宏观事件)
+          - "gdelt": GDELT 2.0 全球新闻流 (Phase 7 新, 补外部事件)
+
+    Returns:
+        MacroEvent list, 合并按 (date, kind) 排序
+    """
     if from_date is None:
         from_date = date.today()
+    if providers is None:
+        providers = ["yaml"]
+
+    events = []
+    if "yaml" in providers:
+        events.extend(_load_yaml_events())
+    if "gdelt" in providers:
+        try:
+            from src.events_gdelt import fetch_gdelt_events
+            # GDELT 是 past events, 拉过去 3 天 + 未来 0 天 (不预测)
+            # events filter 仍走 from_date <= e.date <= end, 未来命中会从 yaml 来
+            events.extend(fetch_gdelt_events(
+                from_date=from_date - timedelta(days=3),  # 起点: 3 天前
+                lookahead_days=3,  # window 3 天 (昨天-今天-明天), 覆盖 from_date ± 1.5
+            ))
+        except Exception as e:
+            logger.warning(f"[events] gdelt 拉取失败: {e}")
+
     end = from_date + timedelta(days=lookahead_days)
-    cal = load_calendar()
     return sorted(
-        [e for e in cal if from_date <= e.date <= end],
-        key=lambda e: e.date,
+        [e for e in events if from_date <= e.date <= end],
+        key=lambda e: (e.date, e.kind),  # 稳定排序
     )
 
 
 def past_events(
     from_date: Optional[date] = None,
     lookback_days: int = 30,
+    providers: Optional[list[str]] = None,
 ) -> list[MacroEvent]:
     """过去 N 天内的事件"""
     if from_date is None:
         from_date = date.today()
+    if providers is None:
+        providers = ["yaml"]
     start = from_date - timedelta(days=lookback_days)
-    cal = load_calendar()
+
+    events = []
+    if "yaml" in providers:
+        events.extend(_load_yaml_events())
+    if "gdelt" in providers:
+        try:
+            from src.events_gdelt import fetch_gdelt_events
+            events.extend(fetch_gdelt_events(
+                from_date=start,
+                lookahead_days=lookback_days,
+            ))
+        except Exception as e:
+            logger.warning(f"[events] gdelt 拉取失败: {e}")
+
     return sorted(
-        [e for e in cal if start <= e.date <= from_date],
-        key=lambda e: e.date,
+        [e for e in events if start <= e.date <= from_date],
+        key=lambda e: (e.date, e.kind),
     )
 
 
 def next_event(from_date: Optional[date] = None) -> Optional[MacroEvent]:
-    """下一个高影响事件"""
+    """下一个高影响事件 (yaml only, 跟 v0.3.2 行为一致)"""
     if from_date is None:
         from_date = date.today()
-    cal = load_calendar()
+    cal = _load_yaml_events()
     future = sorted([e for e in cal if e.date >= from_date], key=lambda e: e.date)
     return future[0] if future else None
 

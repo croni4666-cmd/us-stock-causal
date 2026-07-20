@@ -25,7 +25,7 @@ def test_module_imports():
         'src.proxy', 'src.data', 'src.cache', 'src.returns',
         'src.thresholds', 'src.attribution', 'src.residual',
         'src.patterns', 'src.events', 'src.signals',
-        'src.macro', 'src.kline', 'src.report'
+        'src.macro', 'src.kline', 'src.report', 'src.events_gdelt'
     ]
     for m in modules:
         __import__(m)
@@ -429,8 +429,6 @@ def test_attribute_multi_window_5d_vs_20d():
 
 def test_topline_multi_horizon():
     """v0.6.8 (P6-4): 报告顶部 1 行 → 3 行 (1d / 5d / 20d)
-
-    验证:
     - topline() 默认 horizons=(1, 5, 20) 返回 3 行 markdown bullet list
     - 3 行分别含 "1d" / "5d" / "20d" 标签
     - 3 行都含 VIX / 10Y / DXY + DIA / QQQ / RSP / QQQE
@@ -479,6 +477,88 @@ def test_topline_multi_horizon():
     il_20d = indices_1line(lookback_days=20)
     for il, lbl in [(il_1d, "1d"), (il_5d, "5d"), (il_20d, "20d")]:
         assert f"({lbl})" in il, f"indices_1line lookback={lbl} 缺 ({lbl}) 标签: {il[:80]}"
+
+
+def test_events_gdelt_graceful_degradation():
+    """v0.6.8c (Stage 1 of P-event-enrichment): GDELT 拉取失败时优雅降级
+
+    验证:
+    - fetch_gdelt_events 函数存在 + 接受 keywords/lookahead_days
+    - 限流 (429) / JSON 解析失败 / 网络错误时返回 [], 不抛错
+    - 默认 DEFAULT_KEYWORDS 是 macro 关键词 (FOMC/CPI/NFP/...)
+    - 限流时返回 list 不是 raise (跟 events.py 兼容)
+    """
+    from src.events_gdelt import fetch_gdelt_events, DEFAULT_KEYWORDS, _build_query
+
+    # 1. 函数存在 + 参数签名
+    import inspect
+    sig = inspect.signature(fetch_gdelt_events)
+    for param in ['from_date', 'lookahead_days', 'keywords', 'max_records', 'use_proxy']:
+        assert param in sig.parameters, f"fetch_gdelt_events 缺参数 {param}"
+
+    # 2. DEFAULT_KEYWORDS 是 macro 关键词
+    assert len(DEFAULT_KEYWORDS) > 5, "DEFAULT_KEYWORDS 太少"
+    keywords_text = " ".join(DEFAULT_KEYWORDS).lower()
+    for kw in ['federal reserve', 'fomc', 'cpi', 'nfp']:
+        assert kw in keywords_text, f"DEFAULT_KEYWORDS 缺 {kw}"
+
+    # 3. _build_query 加括号 (GDELT OR 语法)
+    q = _build_query(['Federal Reserve', 'CPI'])
+    assert q.startswith('(') and q.endswith(')'), f"_build_query 缺括号: {q}"
+    assert ' OR ' in q, f"_build_query 缺 OR: {q}"
+
+    # 4. 优雅降级: 强制 max_records=0 应该返回 [] 不抛错
+    r = fetch_gdelt_events(lookahead_days=1, max_records=0)
+    assert isinstance(r, list), "应返回 list"
+    assert len(r) == 0, f"max_records=0 应返回 [], 实际 {len(r)}"
+
+    # 5. 优雅降级: use_proxy=False 不应该抛错 (虽然不一定拉到)
+    r2 = fetch_gdelt_events(lookahead_days=0, use_proxy=False)
+    assert isinstance(r2, list), "use_proxy=False 应返回 list"
+
+    # 6. MacroEvent kind 字段
+    if r or r2:
+        for e in (r or r2):
+            assert e.kind == "GDELT", f"kind 应 GDELT, 实际 {e.kind}"
+            assert e.date is not None
+            assert e.description  # 至少有 title + tone
+
+
+def test_events_providers_param():
+    """v0.6.8c: events.upcoming_events / past_events 加 providers 参数
+
+    验证:
+    - upcoming_events 默认 providers=["yaml"] (向后兼容)
+    - upcoming_events(providers=["yaml", "gdelt"]) 同时拉 yaml + gdelt
+    - past_events 同样支持 providers
+    """
+    from src.events import upcoming_events, past_events
+    import inspect
+
+    # 1. 签名
+    sig_up = inspect.signature(upcoming_events)
+    sig_past = inspect.signature(past_events)
+    assert 'providers' in sig_up.parameters, "upcoming_events 缺 providers 参数"
+    assert 'providers' in sig_past.parameters, "past_events 缺 providers 参数"
+    # 默认值 None (向后兼容)
+    assert sig_up.parameters['providers'].default is None
+    assert sig_past.parameters['providers'].default is None
+
+    # 2. backward compat: 默认 yaml
+    up = upcoming_events(lookahead_days=30)
+    assert all(e.kind != "GDELT" for e in up), "默认 providers 应不含 GDELT"
+    assert len(up) > 0, "默认 yaml 应至少有事件"
+
+    # 3. yaml + gdelt 混合 (gdelt 限流时可能 0 条, 不报错)
+    up2 = upcoming_events(lookahead_days=30, providers=["yaml", "gdelt"])
+    # yaml 部分应该仍有
+    yaml_count = sum(1 for e in up2 if e.kind != "GDELT")
+    assert yaml_count > 0, "yaml 仍应返回事件"
+
+    # 4. 只 gdelt (空)
+    up3 = upcoming_events(lookahead_days=30, providers=["gdelt"])
+    # 限流时 0 条 OK
+    assert isinstance(up3, list), "providers=['gdelt'] 应返回 list"
 
 
 if __name__ == "__main__":
