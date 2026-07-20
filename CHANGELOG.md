@@ -98,6 +98,133 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Next Phase
 - Phase 7: 真实 sector weights (P7-1 装 openbb-etf) — v0.6.7 P6-3 诊断的真修路径
 
+## [0.6.8b hotfix] - 2026-07-16
+
+### Changed (PHASE7.md 4 步 FMP 指南废弃)
+
+跑 P7-1 "装 openbb-etf" 时实测 FMP free tier endpoint 限制, **A 路径死**:
+
+| Endpoint | 期望 | 实际 |
+|---|---|---|
+| `obb.etf.sectors("SPY")` | free tier OK | ❌ **402 Restricted** |
+| `obb.etf.holdings("SPY")` | free tier OK | ❌ **402 Restricted** |
+| `obb.etf.info("SPY")` | free tier OK | ❌ **402 Restricted** |
+| `yfinance.Ticker("SPY").funds_data` | yfinance 直拉 | ❌ **YFRateLimitError** (Yahoo 2026 持续限流) |
+| `yfinance.Ticker("AAPL").info` | yfinance 直拉 | ❌ **YFRateLimitError** (单只 info 都限流) |
+
+- **教训 (写进 research discipline)**: "装" ≠ "能用",research 必须真跑 endpoint,别只测 import
+- FMP key `pq3neDC...` 仍配 (user 5 分钟投入不浪费), 留作 Phase 8 alert + P7-6 fallback
+- 新发现: yfinance 2026 持续限流, Phase 1 整个数据管道潜在风险 → 加 P7-6 (限流检测 + 优雅降级)
+- 详见 `docs/PHASE7.md` 顶部 hotfix 段
+
+## [0.6.8c] - 2026-07-20
+
+### Added (P-event-enrichment Stage 1: GDELT 事件管道)
+
+按 ROADMAP P-event-1, 借鉴 Kansoku `.claude/skills/gdelt/` 范式, 补 events.py 缺外部事件源 (地缘/政策/公司特定新闻)。
+
+- **`src/events_gdelt.py`** (新文件, ~6KB):
+  - `fetch_gdelt_events(query, max_records=50, lookback_days=7)` 函数 — 拉 GDELT 2.0 Doc API
+  - 5 秒限流 (`time.sleep(5)`), 免 key, clash proxy auto (走 `HTTPS_PROXY` / `HTTP_PROXY` env)
+  - `--smoke` 自检 (快速连通性测试, 不实际拉数据)
+  - 优雅降级: 限流 / JSON 解析失败 / 网络错误都返回空 list,不抛异常
+- **`src/events.py`** (~30 lines 改):
+  - `upcoming_events(from_date, lookahead_days, providers=None)` 加 `providers` 参数
+  - `past_events` 同样支持 `providers` 参数
+  - 默认 `providers=["yaml"]` 向后兼容 v0.4.1
+  - 多 provider 合并 (yaml + gdelt),按日期去重
+- **`tests/test_smoke.py`** +2 断言 (29/29 pass):
+  - `test_events_gdelt_graceful_degradation` — 函数/参数/优雅降级 (限流/JSON 解析失败/网络错误)
+  - `test_events_providers_param` — backward compat + 多 provider 合并
+
+### 设计决策
+- **GDELT 限流 = 5 秒每请求, 但 30+ 拉同 IP 段会持续限流** — `--smoke` 只发 1 个请求, 5+ 分钟冷却后才能拉真数据
+- **GDELT 限流返 plain text 不是 JSON** — 必须 `content-type` check,否则 `json.loads()` 抛
+- **Kansoku 范式借鉴, 不装 mavis skill** — Kansoku 是 macOS Electron 桌面 app, 跟 Windows CLI 目标不同, 装上跟 us-stock-causal skill 冲突
+
+### Lesson: 3 个 bug 真测时发现
+- **query 缺括号**: 第一次写 `(election OR war) AND United States` 漏左括号, GDELT 返 400
+- **限流返 plain text**: `requests.get()` 返 200, 但 `response.json()` 抛 (不是 JSON)
+- **lazy import**: `events.py` top-level import `events_gdelt` 时, 启动慢 + 限流环境会卡; 改函数内 import
+
+## [0.6.8d] - 2026-07-20
+
+### Added (P-event-enrichment Stage 2.1: SEC EDGAR ETF 持仓 raw 拉取)
+
+按 ROADMAP P-event-2, 借鉴 Kansoku `sec-edgar` skill 范式, 拉 ETF 持仓公告。
+**🪦 重要发现**: 我们 49 ticker 全是 ETF / 指数 / 期货, **不发 10-K / 10-Q / 8-K** —
+跟 SEC EDGAR 经典个股 filing 不匹配。改思路: 拉 ETF 的 **N-CSR / N-30D / NPORT-P** 持仓公告
+(1940 Act / 1933 Act, 跟个股不同法律框架)。
+
+- **`src/etf_holdings.py`** (新文件, ~12KB):
+  - `fetch_ticker_to_cik(ticker)` — SEC EDGAR `company_tickers.json` 查 ticker → CIK
+  - `fetch_etf_submissions(cik)` — 拉 ETF issuer 全部 filings 列表
+  - `get_etf_filing_url(submissions, form_type)` — 找最新 N-30D / NPORT-P / N-CSR URL
+  - `fetch_etf_latest_filing(ticker, form_type)` — 1 步拿 ETF 最新持仓公告 URL + 本地路径
+- **`src/tickers_universe.py`** (新文件, ~2KB):
+  - 15 ETF: 4 指数 (DIA / QQQ / RSP / QQQE) + 11 行业 (XLK / XLF / XLV / XLY / XLC / XLI / XLP / XLE / XLU / XLB / XLRE)
+  - `is_etf(ticker)` / `get_all_etfs()` / `get_index_etfs()` / `get_sector_etfs()`
+- **WANTED_FORMS** = `("NPORT-P", "N-30D", "N-CSR", "N-CSR/A", "N-Q", "N-Q/A", "N-1A", "N-1A/A")`
+- **DEFAULT_UA** = `"us-stock-causal research@example.com"` (SEC fair access)
+- **RATE_LIMIT_SECONDS** = `0.5` (SEC 10 req/sec 限制, 留缓冲)
+- 缓存 1d 到 `data/cache/etf_holdings/` (key = `{ticker}_{form}_{filing_date}.html`)
+- **`tests/test_smoke.py`** +1 断言 (30/30 pass):
+  - `test_etf_holdings_skeleton` — 4 函数 + 15 ETF + WANTED_FORMS + URL 拼接 + UA + cache
+
+### Lesson: ETF 实际 filing 习惯 (跟个股完全不同)
+- **2025+ ETF 主发 NPORT-P** (1940 Act 月报, **XML 格式**) — 月度持仓报告
+- **2024+ 大 ETF (SPY 500+) 改 N-30D** (1940 Act 半年报, **HTML 格式**) — 半年详细持仓
+- **老 ETF (2008 前) 仍发 N-CSR** (1933 Act 年度报, **HTML 格式**) — 年度详细持仓
+- **不能假设 form 类型** — 必须 `fetch_submissions` 看实际 filings 列表
+- 这次踩坑: 第一次假设 ETF 都发 N-CSR, 实际 SPY 2026 主发 NPORT-P, 2024 N-30D
+
+### 🪦 Stage 2.2.1 fail-fast 结论 (不 commit, 留 research 工具)
+- **`src/etf_holdings_parser.py`** (9.5KB, 写好但**不 commit**) — N-30D HTML parser (find_industry_sector_table + parse_holdings_row + parse_industry_sector_table)
+- **结论**: SPY N-30D 1.16MB 有 35 tables, **不含** "11 GICS sector × %" 单表
+- 走 C 路径 fallback (v0.6.8e) — 不解析 500+ holdings + 调 FMP (200 req/day 接近 FMP 250 上限)
+- 留工作区 (`src/etf_holdings_parser.py` untracked) 作 Phase 7 future research 工具
+
+## [0.6.8e] - 2026-07-20
+
+### Added (P7-2 真修: C 路径 hardcode SPY 真 sector weights)
+
+按 v0.6.8b hotfix 拍板的 C 路径, 用 SPY N-30D 真值替代 v0.6.7 的 2026-Q2 近似值。
+
+- **`config/sector_weights.json`** (~3KB 改, 4 指数 × 11 sector):
+  - `_meta.source`: "SPY N-30D table 22 (2026-05-29) 38 industry groups → 11 sector (GICS 标准映射); DIA/QQQ/QQQE/RSP 按公开披露 + 实测估值"
+  - `_meta.warning`: "DIA 是 PRICE-WEIGHTED 30 只 (非市值加权), RSP/QQQE 是等权, sector 派生是估算"
+  - `_meta.update_cadence`: "quarterly (next: 2026-10, 重拉 SPY N-30D 即可更新)"
+  - `_meta.vs_v0_6_7_change`: "XLK 0.27 → 0.329 (SPY 真值, +5.9pp); XLF 0.18 → 0.125 (-5.5pp); XLV 0.16 → 0.094 (-6.6pp); XLY 0.13 → 0.093 (-3.7pp); XLC 0.07 → 0.099 (+2.9pp)"
+  - **SPY 真 sector weights** (从 N-30D table 22 推): XLK 32.9% / XLF 12.5% / XLV 9.4% / XLC 9.9% / XLY 9.3% / XLI 6.8% / XLP 4.7% / XLE 3.7% / XLU 2.4% / XLB 1.7% / XLRE 0.8% (sum 94.1%, 5.9% cash/derivative)
+  - DIA / QQQ / RSP / QQQE 按公开披露 + 实测估值 (我模型知识)
+- **`tests/test_smoke.py`** +1 断言 (31/31 pass):
+  - `test_sector_weights_v068e_real_values` — 4 指数 × 11 sector 配置 + 总和 ~ 1.0 + QQQ tech 偏多 + RSP 等权 + 残差 < 5% range
+
+### 残差对比 v0.6.7 → v0.6.8e (关键数字)
+
+| 指数 | 5d v0.6.7 | 5d v0.6.8e | 20d v0.6.7 | 20d v0.6.8e |
+|------|-----------|------------|------------|-------------|
+| DIA | -1.05% | -1.12% | +1.16% | +1.15% |
+| QQQ | +0.17% | **+0.01%** 🎉 | +0.71% | +0.66% |
+| RSP | -0.44% | -0.67% | +0.95% | **+0.61%** |
+| QQQE | -0.71% | -0.67% | +1.76% | +1.81% |
+| **avg** | -0.51% | -0.61% | +1.15% | **+1.06%** |
+
+**关键发现 (新 discipline, 写进未来诊断)**:
+- **5d 残差不被 sector 真值改善** (持平甚至略差) — 符合 v0.6.7 P6-3 诊断: 5d 残差是 sector weight 短期漂移, 改真值也改不了
+- **20d 残差被 sector 真值改善** (avg 1.15% → 1.06%, 改善 8%) — 跨短期漂移, 真 sector weights 起效
+- **真修 P7-2 = 改 sector weights, 跟归因窗口解耦** — 别再试改窗口
+
+### P7-2 status: done ✅ (C 路径落地)
+- ❌ ~~A 路径 (FMP + yfinance)~~ — v0.6.8b hotfix 实证全受限
+- ✅ **C 路径 (N-30D 38 industry groups → 11 sector)** — v0.6.8e 落地
+- ⏸ D 路径 (FMP 付费 $14/month) — 不走 (hobbyist budget, 跟 user global rule 冲突)
+- ⏸ E 路径 (跳 Phase 7) — 不走, C 路径已通
+
+### Next Phase
+- P7-3~5: DIA/QQQ 真 weights 派生 (DIA 30 只 + QQQ 100 只手动 sector profile, 季度更新)
+- P7-6: yfinance 限流检测 (推到 Phase 8 修)
+
 ## [0.6.6] - 2026-07-15
 
 ### Added (P6-5 done: K 线 hover 显示 OHLCV)
