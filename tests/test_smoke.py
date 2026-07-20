@@ -25,7 +25,8 @@ def test_module_imports():
         'src.proxy', 'src.data', 'src.cache', 'src.returns',
         'src.thresholds', 'src.attribution', 'src.residual',
         'src.patterns', 'src.events', 'src.signals',
-        'src.macro', 'src.kline', 'src.report', 'src.events_gdelt'
+        'src.macro', 'src.kline', 'src.report', 'src.events_gdelt',
+        'src.etf_holdings', 'src.tickers_universe'
     ]
     for m in modules:
         __import__(m)
@@ -524,10 +525,61 @@ def test_events_gdelt_graceful_degradation():
             assert e.description  # 至少有 title + tone
 
 
-def test_events_providers_param():
-    """v0.6.8c: events.upcoming_events / past_events 加 providers 参数
+def test_etf_holdings_skeleton():
+    """v0.6.8d: SEC EDGAR ETF 持仓公告 (Stage 1 raw 拉取, 不解析 HTML)
 
     验证:
+    - 4 个核心函数存在: fetch_ticker_to_cik / fetch_etf_submissions / get_etf_filing_url / fetch_etf_latest_filing
+    - tickers_universe 15 只 ETF (4 指数 + 11 行业)
+    - WANTED_FORMS 包含 NPORT-P (月报, 实际是 2025+ ETF 主发)
+    - get_etf_filing_url 路径拼接对
+    - 1d cache 机制
+    """
+    from src.etf_holdings import (
+        fetch_ticker_to_cik, fetch_etf_submissions,
+        get_etf_filing_url, fetch_etf_latest_filing,
+        WANTED_FORMS, CACHE_DIR, DEFAULT_UA,
+    )
+    from src.tickers_universe import ETF_TICKERS, INDEX_ETFS, SECTOR_ETFS
+
+    # 1. 15 只 ETF (4 指数 + 11 行业)
+    assert len(ETF_TICKERS) == 15, f"ETF_TICKERS 应 15 只, 实际 {len(ETF_TICKERS)}"
+    assert len(INDEX_ETFS) == 4
+    assert len(SECTOR_ETFS) == 11
+    # INDEX_ETFS 包含 DIA/QQQ/RSP/QQQE
+    for t in ["DIA", "QQQ", "RSP", "QQQE"]:
+        assert t in INDEX_ETFS, f"INDEX_ETFS 缺 {t}"
+    # SECTOR_ETFS 包含 11 行业 GICS
+    for t in ["XLK", "XLF", "XLE", "XLY", "XLP", "XLV", "XLI", "XLU", "XLB", "XLRE", "XLC"]:
+        assert t in SECTOR_ETFS, f"SECTOR_ETFS 缺 {t}"
+
+    # 2. WANTED_FORMS 包含 NPORT-P (2025+ ETF 主发)
+    assert "NPORT-P" in WANTED_FORMS, f"WANTED_FORMS 缺 NPORT-P: {WANTED_FORMS}"
+    assert "N-30D" in WANTED_FORMS, "WANTED_FORMS 缺 N-30D"
+    assert "N-CSR" in WANTED_FORMS, "WANTED_FORMS 缺 N-CSR (老 ETF)"
+
+    # 3. URL 拼接对
+    url = get_etf_filing_url("0000884394", "0001193125-26-247066", "d75559dn30d.htm")
+    assert "data/884394" in url, f"URL cik 路径错: {url}"
+    assert "000119312526247066" in url, f"URL accession 错 (应去 dash): {url}"
+    assert "d75559dn30d.htm" in url, f"URL primary doc 错: {url}"
+    assert url.startswith("https://www.sec.gov/Archives/"), f"URL 应是 Archives 路径: {url}"
+
+    # 4. UA header 强制
+    assert "research" in DEFAULT_UA or "@" in DEFAULT_UA, f"UA 应含联系方式: {DEFAULT_UA}"
+
+    # 5. 缓存目录存在
+    assert CACHE_DIR.exists(), f"cache 目录 {CACHE_DIR} 不存在"
+
+    # 6. 函数签名 (只验 callable, 不真拉, 避免 SEC 限流)
+    import inspect
+    assert callable(fetch_ticker_to_cik)
+    assert callable(fetch_etf_submissions)
+    assert callable(fetch_etf_latest_filing)
+
+
+def test_events_providers_param():
+    """v0.6.8c: events.upcoming_events / past_events 加 providers 参数
     - upcoming_events 默认 providers=["yaml"] (向后兼容)
     - upcoming_events(providers=["yaml", "gdelt"]) 同时拉 yaml + gdelt
     - past_events 同样支持 providers
