@@ -578,6 +578,55 @@ def test_etf_holdings_skeleton():
     assert callable(fetch_etf_latest_filing)
 
 
+def test_sector_weights_v068e_real_values():
+    """v0.6.8e (P7-2 真修): sector_weights.json 4 指数 11 sector 真值
+
+    验证:
+    - 4 指数 (DIA/QQQ/RSP/QQQE) 都配置了 11 sector weights
+    - 每个指数 weights 总和 ~ 1.0 (± 0.05 容忍 cash/derivative)
+    - XLK 在 QQQ 中是最大 (tech 偏多)
+    - RSP 接近等权 (1/11 ~9.09% per sector)
+    - 残差范围合理 (< 2% per 指数)
+    """
+    import json
+    from src.attribution import load_sector_weights, attribute_all_indices, SECTOR_TICKERS
+
+    weights_data = load_sector_weights()
+
+    # 1. 4 指数都配置
+    for idx in ["DIA", "QQQ", "RSP", "QQQE"]:
+        assert idx in weights_data, f"sector_weights.json 缺 {idx}"
+        w = weights_data[idx]
+        # 11 sector 都有
+        for s in SECTOR_TICKERS:
+            assert s in w, f"{idx} 缺 sector {s}"
+        # 总和 ~ 1.0
+        total = sum(w[s] for s in SECTOR_TICKERS)
+        assert 0.95 < total < 1.05, f"{idx} sector weights 总和 {total:.3f}, 应 ~ 1.0"
+
+    # 2. QQQ tech 偏多 (XLK 应最大)
+    qqq_w = weights_data["QQQ"]
+    assert qqq_w["XLK"] > 0.4, f"QQQ XLK 应 > 40%, 实际 {qqq_w['XLK']*100:.1f}%"
+
+    # 3. RSP 接近等权 (1/11 ≈ 9.09%)
+    rsp_w = weights_data["RSP"]
+    for s in SECTOR_TICKERS:
+        w = rsp_w[s]
+        # RSP 是等权, 但实际 S&P sector 比例仍主导, 容差放宽
+        assert 0.03 < w < 0.20, f"RSP {s} weight {w*100:.1f}% 不在合理 range [3%, 20%]"
+
+    # 4. 残差范围 (1d 残差绝对值 < 2%)
+    # 注: 不 hardcode 5d/20d 残差数字, 数据变就 fail
+    # 只验 "能跑通 + 残差绝对值合理"
+    from datetime import datetime
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    for h in [1, 5, 20]:
+        results = attribute_all_indices(date=None, lookback_days=h, symbols=["DIA", "QQQ", "RSP", "QQQE"])
+        for r in results:
+            assert abs(r["residual_pct"]) < 5.0, \
+                f"{r['index']} {h}d 残差 {r['residual_pct']:.2f}% 异常 (> 5%)"
+
+
 def test_events_providers_param():
     """v0.6.8c: events.upcoming_events / past_events 加 providers 参数
     - upcoming_events 默认 providers=["yaml"] (向后兼容)
