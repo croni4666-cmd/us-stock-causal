@@ -225,6 +225,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - P7-3~5: DIA/QQQ 真 weights 派生 (DIA 30 只 + QQQ 100 只手动 sector profile, 季度更新)
 - P7-6: yfinance 限流检测 (推到 Phase 8 修)
 
+## [0.6.8f] - 2026-07-23
+
+### Added (P7-3 done: 从硬编码 ETF 成分股派生 4 指数 sector weights)
+
+按 ROADMAP P7-3, 从硬编码 ETF 成分股派生 4 指数真 sector weights (替代 v0.6.8e 的模型估算)。
+
+- **`data/static/etf_constituents.py`** (新文件, ~9KB, 季度手动维护源):
+  - `DIA_30`: 30 成分股 + GICS sector + 估算价格 (price-weighted 派生)
+  - `QQQ_100_TOP_60 + QQQ_100_TAIL_40`: 100 成分股 + GICS sector + 估算市值 (cap-weighted / equal-weight 派生)
+  - `SP500_SECTOR_COUNTS`: S&P 500 11 sector 股票数 (count-based 派生)
+  - `SECTOR_TICKER_TO_NAME` / `SECTOR_TICKERS_11`: 11 sector ticker 映射
+  - **诚实标注**: 成分股 + 价格 / 市值是模型知识 (cutoff 2026-01) + 粗估, 不是实时数据
+- **`scripts/derive_sector_weights.py`** (新文件, ~5.9KB, 派生脚本):
+  - `derive_dia_price_weighted()`: DIA 30 → price-weighted sector weights
+  - `derive_qqq_cap_weighted()`: QQQ 100 → cap-weighted sector weights
+  - `derive_qqqe_equal_weighted()`: QQQ 100 → count-based equal-weight
+  - `derive_rsp_equal_weighted()`: S&P 500 sector count → count-based equal-weight
+  - 输出到 `config/sector_weights.json` (含 SPY 保留 v0.6.8e 真值)
+- **`config/sector_weights.json`** (重写, 4 指数 × 11 sector):
+  - **DIA** (price-weighted, XLF 显著上升): XLF 23.6% / XLK 19.0% / XLV 18.2% / XLY 10.1% / XLI 8.3% / XLC 5.2% / XLP 6.0% / XLE 4.4% / XLB 4.1% / XLU 0% / XLRE 0%
+  - **QQQ** (cap-weighted, IT 50%): XLK 50.7% / XLC 20.3% / XLY 15.7% / XLP 5.0% / XLV 4.0% / XLI 2.4% / XLF 1.6% / XLE 0.4% / XLB 0% / XLU 0.1% / XLRE 0%
+  - **RSP** (count-based equal-weight, Industrials 跟 IT 并列): XLI 15.2% / XLK 15.2% / XLF 14.0% / XLV 12.3% / XLY 9.7% / XLP 7.4% / XLRE 6.0% / XLU 5.8% / XLB 5.5% / XLE 4.5% / XLC 4.3%
+  - **QQQE** (count-based equal-weight, 比 QQQ 分散): XLK 34.7% / XLY 13.9% / XLV 11.9% / XLC 10.9% / XLP 8.9% / XLI 5.9% / XLF 1.0% / XLE 1.0% / XLB 0% / XLU 2.0% / XLRE 0%
+  - **SPY** 保留 v0.6.8e 真值 (从 N-30D table 22 推, 最可靠)
+- **`tests/test_smoke.py`** +1 断言 (32/32 pass):
+  - `test_sector_weights_v068f_p73_derived` — DIA XLF > XLK / QQQ XLK ~50% / QQQE XLK < QQQ / RSP 无 sector > 20% / constituents 数据健全 / 5d 残差 < 1%
+
+### 残差对比 v0.6.8e → v0.6.8f (关键改善)
+
+| 指数 | 5d v0.6.8e | 5d v0.6.8f | 20d v0.6.8e | 20d v0.6.8f |
+|------|-----------|------------|------------|-------------|
+| DIA | -1.12% | **-0.55%** 🎉 | +1.15% | **+0.21%** 🎉 |
+| QQQ | +0.01% | +0.12% | +0.66% | +0.90% |
+| RSP | -0.67% | **-0.32%** 🎉 | +0.61% | **+0.11%** 🎉 |
+| QQQE | -0.67% | **-0.38%** 🎉 | +1.81% | +1.47% |
+| **avg** | -0.61% | **-0.28%** | +1.06% | **+0.67%** |
+
+**关键发现 (新 discipline, 写进未来诊断)**:
+- **5d avg 残差 -0.61% → -0.28% (改善 54%)** — P7-3 派生真起效
+- **20d avg 残差 +1.06% → +0.67% (改善 37%)** — P7-3 派生真起效
+- **DIA 改善最显著** (5d 改善 0.57pp, 20d 改善 0.94pp) — DIA price-weighted 之前模型估算偏差最大, 派生修正最大
+- **QQQ 略差** (5d +0.11pp, 20d +0.24pp) — QQQ cap-weighted 之前模型估算已经比较准 (XLK 55% vs 真实 ~50%), 派生后"过度修正"反而略偏
+- **DIA vs QQQ 对比**: DIA 模型估算偏差大 (因为 price-weighted 跟 cap-weighted 不同), QQQ 模型估算已较准 (我模型知识里 QQQ IT 集中度是常识)
+
+### 决策记录
+- **P7-3 done** ✅: 4 指数 sector weights 全部从硬编码成分股派生
+- **维护方式**: 季度手动改 `data/static/etf_constituents.py` 然后重跑 `python scripts/derive_sector_weights.py` 即可 (1 步)
+- **下一步**: P7-4 (cache 1d) 不需要了 (直接 hardcode, 季度更新, 不像 v0.6.7 那样频繁拉) / P7-5 (残差回归测试) 用本 commit 的残差数字作 baseline
+- **P7-6 (yfinance 限流)**: 仍推到 Phase 8 修
+
 ## [0.6.6] - 2026-07-15
 
 ### Added (P6-5 done: K 线 hover 显示 OHLCV)
