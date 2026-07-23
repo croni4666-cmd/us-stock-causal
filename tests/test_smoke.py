@@ -297,6 +297,80 @@ def test_kline_period_string_500d_2y():
     plt.close(fig)
 
 
+def test_kline_sma_warmup_v068g():
+    """v0.6.8g (P6-7) fix: SMA 连续性 — 200 SMA 在 1y 图首日就有效 (不是 NaN)
+
+    v0.6.8g 前 bug: plot_single 把 df 切到 iloc[-lookback_days:], 200 SMA 在前 200 天
+    是 NaN, 1y 窗口 (365 天) 的前 200 天 (≈前 6 个月) 看不到 200 SMA。
+
+    v0.6.8g fix: 不切片 df, 用全量 cache 画, xlim 限定最后 lookback_days。
+    要求: cache 至少 lookback_days + 200 行 (2y 缓存能保证 1y 图 200 SMA 全程有效)。
+
+    验证:
+    1. 1y 图的 200 SMA line 在 xlim 第一天的 y 值不是 NaN
+    2. cache 长度 >= 365 + 200 = 565
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from src.kline import plot_single
+    from src.thresholds import load_prices
+
+    # 1. 验证 cache 长度足够 (2y 缓存 ~730 天)
+    df_gold = load_prices("GC=F", "commodities_futures")
+    assert len(df_gold) >= 365 + 200, \
+        f"GC=F cache 至少需 565 行 (1y + 200 SMA warmup), 实际 {len(df_gold)} 行"
+
+    # 2. 1y 窗口下 200 SMA line 在 xlim 第一天有效
+    fig, ax = plt.subplots(1, 1, figsize=(8, 5))
+    plot_single("GC=F", ax, layer="commodities_futures", lookback_days=365)
+
+    # xlim 应是 1y 窗口 (matplotlib 返回 float ordinal, 365 天 = ~365)
+    xlim = ax.get_xlim()
+    assert xlim[1] - xlim[0] > 360, f"xlim 应 ~365 天, 实际 {xlim[1] - xlim[0]:.1f} 天"
+
+    # 找 200 SMA line (label 含 "200 SMA")
+    sma200_line = None
+    for line in ax.get_lines():
+        if "200 SMA" in line.get_label():
+            sma200_line = line
+            break
+    assert sma200_line is not None, "200 SMA line not found"
+
+    # 在 xlim 第一天附近查 y 值, 不应是 NaN
+    x_data = sma200_line.get_xdata()
+    y_data = sma200_line.get_ydata()
+    # xlim 第一天 (matplotlib date number = days since 0001-01-01)
+    # 用 matplotlib.dates.num2date 转成 datetime, 避免 0001 overflow
+    from matplotlib.dates import num2date
+    x_start = num2date(xlim[0]).replace(tzinfo=None)  # naive datetime
+    # 找 x_data 中最接近 x_start 的 index
+    import pandas as _pd
+    x_pd = _pd.to_datetime(x_data)  # DatetimeIndex
+    idx_at_start = int(np.abs((x_pd - _pd.Timestamp(x_start)).to_numpy().astype('timedelta64[D]').astype(int)).argmin())
+    y_at_start = y_data[idx_at_start]
+    assert not np.isnan(y_at_start), \
+        f"v0.6.8g fix 失效: 200 SMA 在 1y 图首日是 NaN (y={y_at_start}, idx={idx_at_start}, date={x_pd[idx_at_start]})"
+
+    # 同样验证 100 SMA
+    sma100_line = None
+    for line in ax.get_lines():
+        if "100 SMA" in line.get_label():
+            sma100_line = line
+            break
+    if sma100_line is not None:
+        x_data = sma100_line.get_xdata()
+        y_data = sma100_line.get_ydata()
+        x_pd = _pd.to_datetime(x_data)
+        idx_at_start = int(np.abs((x_pd - _pd.Timestamp(x_start)).to_numpy().astype('timedelta64[D]').astype(int)).argmin())
+        y_at_start = y_data[idx_at_start]
+        assert not np.isnan(y_at_start), \
+            f"v0.6.8g fix 失效: 100 SMA 在 1y 图首日是 NaN (y={y_at_start}, idx={idx_at_start}, date={x_pd[idx_at_start]})"
+
+    plt.close(fig)
+
+
 def test_kline_event_lines_drawn():
     """v0.6.4 (P6-1): K 线上叠加 CPI/FOMC/NFP 事件垂直线"""
     import matplotlib

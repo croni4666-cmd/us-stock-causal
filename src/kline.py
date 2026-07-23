@@ -230,9 +230,24 @@ def plot_single(
     """Plot single symbol K-line on given axes
 
     compact_title (v0.6.3): 4-subplot 时用紧凑模式, 只显示 SMA200 + 52w
+
+    v0.6.8g (P6-7): SMA 连续性 fix — 不要再切片 df (df = df.iloc[-lookback_days:])。
+    原因: 200 SMA 滚动 200 天, 切片 1y 后前 200 天没值, 200 SMA 要到 2026-02 才出现。
+    fix: 用 cache 全量数据画, xlim 限定最后 lookback_days, 让 SMA 从图一开始就连续。
+    要求: cache 至少 lookback_days + 200 (2y 缓存能保证 1y 图 200 SMA 全程有效)。
     """
     df = load_prices(symbol, layer)
-    df = df.iloc[-lookback_days:].copy()
+
+    # v0.6.8g: 不再切片! 画全量数据, xlim 限定显示窗口
+    # 这样 200 SMA 滚动 200 天有 warmup, 1y 图全程有效
+    if len(df) < lookback_days:
+        # cache 不足, fallback 老逻辑 (宁可部分 SMA 缺, 不报错)
+        df = df.copy()
+    else:
+        df = df.copy()
+        # 设置 xlim 到最后 lookback_days 窗口
+        visible_start = df.index[-lookback_days]
+        ax.set_xlim(visible_start, df.index[-1])
 
     # 蜡烛
     _draw_candles(ax, df)
