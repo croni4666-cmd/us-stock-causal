@@ -866,6 +866,37 @@ def test_sector_weights_v068f_p73_derived():
         f"P7-3 派生后 5d avg 残差绝对值 {avg_5d_abs:.3f}% 偏大 (期望 < 1%)"
 
 
+def test_residual_regression_v068i_p75():
+    """v0.6.8i (P7-5): 残差回归测试 — 任何 commit 让残差恶化 50% 触发 fail
+
+    跑 4 指数 × 3 窗口 (1d/5d/20d), 比较当前残差 vs baseline (v0.6.8f):
+    - tolerance = 1.5x (允许 50% 恶化, 留 buffer 给市场短期波动)
+    - abs_floor = 0.05% (baseline 极小时避免放大)
+
+    第一次跑会 fail (没 baseline), 应该先 `python -m src.residual_regression capture`
+    """
+    from src.residual_regression import (
+        capture_residuals, load_baseline, compare_to_baseline, DEFAULT_BASELINE,
+    )
+
+    # baseline 必须存在 (这是 v0.6.8i 的强制要求)
+    assert DEFAULT_BASELINE.exists(), \
+        f"baseline {DEFAULT_BASELINE} 不存在, 先 `python -m src.residual_regression capture`"
+
+    baseline = load_baseline()
+    current = capture_residuals()
+    ok, violations = compare_to_baseline(current, baseline, tolerance=1.5, abs_floor=0.05)
+
+    if not ok:
+        # 失败时, 列出所有 violation
+        msgs = [
+            f"  {v['index']} {v['window']}: baseline {v['baseline_pct']:+.3f}% → "
+            f"current {v['current_pct']:+.3f}% (ratio {v['regression_ratio']}x)"
+            for v in violations
+        ]
+        assert ok, f"P7-5 残差回归 fail ({len(violations)} 处):\n" + "\n".join(msgs)
+
+
 def test_events_providers_param():
     """v0.6.8c: events.upcoming_events / past_events 加 providers 参数
     - upcoming_events 默认 providers=["yaml"] (向后兼容)

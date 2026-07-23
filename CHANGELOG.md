@@ -377,6 +377,59 @@ User 看了 v0.6.8g 重渲染的金图后反馈 2 件事:
 
 ### Phase 6 进度: 8/8 done 🎉 (P6-1~7 + P6-7.5)
 
+## [0.6.8i] - 2026-07-23
+
+### Added (P7-5 done: 残差回归测试 — 锁住 v0.6.8f 残差 baseline)
+
+按 ROADMAP P7-5, 把 v0.6.8f 残差数字 (4 指数 × 3 窗口) 捕获为 baseline,
+任何 commit 让残差恶化 50% 触发 fail, 防止未来误改 sector weights / 加新 ETF / 改归因公式
+导致残差回弹 (回退到 v0.3.0 那种 "5d 残差偏大但不知道为啥" 的状态)。
+
+- **`src/residual_regression.py`** 新建 (~8.4KB):
+  - `capture_residuals()` — 跑 4 指数 × 3 窗口归因, 返回 dict
+  - `save_baseline(snapshot)` / `load_baseline()` — JSON I/O 到 `data/baseline/`
+  - `compare_to_baseline(current, baseline, tolerance=1.5, abs_floor=0.05)` — 比较
+    - tolerance 1.5x: 允许 50% 恶化 (留 buffer 给市场短期波动)
+    - abs_floor 0.05%: baseline 极小时避免放大效应 (e.g. 0.01% baseline 0.015% current 是 1.5x 但绝对值小, 仍过)
+  - `render_comparison()` — markdown 表格 (终端/HTML 友好, [OK]/[FAIL] GBK 兼容)
+  - CLI: `python -m src.residual_regression {capture|compare}`
+- **`data/baseline/residuals_v068f.json`** 新建: 捕获 v0.6.8f 残差
+  - 1d: avg abs 0.14% / 5d: 0.34% / 20d: 0.67%
+  - 4 指数 × 3 窗口 = 12 数据点
+- **`tests/test_smoke.py`** +1 断言 (37/37 pass):
+  - `test_residual_regression_v068i_p75` — 自动跑 capture + compare, fail 时列出所有 violation
+  - baseline 必须存在, 第一次跑会 fail (提示 `python -m src.residual_regression capture`)
+
+### 实测 (2026-07-23, v0.6.8f 数据)
+
+| 指数 | 1d | 5d | 20d |
+|------|----:|----:|----:|
+| DIA | +0.124% | -0.548% | +0.209% |
+| QQQ | -0.113% | +0.118% | +0.903% |
+| RSP | +0.016% | -0.325% | +0.111% |
+| QQQE | -0.310% | -0.379% | +1.472% |
+| **avg abs** | **0.14%** | **0.34%** | **0.67%** |
+
+第一次 compare: 12/12 [OK] (因为 baseline = current, 没恶化)
+
+### 设计决策
+- **tolerance 1.5x**: 50% 容忍度, 跟市场短期 sector weight 漂移 (rebalance / ETF flow) 兼容
+- **abs_floor 0.05%**: baseline 0.01% 时 current 0.015% 是 1.5x 但绝对值小, 仍过 (不杀鸡用牛刀)
+- **存 baseline JSON**: 跨 commit 可重现, 未来 re-capture (调 sector weights 后) 只需重跑 capture
+- **不加 absolute % 改善**: 旧 0.001% → 新 0.01% 是 10x 但不重要, 不该 fail
+
+### Lesson (写进 future engineering)
+- **回归测试要"锁住现状"**: 跟 unit test 不同, 回归测试捕获当前数字, 任何恶化 fail
+  - 类似 lockfile: 把现在的工作状态作 baseline, 防止无意回退
+- **容忍度留 buffer**: tolerance 1.5x 不是 1.0x, 因为市场短期波动 (5d 残差可能 ±0.2% 浮动)
+  - 1.0x 太严 (一次偶然波动就 fail), 2.0x 太松 (50% 恶化都过)
+- **CLI 设计**: `python -m src.X {capture|compare}` 双向, capture 是 admin, compare 是日常
+  - CI 跑 compare, 季度重算 baseline 时跑 capture 重写 JSON
+
+### Phase 7 进度
+- P7-1 ✅ / P7-2 ✅ / P7-3 ✅ / P7-4 不需要 / **P7-5 ✅** / P7-6 proposed
+- Phase 7 5/6 done (P7-6 推 Phase 8)
+
 ## [0.6.6] - 2026-07-15
 
 ### Added (P6-5 done: K 线 hover 显示 OHLCV)
