@@ -40,6 +40,7 @@ import matplotlib.dates as mdates
 from loguru import logger
 
 from src.thresholds import get_thresholds, load_prices
+from matplotlib.ticker import MaxNLocator, FuncFormatter
 
 
 # v0.6.2: 强制开 anti-aliasing (栅格化输出的边缘更平滑)
@@ -47,6 +48,30 @@ from src.thresholds import get_thresholds, load_prices
 mpl.rcParams['lines.antialiased'] = True
 mpl.rcParams['text.antialiased'] = True
 mpl.rcParams['patch.antialiased'] = True
+
+
+def _set_ylim_52w_padding(ax: plt.Axes, df_visible: pd.DataFrame, padding: float = 0.20) -> None:
+    """v0.6.8h: 设置 ylim 为 52w high+20% / 52w low-20% (User 建议)
+
+    User 反馈: 默认 ylim 范围太大 (黄金图 2000-5800), 价格离 y 轴太远。
+    fix: 用 visible window 的 52w (252 trading days) high/low, 各 padding 20%。
+
+    Tick: MaxNLocator nbins=8 steps=[1,2,5,10] 自动选 1/2/5 × 10^n, 6-10 个 ticks 视觉舒服。
+    """
+    if len(df_visible) < 2:
+        return
+    window = min(len(df_visible), 252)
+    high_52w = float(df_visible["high"].iloc[-window:].max())
+    low_52w = float(df_visible["low"].iloc[-window:].min())
+    if high_52w <= 0 or low_52w <= 0 or high_52w <= low_52w:
+        return  # 数据异常, 不动 ylim
+    ymin = low_52w * (1 - padding)
+    ymax = high_52w * (1 + padding)
+    ax.set_ylim(ymin, ymax)
+    # 合理 ticks
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=8, steps=[1, 2, 5, 10]))
+    # 整数价格格式 (跟 finance 显示习惯一致, 不显示 1.234e3)
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x:,.0f}"))
 
 # v0.6.2: 默认 DPI 200 → 300 (PNG 像素密度提升 2.25x)
 DEFAULT_DPI = 300
@@ -255,6 +280,9 @@ def plot_single(
     _draw_thresholds(ax, df, symbol, show_50sma=show_50sma, layer=layer)
     # v0.6.4 (P6-1) 事件线: FOMC / CPI / NFP 垂直线
     _draw_events(ax, df)
+    # v0.6.8h (P6-7.5): ylim 用 52w high/low ±20% (User 反馈默认 ylim 离价格太远)
+    if len(df) >= 2:
+        _set_ylim_52w_padding(ax, df)
 
     # 标题 — 5 SMA 全显示 (v0.6.0) + 实际 lookback period (v0.6.3 fix)
     t = get_thresholds(symbol, layer=layer)

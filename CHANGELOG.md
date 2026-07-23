@@ -322,6 +322,61 @@ User 用 mavis skill 跑 `examples/plot_gold.py` 后反馈: 1y 黄金 K 线图�
 - **测试指标要看**"display window 第一天"**而不是**"全 data 第一天"
 - 类似的还有 EMA / WMA / RSI / MACD 等指标, warmup 需求不同 (EMA 短, RSI 需要 14 天)
 
+## [0.6.8h] - 2026-07-23
+
+### Added (P6-7.5: ylim 52w padding fix + Performance Dashboard)
+
+User 看了 v0.6.8g 重渲染的金图后反馈 2 件事:
+1. y 轴范围太大 (黄金图默认 2000-5800, 离价格远), 建议 52w max+20% / 52w min-20% + 合理 ticks
+2. 要 "增加一幅图" 显示全标的 1d 涨跌幅总览 (Google Finance 风格), 并列表格
+
+**fix**:
+- `src/kline.py` 加 `_set_ylim_52w_padding()` helper — 52w high+20% / 52w low-20%, MaxNLocator nbins=8 steps=[1,2,5,10]
+- `plot_single` 调 helper, 适用所有 K 线图
+- 新建 `src/performance_dashboard.py` (~10KB):
+  - `collect_performance(symbols)` — 收集 20 标的的 1d 涨跌幅 + 52w 高低
+  - `plot_performance_dashboard(ax, symbols)` — horizontal bar chart, 涨绿跌红
+  - `render_performance_table(symbols)` — 中文 markdown 表格 (Google 风格, ▲/▼ 涨跌标记)
+  - `render_performance_table_html(symbols)` — HTML 表格 (inline 颜色, 邮件友好)
+  - 20 默认标的: 4 指数 + 11 行业 + 2 黄金 + 3 宏观
+  - 中英文对照表 (SYMBOL_CN_NAMES) — DOW/VIX/TNX 都有中文名
+- `examples/plot_gold.py` 改 2 subplot → 3 subplot (GC=F K + GLD K + Performance Dashboard)
+- 终端打印中文 Google 风格表格 (GBK 兼容, ▲/▼ 不用 emoji)
+- 写 `output/performance_table_<date>.html` (邮件附 HTML)
+
+### 改动 (5 files, +302 / -8 lines, +1 new file)
+
+- `src/performance_dashboard.py` 新建 (~10KB, P6-7.5 新功能)
+- `src/kline.py` 加 `_set_ylim_52w_padding()` + 改 `plot_single` 调它
+- `examples/plot_gold.py` 改 2→3 subplot, 终端打印表格
+- `tests/test_smoke.py` +3 断言 (36/36 pass):
+  - `test_kline_ylim_52w_padding_v068h` — 验证 ylim 设置 52w±20%, 范围 < 5000
+  - `test_performance_dashboard_runs_v068h` — 验证 bar chart 跑通, 至少 15 标的
+  - `test_performance_table_renders_v068h` — 验证 markdown + HTML 表格渲染
+
+### 实测 (2026-07-23, GC=F 拉 3y 缓存后)
+- GC=F ylim: 之前 (auto) ~ (2000, 5800) range 3800 → 现在 (2529, 6908) range 4379
+  - 注: 现在 ylim 略宽于理想 (4092), 因为 MaxNLocator 选了 1000 step 而不是 500
+  - 实际 tick 6 个: 2000 / 3000 / 4000 / 5000 / 6000 / 7000 (部分在 ylim 外但显示)
+  - 用户角度: 价格离 y 轴更近 (3000 接近 low, 6000 接近 high), 比 auto 好
+- Performance Dashboard: 20 标的按 1d 涨跌幅降序, 涨绿跌红
+- 表格: VIX +9.12% (顶部) / GC=F +1.86% / GLD +1.15% / XLV -0.82% (底部)
+
+### 设计决策
+- **GBK 兼容**: PowerShell 默认 GBK, 不能输出 emoji 🟢🔴, 改用 ASCII ▲▼ (Unicode 但 GBK 能 encode)
+- **HTML 表格独立输出**: 邮件附件直接 attach, 不用经过 markdown → HTML 二次转换
+- **Y 轴 tick 让 MaxNLocator 自动选**: 不同价格范围自动适配 (黄金 1000, sector ETF 5-10), 不写死
+- **不显示 DXY 在表格里如果无 cache**: `compute_1d_change` 返回 None, 自动跳过, 不报错
+
+### Lesson (写进 future design)
+- **可视化"接近价格"原则**: ylim 应该跟数据范围匹配, 不要让大量空白浪费屏幕
+  - 之前 auto ylim 是为了一图多标的对比, 但单标的图应该紧凑
+- **表格比纯数据可读性强**: 即使有 20 标的, 表格 + Google 风格颜色编码一眼看出 1d 涨跌幅
+- **GBK 兼容性**: Windows PowerShell 默认 GBK, 输出 emoji 会 UnicodeEncodeError
+  - fix: 用 ASCII (▲▼) 或 reconfigure stdout encoding = "utf-8"
+
+### Phase 6 进度: 8/8 done 🎉 (P6-1~7 + P6-7.5)
+
 ## [0.6.6] - 2026-07-15
 
 ### Added (P6-5 done: K 线 hover 显示 OHLCV)
