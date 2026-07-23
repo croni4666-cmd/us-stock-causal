@@ -47,9 +47,9 @@ def main() -> int:
     out_path = out_dir / f"gold_1y_{today_str}.png"
 
     # 3 subplot: 2 K-line + 1 performance dashboard
-    # 比例: 上 4:4, 下 2 (performance dashboard 矮一点)
-    fig = plt.figure(figsize=(14, 13))
-    gs = fig.add_gridspec(3, 1, height_ratios=[4, 4, 2.2], hspace=0.35)
+    # 比例: 上 3:3, 下 4 (performance dashboard 高一点, 因为 20 标的 + 2 行 label)
+    fig = plt.figure(figsize=(15, 15))
+    gs = fig.add_gridspec(3, 1, height_ratios=[3, 3, 4.5], hspace=0.40)
     axes = [fig.add_subplot(gs[0]), fig.add_subplot(gs[1]), fig.add_subplot(gs[2])]
 
     fig.suptitle(
