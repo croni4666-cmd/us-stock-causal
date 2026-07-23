@@ -86,6 +86,21 @@ def update_or_fetch(
     """
     path = cache_path(symbol, layer, cache_root)
 
+    # 0. v0.6.8j (P7-6): yfinance 限流检测 — 限流时跳过 fetch, 返回旧缓存
+    #    防止 daily cron 静默挂掉, Phase 8 alert 推送
+    from src.yfinance_rate_limit import is_rate_limited, get_rate_limit_info
+    if is_rate_limited() and not force_refresh:
+        info = get_rate_limit_info()
+        logger.warning(
+            f"[{symbol}] yfinance 限流中 (hit={info.get('hit_count', '?')}, "
+            f"expires={info.get('expires_at', '?')}). 跳过 fetch, 用 cache only."
+        )
+        cached = read_cache(path)
+        if cached is not None and len(cached) > 0:
+            return cached, "rate_limited"
+        # 无缓存 + 限流 = 拿不到数据, 返回空
+        return pd.DataFrame(), "rate_limited_empty"
+
     # 1. 强制刷新
     if force_refresh and path.exists():
         path.unlink()

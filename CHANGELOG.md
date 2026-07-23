@@ -430,6 +430,51 @@ User 看了 v0.6.8g 重渲染的金图后反馈 2 件事:
 - P7-1 ✅ / P7-2 ✅ / P7-3 ✅ / P7-4 不需要 / **P7-5 ✅** / P7-6 proposed
 - Phase 7 5/6 done (P7-6 推 Phase 8)
 
+## [0.6.8j] - 2026-07-23
+
+### Added (P7-6 done: yfinance 限流检测 + 优雅降级)
+
+按 ROADMAP P7-6 (v0.6.8b hotfix 新发现) 修 yfinance 限流时 daily cron 静默挂的问题。
+
+**问题**: yfinance 2026 持续限流 (YFRateLimitError, 429 Too Many Requests),
+限流时 cache miss 拉新数据会失败, daily cron 增量挂, 第二天才发现没数据。
+
+**fix**:
+- `src/yfinance_rate_limit.py` 新建 (~5KB):
+  - `record_rate_limit(symbol, exc, duration_hours=24)` — 写 `data/cache/yfinance_rate_limit.json`
+  - `is_rate_limited()` — 检查当前是否在 24h cooldown 期
+  - `get_rate_limit_info()` — 读 status dict (Phase 8 alert 用)
+  - `clear_rate_limit()` — admin 工具, 手动清状态
+  - `is_yf_rate_limit_error(exc)` — 识别 YFRateLimitError + requests 429 + 关键字
+  - 兼容老 yfinance (没 YFRateLimitError 异常) — 用 requests 429 + 关键字回退
+- `src/data.py` `fetch()` 改: 捕 YFRateLimitError → 立即 record + 不重试 (省时间) + re-raise
+- `src/cache.py` `update_or_fetch()` 改: 0 步加限流 check, 限流时跳过 fetch, 返回旧缓存 (status "rate_limited")
+- `tests/test_smoke.py` +1 断言 (38/38 pass):
+  - `test_yfinance_rate_limit_v068j_p76` — 9 步验证: 路径 / 干净环境 / record / is_rate_limited / get_info / 累加 hit_count / 错误识别 / clear / 幂等
+
+### 设计决策
+- **24h cooldown**: Yahoo 经验值, 太短 (1h) 可能没自愈, 太长 (48h) 失去时效性
+- **hit_count 累加**: 多次限流标记, 反映"这个 IP 段一直黑"
+- **不抛新异常**: re-raise 原 YFRateLimitError, 让上层 cache 自然降级
+- **cache 内 stat 字段**: 方便 Phase 8 alert 推送"yfinance 限流"通知
+
+### 优雅降级流程
+```
+yfinance.fetch() hits YFRateLimitError
+  ↓
+record_rate_limit() 写 cache + re-raise
+  ↓
+cache.update_or_fetch() 捕
+  ↓
+is_rate_limited() 返 True → 跳过 fetch → 返回旧 cache
+  ↓
+status="rate_limited" → caller 知道数据没刷新
+```
+
+### Phase 7 进度
+- P7-1 ✅ / P7-2 ✅ / P7-3 ✅ / P7-4 不需要 / P7-5 ✅ / **P7-6 ✅**
+- **Phase 7 6/6 done 🎉** (全部 done, 准备 Phase 8 启动)
+
 ## [0.6.6] - 2026-07-15
 
 ### Added (P6-5 done: K 线 hover 显示 OHLCV)

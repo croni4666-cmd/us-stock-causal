@@ -25,6 +25,7 @@ from loguru import logger
 
 # proxy 必须在 yfinance 之前 import (yfinance 用 requests,会读 env var)
 from src import proxy  # noqa: F401
+from src.yfinance_rate_limit import is_yf_rate_limit_error, record_rate_limit  # noqa: E402
 
 
 # yfinance 的 ticker 别名映射 (OpenBB/yahoo 名字差异)
@@ -101,6 +102,16 @@ def fetch(
             return _normalize(df, symbol)
         except Exception as e:
             last_err = e
+            # v0.6.8j (P7-6): 检测 yfinance 限流, 立即记录 + 不再重试 (省时间)
+            if is_yf_rate_limit_error(e):
+                info = record_rate_limit(symbol, e)
+                logger.error(
+                    f"[{symbol}] yfinance 限流检测! hit={info['hit_count']} "
+                    f"expires={info['expires_at']}. 24h 内跳过 yfinance, 用 cache only."
+                )
+                # 重新 raise, 让上层 cache.update_or_fetch 决定 fallback
+                raise
+            # 其他错误正常重试
             wait = 2 ** attempt
             logger.warning(f"[{symbol}] yfinance 失败 (attempt {attempt+1}/3): {e}. {wait}s 后重试")
             time.sleep(wait)
