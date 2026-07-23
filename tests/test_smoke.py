@@ -371,6 +371,108 @@ def test_kline_sma_warmup_v068g():
     plt.close(fig)
 
 
+def test_kline_ylim_52w_padding_v068h():
+    """v0.6.8h (P6-7.5): ylim 用 52w high+20% / 52w low-20% (User 反馈)
+
+    User 反馈: 默认 ylim 范围太大 (黄金图 2000-5800), 价格离 y 轴太远。
+    fix: 用 visible window 的 52w high/low, 各 padding 20%。
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from src.kline import plot_single, _set_ylim_52w_padding
+    from src.thresholds import load_prices
+
+    # 1. 直接验证 helper function
+    df_gold = load_prices("GC=F", "commodities_futures")
+    window = min(len(df_gold), 252)
+    high_52w = float(df_gold["high"].iloc[-window:].max())
+    low_52w = float(df_gold["low"].iloc[-window:].max())  # 用 .max() 测试错误用法不会被采纳
+    low_52w = float(df_gold["low"].iloc[-window:].min())
+    expected_ymin = low_52w * 0.8
+    expected_ymax = high_52w * 1.2
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 5))
+    _set_ylim_52w_padding(ax, df_gold)
+    ylim = ax.get_ylim()
+    assert abs(ylim[0] - expected_ymin) < 1.0, \
+        f"ymin 应 ~{expected_ymin:.0f}, 实际 {ylim[0]:.0f}"
+    assert abs(ylim[1] - expected_ymax) < 1.0, \
+        f"ymax 应 ~{expected_ymax:.0f}, 实际 {ylim[1]:.0f}"
+    plt.close(fig)
+
+    # 2. 验证 plot_single 调用后 ylim 已经被设置
+    fig, ax = plt.subplots(1, 1, figsize=(8, 5))
+    plot_single("GC=F", ax, layer="commodities_futures", lookback_days=252)
+    ylim = ax.get_ylim()
+    # 验证 ymin / ymax 在 52w low-25% ~ 52w high+25% 范围内
+    # (MaxNLocator 会把 ylim 稍微外扩来对齐 ticks, 留 5% buffer)
+    assert ylim[0] < low_52w * 0.85, \
+        f"ymin {ylim[0]:.0f} 应 < {low_52w * 0.85:.0f} (52w low - 15%)"
+    assert ylim[0] > low_52w * 0.75, \
+        f"ymin {ylim[0]:.0f} 应 > {low_52w * 0.75:.0f} (52w low - 25%)"
+    assert ylim[1] > high_52w * 1.15, \
+        f"ymax {ylim[1]:.0f} 应 > {high_52w * 1.15:.0f} (52w high + 15%)"
+    assert ylim[1] < high_52w * 1.30, \
+        f"ymax {ylim[1]:.0f} 应 < {high_52w * 1.30:.0f} (52w high + 30%)"
+    # ylim 范围应 < 默认 auto 的 5000 (大幅收紧)
+    ylim_range = ylim[1] - ylim[0]
+    assert ylim_range < 5000, \
+        f"v0.6.8h fix 失效: ylim 范围 {ylim_range:.0f} 偏大 (期望 < 5000)"
+    plt.close(fig)
+
+
+def test_performance_dashboard_runs_v068h():
+    """v0.6.8h: 全标的 1d 涨跌幅 horizontal bar chart 能跑"""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from src.performance_dashboard import (
+        plot_performance_dashboard,
+        collect_performance,
+    )
+    # 默认 20 个标的应该都能 collect 到 (有 cache)
+    results = collect_performance()
+    assert len(results) >= 15, f"应至少 15 个标的 (4 指数 + 11 行业 + 2 黄金 + 3 宏观), 实际 {len(results)}"
+    # 验证每条都有必要字段
+    for r in results:
+        assert "symbol" in r
+        assert "last_close" in r
+        assert "change_pct" in r
+        assert "high_52w" in r
+        assert "low_52w" in r
+    # 画图不报错
+    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    plot_performance_dashboard(ax)
+    assert len(ax.patches) > 0, "应有 bar patches"
+    assert ax.get_title() != "", "应有标题"
+    plt.close(fig)
+
+
+def test_performance_table_renders_v068h():
+    """v0.6.8h: 中文 Google 风格表格渲染 (markdown + HTML)"""
+    from src.performance_dashboard import (
+        render_performance_table,
+        render_performance_table_html,
+    )
+    md = render_performance_table()
+    # markdown 格式
+    assert "| 中文名 |" in md, "应有表头"
+    assert "|" in md, "应有多行表格"
+    assert "1d 涨跌幅" in md
+    # 至少 10 行 (去掉表头表分隔)
+    lines = [l for l in md.split("\n") if l.strip().startswith("|")]
+    assert len(lines) >= 12, f"应至少 12 行 (表头 + 分隔 + 10 数据), 实际 {len(lines)}"
+
+    # HTML 格式
+    html = render_performance_table_html()
+    assert "<table" in html
+    assert "中文名" in html
+    assert "1d 涨跌幅" in html
+    # 验证颜色: 涨绿 (#137333) 或 跌红 (#c5221f)
+    assert "#137333" in html or "#c5221f" in html, "应有 inline 颜色"
+
+
 def test_kline_event_lines_drawn():
     """v0.6.4 (P6-1): K 线上叠加 CPI/FOMC/NFP 事件垂直线"""
     import matplotlib
