@@ -149,6 +149,7 @@ def plot_performance_dashboard(
     """画 1 张 1d 涨跌幅 horizontal bar chart
 
     按涨跌幅降序 (涨在上, 跌在下), 颜色按方向
+    v0.6.8h fix: y-tick label 2 行 (symbol + 中文名), 避免重叠
     """
     results = collect_performance(symbols)
     if not results:
@@ -165,7 +166,7 @@ def plot_performance_dashboard(
         results = top_up + top_dn
         results.sort(key=lambda r: r["change_pct"], reverse=True)
 
-    labels = [SYMBOL_CN_NAMES.get(r["symbol"], r["symbol"]) for r in results]
+    labels_cn = [SYMBOL_CN_NAMES.get(r["symbol"], r["symbol"]) for r in results]
     values = [r["change_pct"] for r in results]
     colors = [COLOR_UP if v > 0 else COLOR_DOWN if v < 0 else COLOR_NEUTRAL for v in values]
 
@@ -173,9 +174,18 @@ def plot_performance_dashboard(
     y_pos = list(range(len(results)))
     bars = ax.barh(y_pos, values, color=colors, alpha=0.85, edgecolor="white", linewidth=0.5)
 
-    # Y 轴标签 (在 bar 右侧)
+    # v0.6.8h fix: y-tick label 2 行 (symbol 加粗 + 中文名) — 避免单行重叠
+    multi_line_labels = [
+        f"{r['symbol']}\n{labels_cn[i]}"  # 2 行: symbol 上, 中文名下
+        for i, r in enumerate(results)
+    ]
     ax.set_yticks(y_pos)
-    ax.set_yticklabels([f"{r['symbol']:8s} {labels[i]}" for i, r in enumerate(results)], fontsize=8)
+    ax.set_yticklabels(multi_line_labels, fontsize=7, va="center")
+    # 减小 y-tick padding, 给 bar 更多空间
+    ax.tick_params(axis="y", pad=2)
+    # 增大 y-tick label 高度, 给 2 行更多空间
+    for label in ax.get_yticklabels():
+        label.set_linespacing(1.2)
 
     # 0% 参考线
     ax.axvline(0, color=COLOR_NEUTRAL, linestyle="--", linewidth=0.8, alpha=0.6)
