@@ -149,7 +149,8 @@ def plot_performance_dashboard(
     """画 1 张 1d 涨跌幅 horizontal bar chart
 
     按涨跌幅降序 (涨在上, 跌在下), 颜色按方向
-    v0.6.8h fix: y-tick label 2 行 (symbol + 中文名), 避免重叠
+    v0.6.8h hotfix 2: y-tick 只放 symbol (1 行), 中文名做 annotation 放 bar 末端
+    解决 20 标的时 y-tick 2 行 label 垂直重叠问题
     """
     results = collect_performance(symbols)
     if not results:
@@ -174,18 +175,11 @@ def plot_performance_dashboard(
     y_pos = list(range(len(results)))
     bars = ax.barh(y_pos, values, color=colors, alpha=0.85, edgecolor="white", linewidth=0.5)
 
-    # v0.6.8h fix: y-tick label 2 行 (symbol 加粗 + 中文名) — 避免单行重叠
-    multi_line_labels = [
-        f"{r['symbol']}\n{labels_cn[i]}"  # 2 行: symbol 上, 中文名下
-        for i, r in enumerate(results)
-    ]
+    # v0.6.8h hotfix 2: y-tick 只放 symbol (1 行, 短), 中文名 annotation 放 bar 末端
+    # 这样 y-tick 不会因为 2 行 label 在 16px/row 时垂直重叠
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(multi_line_labels, fontsize=7, va="center")
-    # 减小 y-tick padding, 给 bar 更多空间
-    ax.tick_params(axis="y", pad=2)
-    # 增大 y-tick label 高度, 给 2 行更多空间
-    for label in ax.get_yticklabels():
-        label.set_linespacing(1.2)
+    ax.set_yticklabels([r["symbol"] for r in results], fontsize=8, fontfamily="monospace")
+    ax.tick_params(axis="y", pad=4)
 
     # 0% 参考线
     ax.axvline(0, color=COLOR_NEUTRAL, linestyle="--", linewidth=0.8, alpha=0.6)
@@ -197,21 +191,35 @@ def plot_performance_dashboard(
     ax.xaxis.set_major_locator(MaxNLocator(nbins=6, steps=[1, 2, 5, 10]))
     ax.tick_params(axis="x", labelsize=8)
 
-    # Bar 末端显示数值
+    # Bar 末端显示百分比 + 中文名
     xmax = max(values) if values else 0
     xmin = min(values) if values else 0
     x_range = max(abs(xmax), abs(xmin), 0.5)
-    for i, (bar, val) in enumerate(zip(bars, values)):
+    for i, (bar, val, name_cn) in enumerate(zip(bars, values, labels_cn)):
+        # 缩短中文名 (去掉括号注释, 比如 "黄金期货 (COMEX)" → "黄金期货")
+        name_short = name_cn.split(" (")[0]
         if val >= 0:
-            ax.text(val + x_range * 0.01, i, f"{val:+.2f}%", va="center", ha="left", fontsize=7, color="#333")
+            # bar 右端: 百分比 + 短中文名
+            ax.text(val + x_range * 0.01, i, f"{val:+.2f}%  {name_short}",
+                    va="center", ha="left", fontsize=7, color="#333")
         else:
-            ax.text(val - x_range * 0.01, i, f"{val:+.2f}%", va="center", ha="right", fontsize=7, color="#333")
+            # bar 左端: 短中文名 + 百分比 (中文名在左, 数字在右贴近 bar)
+            ax.text(val - x_range * 0.01, i, f"{name_short}  {val:+.2f}%",
+                    va="center", ha="right", fontsize=7, color="#333")
 
     # 标题
     ax.set_title(f"全标的 1d 涨跌幅总览 ({len(results)} 只)", fontsize=11, fontweight="bold", pad=8)
     ax.set_xlabel("1d 涨跌幅", fontsize=9)
     ax.grid(axis="x", alpha=0.3, linestyle=":", linewidth=0.5)
     ax.set_axisbelow(True)
+
+    # 给右端 annotation 留空间
+    xlim_left, xlim_right = ax.get_xlim()
+    # 加宽 xlim 给 annotation 留位置
+    if xlim_right > 0:
+        ax.set_xlim(xlim_left, xlim_right * 1.35)
+    if xlim_left < 0:
+        ax.set_xlim(xlim_left * 1.35, xlim_right)
 
     # 反转 Y 轴 (涨在上)
     ax.invert_yaxis()
