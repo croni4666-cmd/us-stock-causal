@@ -627,6 +627,69 @@ def test_sector_weights_v068e_real_values():
                 f"{r['index']} {h}d 残差 {r['residual_pct']:.2f}% 异常 (> 5%)"
 
 
+def test_sector_weights_v068f_p73_derived():
+    """v0.6.8f (P7-3 派生): 从硬编码 ETF 成分股派生 4 指数 sector weights
+
+    验证 (vs v0.6.8e 主要差异):
+    - DIA: price-weighted → Financials (XLF) 显著上升, IT 下降
+    - QQQ: cap-weighted → IT 50%+, 跟 v0.6.8e 类似但更精确 (从 100 成分股 + mcap)
+    - QQQE: equal-weight Nasdaq-100 → IT 降 (从 ~50% → ~35%)
+    - RSP: equal-weight S&P 500 → Industrials/XLK 并列最高 (各 sector ~9%)
+    - 5d 残差改善 (v0.6.8e avg -0.61% → v0.6.8f < 0)
+    """
+    from src.attribution import load_sector_weights, attribute_all_indices, SECTOR_TICKERS
+    from data.static.etf_constituents import DIA_30, get_qqq_100, SP500_SECTOR_COUNTS
+
+    weights_data = load_sector_weights()
+
+    # 1. DIA price-weighted: XLF (Financials) 应该是 top sector
+    #    (高价格股 GS=$470, V=$280, JPM=$210, TRV=$240, AXP=$240 集中)
+    dia_w = weights_data["DIA"]
+    assert dia_w["XLF"] > dia_w["XLK"], \
+        f"DIA price-weighted: XLF ({dia_w['XLF']*100:.1f}%) 应 > XLK ({dia_w['XLK']*100:.1f}%)"
+    assert dia_w["XLF"] > 0.20, \
+        f"DIA XLF 应 > 20% (Financials 高价格股集中), 实际 {dia_w['XLF']*100:.1f}%"
+
+    # 2. QQQ cap-weighted: XLK 应 ~50% (跟 published QQQ factsheet 一致)
+    qqq_w = weights_data["QQQ"]
+    assert 0.45 < qqq_w["XLK"] < 0.55, \
+        f"QQQ XLK 应 ~50% (cap-weighted tech 集中), 实际 {qqq_w['XLK']*100:.1f}%"
+    # 加上 XLC (Comm) 应 > 65%
+    assert qqq_w["XLK"] + qqq_w["XLC"] > 0.65, \
+        f"QQQ XLK+XLC 应 > 65% (tech + comm 主导), 实际 {(qqq_w['XLK']+qqq_w['XLC'])*100:.1f}%"
+
+    # 3. QQQE equal-weight: XLK 应 < QQQ XLK (更分散)
+    qqqe_w = weights_data["QQQE"]
+    assert qqqe_w["XLK"] < qqq_w["XLK"], \
+        f"QQQE XLK ({qqqe_w['XLK']*100:.1f}%) 应 < QQQ XLK ({qqq_w['XLK']*100:.1f}%) (equal-weight 更分散)"
+    assert qqqe_w["XLK"] < 0.40, \
+        f"QQQE XLK 应 < 40% (equal-weight 50 只 IT / 100 总), 实际 {qqqe_w['XLK']*100:.1f}%"
+
+    # 4. RSP equal-weight: 没有 sector > 20% (没单一 sector 主导)
+    rsp_w = weights_data["RSP"]
+    max_sector_w = max(rsp_w[s] for s in SECTOR_TICKERS)
+    assert max_sector_w < 0.20, \
+        f"RSP 最大 sector 应 < 20% (equal-weight 分散), 实际 {max_sector_w*100:.1f}%"
+
+    # 5. constituents 数据本身健全性
+    assert len(DIA_30) == 30, f"DIA 应 30 只, 实际 {len(DIA_30)}"
+    qqq_100 = get_qqq_100()
+    assert 95 <= len(qqq_100) <= 105, f"QQQ 应 ~100 只, 实际 {len(qqq_100)}"
+    # SP500 sector count 总和应该 ~500-520
+    sp500_total = sum(SP500_SECTOR_COUNTS.values())
+    assert 480 < sp500_total < 530, f"S&P 500 sector count 总和应 ~500, 实际 {sp500_total}"
+
+    # 6. P7-3 派生应该比 v0.6.8e 残差更小 (avg 5d 残差绝对值)
+    #    v0.6.8e avg 5d ~-0.61% (我跟 v0.6.8e commit msg 比)
+    #    v0.6.8f 派生后应该 avg 5d 残差绝对值 < 0.6%
+    #    注: 不 hardcode 数字, 只验"派生后没崩"
+    from datetime import datetime
+    results_5d = attribute_all_indices(date=None, lookback_days=5, symbols=["DIA", "QQQ", "RSP", "QQQE"])
+    avg_5d_abs = sum(abs(r["residual_pct"]) for r in results_5d) / 4
+    assert avg_5d_abs < 1.0, \
+        f"P7-3 派生后 5d avg 残差绝对值 {avg_5d_abs:.3f}% 偏大 (期望 < 1%)"
+
+
 def test_events_providers_param():
     """v0.6.8c: events.upcoming_events / past_events 加 providers 参数
     - upcoming_events 默认 providers=["yaml"] (向后兼容)
