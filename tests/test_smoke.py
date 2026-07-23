@@ -897,6 +897,71 @@ def test_residual_regression_v068i_p75():
         assert ok, f"P7-5 残差回归 fail ({len(violations)} 处):\n" + "\n".join(msgs)
 
 
+def test_yfinance_rate_limit_v068j_p76():
+    """v0.6.8j (P7-6): yfinance 限流检测 + 优雅降级
+
+    验证:
+    1. 限流状态 cache 文件路径正确
+    2. record_rate_limit 写入正确字段
+    3. is_rate_limited() 在 cooldown 期内返 True
+    4. clear_rate_limit() 后 is_rate_limited() 返 False
+    5. is_yf_rate_limit_error() 能识别 YFRateLimitError + 429 + 关键字
+    """
+    import tempfile
+    from src.yfinance_rate_limit import (
+        record_rate_limit, is_rate_limited, get_rate_limit_info,
+        clear_rate_limit, is_yf_rate_limit_error, RATE_LIMIT_CACHE,
+    )
+
+    # 1. cache 路径在 data/cache/ 下 (Windows path 用 \\ 或 /, normalize 后 check)
+    path_str = str(RATE_LIMIT_CACHE).replace("\\", "/")
+    assert "data/cache" in path_str, f"cache 路径错: {RATE_LIMIT_CACHE}"
+    assert path_str.endswith("yfinance_rate_limit.json"), f"cache 文件名错: {RATE_LIMIT_CACHE}"
+
+    # 2. 干净环境: 确认初始无 record
+    clear_rate_limit()
+    assert not is_rate_limited(), "干净环境应该不限流"
+    assert get_rate_limit_info() is None, "干净环境应该无 info"
+
+    # 3. 模拟限流 — 写个假的异常
+    class FakeRateLimitError(Exception):
+        pass
+    info = record_rate_limit("DIA", FakeRateLimitError("429 Too Many Requests"), duration_hours=1)
+    assert info["last_symbol"] == "DIA"
+    assert info["hit_count"] == 1
+    assert info["status"] == "active"
+    assert "FakeRateLimitError" in info["last_error"]
+
+    # 4. 限流中: is_rate_limited 返 True
+    assert is_rate_limited(), "记录后应该限流"
+
+    # 5. get_rate_limit_info 返 dict
+    info2 = get_rate_limit_info()
+    assert info2 is not None
+    assert info2["hit_count"] == 1
+
+    # 6. 累加 hit_count
+    record_rate_limit("QQQ", FakeRateLimitError("429"), duration_hours=1)
+    info3 = get_rate_limit_info()
+    assert info3["hit_count"] == 2, f"累加 hit_count 应 = 2, 实际 {info3['hit_count']}"
+    assert info3["last_symbol"] == "QQQ"  # 最后一次覆盖
+
+    # 7. is_yf_rate_limit_error 识别
+    assert is_yf_rate_limit_error(FakeRateLimitError("429 Too Many Requests"))
+    assert is_yf_rate_limit_error(Exception("yfratelimit exceeded"))
+    assert is_yf_rate_limit_error(Exception("rate limit hit"))
+    assert not is_yf_rate_limit_error(Exception("network timeout"))  # 不应误报
+    assert not is_yf_rate_limit_error(ValueError("bad input"))
+
+    # 8. clear_rate_limit 清状态
+    assert clear_rate_limit() is True
+    assert not is_rate_limited(), "clear 后应该不限流"
+    assert get_rate_limit_info() is None, "clear 后应该无 info"
+
+    # 9. 幂等: clear 已不存在的 cache 不报错
+    assert clear_rate_limit() is False
+
+
 def test_events_providers_param():
     """v0.6.8c: events.upcoming_events / past_events 加 providers 参数
     - upcoming_events 默认 providers=["yaml"] (向后兼容)
