@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线在 K 线上) — **P6-1 done in v0.6.4**
 - v0.6.x: 报告顶部 1 行 → 3 行 (1d/5d/20d) — **P6-4 done in v0.6.8**
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
-- v0.8.x: Phase 5 增强 (K 线图发飞书 / 失败重试 / timezone)
+- v0.8.x: Phase 5 增强 (失败重试 / timezone) — **飞书 2026-07-26 archived, 改本地化**
 
 ## [0.6.7] - 2026-07-15
 
@@ -475,6 +475,50 @@ status="rate_limited" → caller 知道数据没刷新
 - P7-1 ✅ / P7-2 ✅ / P7-3 ✅ / P7-4 不需要 / P7-5 ✅ / **P7-6 ✅**
 - **Phase 7 6/6 done 🎉** (全部 done, 准备 Phase 8 启动)
 
+## [0.6.8k] - 2026-07-26
+
+### 🪦 飞书 archived — Phase 5/8 重写为本地化
+
+User 2026-07-26 决定: **暂停所有飞书相关开发**, 跟 user global "hobbyist ceiling" 规则对齐
+(hosted service 需要 token / 维护 channel / 关注"机器人是不是被禁言", 跟个人爱好者经济负担冲突)。
+
+**改动**:
+- `git mv examples/feishu_push.py archive/feishu_push.py` — 脚本保留作 reference, 不进 main flow
+- `docs/PHASE5.md` 顶部加 🪦 ARCHIVED banner, P5-1/2 状态改 cancelled, 链接到新 ROADMAP
+- `CHANGELOG.md` 注释所有飞书 references (line 14, 748, 760, 777, 1175) 加 "🪦 2026-07-26 archived" 标注
+- `[Unreleased]` Planned v0.8.x Phase 5 改: "失败重试 / timezone" (去掉 "发飞书")
+
+**ROADMAP.md 重写** (workspace-level, 已完成):
+- Phase 5 整个飞书路径 archived: P5-1 cancelled, P5-2 改为手动跑 `daily_report.py` 看本地输出
+  (markdown + cache + alert log), P5-4 改为 Windows Task Scheduler (本地 cron)
+- Phase 8 重设计 (本地化告警): 5 类异常检测不变, 但 alert 改写 `data/cache/alerts/alerts_<date>.json`
+  (累积) + 终端显眼 stdout `[ALERT]`, 替代飞书 card
+- **新增 P8-6**: 本地 alert logger (`src/alert_logger.py` record_alert) — 替代飞书 card
+- **新增 P8-7 (可选)**: Windows toast notification (`plyer.notification`) — 低侵入增强项
+
+**Why 飞书 archived (4 理由)**:
+1. 跟 user global "hobbyist ceiling" 规则冲突 (hosted service 维护负担)
+2. 凌晨 cron 跑失败时, 飞书 alert 还要发一条 spam 提醒 — 不如本地 alert log 累积, user 主动看
+3. 跟现有 mavis skill 报告 (HTML 邮件友好) 重复 — 飞书本质是另一种 push channel, 价值不高
+4. 跟 Web 仪表盘 / Streamlit 一样 archived, "不依赖 hosted service" 是统一的
+
+**Phase 5/8 新启动条件**:
+- Phase 5: 本地化 (Windows Task Scheduler + daily_report.py 本地输出)
+- Phase 8: 本地 alert log (P8-6) + 可选 Windows toast (P8-7), 不依赖飞书 cron channel
+
+**Discipline 写进 future design** (新):
+- **"不依赖 hosted service" 是 hobbyist ceiling 的铁律** — 任何第三方 SaaS 都要三思
+  (需要 user 配 token? 维护 channel? 担心被禁言? 都不行)
+- **alert 用累积本地 log, 不用 push** — user 主动看, 不被 spam 提醒
+- **hosted service 的替代方案**: 本地 log / OS notification / 文件 / Markdown report
+
+### 改动文件清单 (5 files, +24 / -22 lines)
+
+- `examples/feishu_push.py` → `archive/feishu_push.py` (git mv, 0 行内容改)
+- `docs/PHASE5.md` 加 ARCHIVED banner + 改 P5-1/2 status
+- `CHANGELOG.md` +24/-22 lines (5 处加 archived 标注 + 本段)
+- `ROADMAP.md` (workspace-level, 不进 git): Phase 5/8 整个重写 + 2026-07-26 update log
+
 ## [0.6.6] - 2026-07-15
 
 ### Added (P6-5 done: K 线 hover 显示 OHLCV)
@@ -745,19 +789,19 @@ User 反馈 v0.6.0/v0.6.1 K 线图"还是有点糊", 跑 GitHub + 论坛 5 层�
   - _meta.json — name / version / platform
   - **junction-safe**: 用真实路径 `.minimax` 装,不走 `.mavis` junction
   - **v1 教训应用**: 检查 `Get-Item` LinkType,确认 Junction,直接走真实路径
-- **P5-1 + P5-2 飞书推送脚本** — `examples/feishu_push.py`
+- **P5-1 + P5-2 飞书推送脚本** — `examples/feishu_push.py` (**🪦 2026-07-26 archived → `archive/feishu_push.py`, 不进 main flow**)
   - 从 .env 读 FEISHU_WEBHOOK_URL (gitignore,安全)
   - 飞书 interactive card 格式 (header + 顶部情绪 + 5 段报告 + footer)
   - `--dry-run` 看 payload 不真发
   - **默认不自动跑** (P5-2 手动确认)
-- **P5-1/2/3/4 完整文档** — `docs/PHASE5.md`
+- **P5-1/2/3/4 完整文档** — `docs/PHASE5.md` (**🪦 2026-07-26 archived, 顶部加 ARCHIVED banner, 保留作 reference**)
   - 4 步用户操作路径: 创建机器人 → dry-run → 真发一次 → 确认 cron 时间
   - v1 教训应用: 不拍脑袋 17:00,等用户确认再注册 cron
   - 已知限制列清楚: K 线图不发 / 30KB 截断 / 无重试 / timezone
 
 ### Verified (2026-07-13)
 - **mavis skill 装好**: 2 文件 7 KB,真实路径,不被 junction 损坏
-- **feishu_push.py dry-run**: 3075 字符 payload,远低于 30KB 限制
+- **feishu_push.py dry-run**: 3075 字符 payload,远低于 30KB 限制 (脚本本身 v0.5.1 verified, 2026-07-26 archived)
 - **4 段元素**: header (title) → 顶部情绪 (VIX/10Y/DXY + 4 指数) → 5 段报告 (lark_md) → footer (note)
 - **Phase 5 gate 全开**: 等用户操作 4 步后才进 P5-4 cron
 
@@ -774,8 +818,8 @@ User 反馈 v0.6.0/v0.6.1 K 线图"还是有点糊", 跑 GitHub + 论坛 5 层�
 - P4-2 ✅ Jupyter Lab 启动器 (v0.5.0)
 - P4-3 ✅ 3 个 sample notebook (v0.5.0)
 - **P4-4 ✅ mavis skill 装好 (本版本)**
-- P5-1 ✅ 飞书 webhook 配置文档 (本版本)
-- P5-2 ✅ 手动推送脚本 (本版本)
+- P5-1 ✅ 飞书 webhook 配置文档 (本版本, 🪦 2026-07-26 archived)
+- P5-2 ✅ 手动推送脚本 (本版本, 🪦 2026-07-26 archived)
 - P5-3 ⏳ 等用户确认 cron 时间
 - P5-4 ⏳ 等用户说"OK 跑"再注册 cron
 
@@ -1172,7 +1216,7 @@ User 反馈 v0.6.0/v0.6.1 K 线图"还是有点糊", 跑 GitHub + 论坛 5 层�
 - 历史模式匹配 (DTW 或欧式距离)
 - 关键阈值检测 (支撑/阻力/财报)
 - 报告生成 (5 段制)
-- 飞书推送
+- 飞书推送 (🪦 2026-07-26 archived — 改本地化 alert log + mavis skill HTML 报告)
 - cron 调度
 - 自分析工具 (Jupyter / sample notebook)
 

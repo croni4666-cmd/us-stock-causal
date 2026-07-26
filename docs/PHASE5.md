@@ -1,18 +1,32 @@
 # Phase 5 — 调度设置 (v0.5.1+)
 
+> **🪦 ARCHIVED 2026-07-26** — 飞书 cron 路径整个废弃,跟 user global "hobbyist ceiling" 规则冲突
+> (hosted service 需要 token / 维护 channel / 关注"机器人是不是被禁言")。
+>
+> 新 Phase 5 路径: **本地化调度** — Windows Task Scheduler + 本地 alert log。
+> 详见 `ROADMAP.md` (workspace) Phase 5 段。
+>
+> 本文件保留作 reference, **不进 main flow**。
+
+---
+
 > **v0.5.1 默认不自动跑**。Cron + 飞书推送需要**用户手动配置**。
 >
 > **Why**: v1 教训 — 拍脑袋设的 17:00 cron 没人看,飞书 webhook 配错导致 spam 整群。
 > Phase 5 走"用户先手动跑一次确认,再决定要不要 cron"的路径。
+>
+> **⏸️ 2026-07-26 整个飞书路径 cancelled, 上面那段是历史**。
 
 ---
 
-## 📋 Phase 5 进度 (0/4 done)
+## 📋 Phase 5 进度 (cancelled 2026-07-26, 改本地化)
 
 | ID | Item | Status | User Action |
 |---|---|---|---|
-| P5-1 | 飞书 webhook 配置 | ⏳ | **需要**: 创建机器人 + 复制 URL |
-| P5-2 | 手动跑一次确认 | ⏳ | **需要**: 跑 `python examples/feishu_push.py` |
+| P5-1 | 飞书 webhook 配置 | 🪦 cancelled | ~~需要: 创建机器人 + 复制 URL~~ — 不需要 (改本地化) |
+| P5-2 | 手动跑一次确认 (飞书) | 🪦 cancelled | ~~需要: 跑 `python examples/feishu_push.py`~~ — 改: 跑 `python examples/daily_report.py` 看本地输出 |
+| P5-3 | 跟 user 确认 cron 时间 | `proposed` | 候选 17:00 / 16:30 / 22:00 |
+| P5-4 | 配置 Windows Task Scheduler (本地 cron) | `proposed` | `scripts/setup_windows_task.ps1` 一键配 |
 | P5-3 | 跟 user 确认 cron 时间 | ⏳ | **需要**: 你说"每天 17:00"或"其它" |
 | P5-4 | Re-enable cron | ⏳ | **需要**: 你说"OK 跑"再注册 |
 
