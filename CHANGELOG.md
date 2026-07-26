@@ -519,6 +519,55 @@ User 2026-07-26 决定: **暂停所有飞书相关开发**, 跟 user global "hob
 - `CHANGELOG.md` +24/-22 lines (5 处加 archived 标注 + 本段)
 - `ROADMAP.md` (workspace-level, 不进 git): Phase 5/8 整个重写 + 2026-07-26 update log
 
+## [0.6.8l] - 2026-07-26
+
+### Added (P5-2 done: `examples/daily_report.py` 一键跑全 pipeline)
+
+按新 Phase 5 (本地化) 设计, 写 daily_report.py — 1 个命令跑全 7 步:
+**fetch → attribution → residual_regression → markdown_report → html_report → performance_dashboard → check_alerts**,
+返回每步状态 + 总耗时, exit code 反映成功 (0) / 失败 (1) 供 cron 用。
+
+- **`examples/daily_report.py`** 新建 (~14.9KB):
+  - `run_daily_report(date_str, skip_fetch, skip_md, skip_html, skip_dashboard, verbose)` 主函数
+  - `step_fetch()` / `step_attribution()` / `step_residual_regression()` / `step_markdown_report()` / `step_html_report()` / `step_performance_dashboard()` / `step_check_alerts()` 7 步函数
+  - CLI: `python examples/daily_report.py [--skip-fetch] [--skip-md] [--skip-html] [--skip-dashboard] [--quiet]`
+  - **graceful degradation**: 每步独立 try/except, 失败不阻塞下一步 (除非关键)
+  - **importable**: smoke test 也能调 `run_daily_report(verbose=False)`
+  - **stdout 强制 UTF-8**: Windows GBK 不会乱码
+- **`tests/test_smoke.py`** +1 断言 (39/39 pass):
+  - `test_daily_report_v068l_p52` — 跑全 pipeline (skip-fetch/skip-html/skip-dashboard) 验证 7 步结构 + OK/SKIP 状态 + 文件存在
+- **P5-2 gate 验证** (2026-07-26 实跑):
+  - `python examples/daily_report.py --skip-fetch --skip-html --skip-dashboard` 5.3s
+  - 4 OK / 3 SKIP / 0 FAIL
+  - attribution 4 指数 × 3 窗口 = 12 结果, residual_regression [OK] 12/12
+  - markdown 写到 `output/report_2026-07-26.md` (3.1 KB)
+  - alerts placeholder 写到 `data/cache/alerts/alerts_2026-07-26.json` (P8-6 还没实现)
+
+### 设计决策
+
+- **CLI 优先 + 函数次之**: `main()` 调 `run_daily_report()` 函数, smoke test 也调函数 (干净, 不解析 stdout)
+- **每步独立**: 1 步 fail 不阻塞后续 (e.g. fetch fail 用 cache, attribution 跑 cache 数据)
+- **skip 参数细粒度**: `--skip-fetch` / `--skip-md` / `--skip-html` / `--skip-dashboard` 4 个独立 flag, 灵活组合
+- **alerts placeholder**: 即使 P8-6 还没写, 也建空文件 — 后续 P8-6 healthcheck runner 写, daily_report 读
+- **不传 date_str 默认今天**: 同一函数可以 cron 跑 (date=今天) 或 backfill 跑 (date=历史), 例: `python examples/daily_report.py --date 2026-07-20`
+
+### Lesson 写进 future engineering (新)
+
+- **Orchestrator 模式**: 大 pipeline 不应该 copy-paste 各 step 逻辑, 而是 import + 调函数
+  - daily_report.py import 现有 examples/report.py, examples/fetch_all.py, src/performance_dashboard.py 等
+  - 每步都是 1 个独立函数, 失败/跳过/重试边界清晰
+- **Smoke test 不跑全 pipeline**: daily_report.py smoke test 跑 5.3s (skip-fetch 等), 不跑 5-10 分钟的完整 fetch
+  - skip 参数是关键: smoke test 用 `skip_fetch=True` + `skip_html=True` 跳过慢的部分, 只验证编排逻辑
+- **每步独立 try/except**: 跟 "failing fast" 哲学相反, 但对 cron 友好 — 1 步失败不挂整个 pipeline
+- **alerts 文件 placeholder**: 即使 P8-6 还没写, daily_report 也建空文件 — 这样 P8-6 写第一行 alert 时不会 "file not found"
+  - **演进 discipline**: 上下游模块不必同时 ready, 写 placeholder 让 pipeline 不挂
+
+### Phase 5 进度
+- P5-1 🪦 飞书 webhook 文档 (cancelled 2026-07-26)
+- **P5-2 ✅ 本版本**: 手动跑 `daily_report.py` 验证本地输出
+- P5-3 ⏳ 跟 user 确认 cron 时间
+- P5-4 ⏳ 配置 Windows Task Scheduler
+
 ## [0.6.6] - 2026-07-15
 
 ### Added (P6-5 done: K 线 hover 显示 OHLCV)
