@@ -43,7 +43,7 @@ python examples/demo_aapl.py
 | 2. 因果分析 | 📋 planned | 归因 + 模式匹配 + 阈值 |
 | 3. 简洁呈现 | 📋 planned | 5 段制报告 |
 | 4. 自分析 | 📋 planned | `pa export` + `pa notebook` |
-| 5. 调度 | 📋 planned | cron + 飞书 (gated on 1-4) |
+| 5. 调度 | 📋 planned | Windows Task Scheduler + 本地 alert log (gated on 1-4) — **飞书 2026-07-26 archived** |
 
 ## 设计原则 (vs v1/v2)
 
