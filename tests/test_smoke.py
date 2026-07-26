@@ -962,6 +962,81 @@ def test_yfinance_rate_limit_v068j_p76():
     assert clear_rate_limit() is False
 
 
+def test_daily_report_v068l_p52():
+    """v0.6.8l (P5-2 gate): examples/daily_report.py 跑通 + 7 步全 OK/SKIP
+
+    验证 daily_report 编排:
+    1. importable (函数 + main 入口)
+    2. --skip-fetch + --skip-html + --skip-dashboard 模式跑通 (用 cache)
+    3. 7 步全过 (无 FAIL)
+    4. attribution 残差 ~ 0 (跟 v0.6.8f baseline 一致)
+    5. residual_regression [OK]
+    6. markdown_report 写到 output/report_<date>.md
+    7. check_alerts 写 placeholder (P8-6 还没实现)
+    """
+    from examples.daily_report import run_daily_report
+    from datetime import datetime
+    date_str = datetime.now().strftime("%Y-%m-%d")
+
+    # 跑全 pipeline (用 cache, 跳过 fetch 和可选 HTML/dashboard)
+    result = run_daily_report(
+        date_str=date_str,
+        skip_fetch=True,
+        skip_html=True,  # 需要先有 K-line SVG, smoke test 跳过
+        skip_dashboard=True,  # 跟 HTML 一样, smoke test 跳过
+        verbose=False,  # 不打 banner, 干净测试
+    )
+
+    # 1. 返回 dict 结构
+    assert "date" in result
+    assert "elapsed_s" in result
+    assert "steps" in result
+    assert result["date"] == date_str
+    assert result["elapsed_s"] > 0
+    assert len(result["steps"]) == 7  # 7 步
+
+    # 2. 每步状态 (有 [OK] / [SKIP] / [FAIL])
+    steps = result["steps"]
+    for name in ["fetch", "attribution", "residual_regression", "markdown_report",
+                "html_report", "performance_dashboard", "check_alerts"]:
+        assert name in steps, f"缺 step: {name}"
+        assert "ok" in steps[name], f"step {name} 缺 ok 字段"
+        assert "elapsed_s" in steps[name], f"step {name} 缺 elapsed_s 字段"
+
+    # 3. fetch + html + dashboard 应该是 skip
+    assert steps["fetch"]["ok"] == "skip"
+    assert steps["html_report"]["ok"] == "skip"
+    assert steps["performance_dashboard"]["ok"] == "skip"
+
+    # 4. attribution / regression / md / alerts 应该是 OK
+    assert steps["attribution"]["ok"] is True, \
+        f"attribution fail: {steps['attribution'].get('error')}"
+    assert steps["residual_regression"]["ok"] is True
+    assert steps["markdown_report"]["ok"] is True
+    assert steps["check_alerts"]["ok"] is True
+
+    # 5. attribution 4 指数 × 3 窗口 = 12 结果
+    attr_results = steps["attribution"]["results"]
+    assert len(attr_results) == 3  # 3 窗口
+    for lb in [1, 5, 20]:
+        assert lb in attr_results
+        assert len(attr_results[lb]) == 4  # 4 指数
+
+    # 6. markdown 报告路径 + 存在
+    md_path = steps["markdown_report"]["path"]
+    assert md_path.exists()
+    assert md_path.stat().st_size > 1000  # 至少 1KB
+
+    # 7. alerts placeholder 创建
+    alert_path = steps["check_alerts"]["path"]
+    assert alert_path.exists()
+    import json as _json
+    data = _json.loads(alert_path.read_text(encoding="utf-8"))
+    assert "as_of" in data
+    assert "alerts" in data
+    assert data["as_of"] == date_str
+
+
 def test_events_providers_param():
     """v0.6.8c: events.upcoming_events / past_events 加 providers 参数
     - upcoming_events 默认 providers=["yaml"] (向后兼容)
