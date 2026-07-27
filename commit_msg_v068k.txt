@@ -1,0 +1,44 @@
+v0.6.8k: 飞书 archived — Phase 5/8 重写为本地化
+
+User 2026-07-26 决定: 暂停所有飞书相关开发, 跟 user global "hobbyist
+ceiling" 规则对齐 (hosted service 需要 token / 维护 channel / 关注
+"机器人是不是被禁言", 跟个人爱好者经济负担冲突)。
+
+## 改动 (3 files, +24 / -22 lines, 1 git mv)
+
+- `git mv examples/feishu_push.py archive/feishu_push.py` — 脚本保留作 reference, 不进 main flow
+- `docs/PHASE5.md` 顶部加 ARCHIVED banner, P5-1/2 状态改 cancelled
+- `CHANGELOG.md`:
+  - `[Unreleased]` Planned v0.8.x Phase 5 改: "失败重试 / timezone" (去掉 "发飞书")
+  - line 748-760, 777, 1175 加 "🪦 2026-07-26 archived" 标注
+  - 新加 v0.6.8k 段 (本文件)
+- `ROADMAP.md` (workspace-level, 不进 git): Phase 5/8 整个重写 + 2026-07-26 update log
+
+## Why 飞书 archived (4 理由)
+
+1. 跟 user global "hobbyist ceiling" 规则冲突 (hosted service 维护负担)
+2. 凌晨 cron 跑失败时, 飞书 alert 还要发一条 spam 提醒 — 不如本地 alert log 累积
+3. 跟现有 mavis skill 报告 (HTML 邮件友好) 重复 — 飞书本质是另一种 push channel
+4. 跟 Web 仪表盘 / Streamlit 一样 archived, "不依赖 hosted service" 是统一的
+
+## Phase 5/8 新路径 (本地化)
+
+- **Phase 5**: 手动跑 `daily_report.py` 看本地输出 (markdown + cache + alert log)
+  + Windows Task Scheduler (本地 cron, 替代 Linux cron)
+- **Phase 8**: 5 类异常检测不变, alert 改写 `data/cache/alerts/alerts_<date>.json`
+  (累积) + 终端显眼 `[ALERT]`, 替代飞书 card
+- **新增 P8-6** (ROADMAP): `src/alert_logger.py` record_alert — 替代飞书 card
+- **新增 P8-7** (ROADMAP, 可选): Windows toast notification (`plyer.notification`)
+
+## Discipline 写进 future design (新)
+
+- **"不依赖 hosted service" 是 hobbyist ceiling 的铁律** — 任何第三方 SaaS
+  都要三思 (需要 user 配 token? 维护 channel? 担心被禁言? 都不行)
+- **alert 用累积本地 log, 不用 push** — user 主动看, 不被 spam 提醒
+- **hosted service 的替代方案**: 本地 log / OS notification / 文件 / Markdown report
+
+## 验证
+
+- 38/38 smoke test pass (没动功能代码, 只改 docs/归档)
+- git history 保留 (git mv, 不是 rm + add)
+- feishu_push.py 在 archive/ 下, 留作 reference 永久可访问

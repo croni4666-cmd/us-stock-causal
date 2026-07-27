@@ -1,0 +1,56 @@
+v0.6.8l: P5-2 done — examples/daily_report.py 一键跑全 pipeline
+
+按新 Phase 5 (本地化) 设计, 写 daily_report.py — 1 个命令跑全 7 步:
+fetch → attribution → residual_regression → markdown_report → html_report
+→ performance_dashboard → check_alerts, 返回每步状态 + 总耗时。
+
+## 改动 (3 files, +432 lines)
+
+- `examples/daily_report.py` 新建 (~14.9KB):
+  - `run_daily_report(date_str, skip_fetch, skip_md, skip_html, skip_dashboard, verbose)` 主函数
+  - 7 个 step_* 函数, 每步独立 try/except (graceful degradation)
+  - CLI: `python examples/daily_report.py [--skip-fetch] [--skip-md]
+          [--skip-html] [--skip-dashboard] [--quiet] [--date YYYY-MM-DD]`
+  - stdout 强制 UTF-8 (Windows GBK 兼容)
+  - importable (smoke test 也调函数, 不解析 stdout)
+- `tests/test_smoke.py` +1 断言 (39/39 pass):
+  - `test_daily_report_v068l_p52` — 跑全 pipeline 验证 7 步结构 + OK/SKIP 状态 + 文件存在
+- `CHANGELOG.md` v0.6.8l 段 + lessons
+
+## 实测 (2026-07-26)
+
+```
+$ python examples/daily_report.py --skip-fetch --skip-html --skip-dashboard
+[Step 1] 拉数据 (fetch_all)  [SKIP] --skip-fetch
+[Step 2] 归因 (4 指数 × 3 窗口)  4 指数 12 结果
+[Step 3] 残差回归 (P7-5 baseline 比对)  [OK] 12/12
+[Step 4] Markdown 报告  [OK] output/report_2026-07-26.md (3.1 KB)
+[Step 7] Alert Check  [0 alerts] data/cache/alerts/alerts_2026-07-26.json
+
+Total: 4 OK / 3 SKIP / 0 FAIL, 耗时 5.3s
+```
+
+## 设计决策
+
+- **Orchestrator 模式**: 不 copy-paste 各 step 逻辑, import 现有函数
+  - fetch_all.main() / src.report.render_full_report() / src.performance_dashboard
+  - 每步独立 try/except, 失败不阻塞 (cron 友好)
+- **CLI 优先 + 函数次之**: main() 调 run_daily_report() 函数, smoke test 也调函数
+- **skip 参数细粒度**: 4 个独立 flag, smoke test 跳过慢的部分 (fetch + html + dashboard)
+- **alerts placeholder**: 即使 P8-6 还没写, daily_report 也建空 alerts_<date>.json
+  - 后续 P8-6 healthcheck runner 写第一行 alert 时不报错
+- **不传 date_str 默认今天**: 同一函数可 cron 跑 (date=今天) 或 backfill (date=历史)
+
+## Lesson 写进 future engineering (新)
+
+- **Orchestrator 不 copy-paste**: 大 pipeline 是 import + 调函数, 不是从零写
+- **Smoke test 用 skip 参数避开慢 step**: daily_report smoke 5.3s 而非 5-10min
+- **每步独立 try/except**: 跟 failing fast 相反, 但 cron 友好
+- **Placeholder 文件让 pipeline 不挂**: 上下游模块不必同时 ready
+
+## Phase 5 进度
+
+- P5-1 🪦 cancelled (飞书 archived 2026-07-26)
+- **P5-2 ✅ 本版本**: 手动跑 daily_report.py 验证本地输出
+- P5-3 ⏳ 跟 user 确认 cron 时间
+- P5-4 ⏳ 配置 Windows Task Scheduler

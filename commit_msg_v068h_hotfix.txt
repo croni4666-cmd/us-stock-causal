@@ -1,0 +1,26 @@
+v0.6.8h hotfix: Performance Dashboard y-tick 标签重叠 (2 行 + 图加高)
+
+User 看了 v0.6.8h 第一版后反馈: 最后一张图 (Performance Dashboard) 的
+左边纵坐标 20 标的 label 挤一起, 完全看不清。
+
+## 根因
+
+单行 label `f"{symbol:8s} 中文名"` = 25+ 字符 (e.g. "GC=F     黄金期货 (COMEX)"),
+20 标的在 4.5" 高的 subplot 里每个 row 不到 16px, 标签挤一起。
+
+## fix
+
+- y-tick label 2 行: `{symbol}\n{中文名}` (symbol 上, 中文名下)
+- 图加高: 2.2 → 4.5 ratio (3 subplot: [3, 3, 4.5])
+- 字号 8 → 7, 行间距 1.2
+- 终端 markdown 表格不动 (不需要这 fix)
+
+## 改动 (2 files)
+
+- `src/performance_dashboard.py` 改 y-tick label 格式 (1 行 → 2 行)
+- `examples/plot_gold.py` 改 height_ratios (2.2 → 4.5) + figsize (13 → 15)
+
+## 验证
+
+- 36/36 smoke test pass (label 改不影响测试)
+- SVG 检查: y-tick 注释是 `<!-- ^VIX -->` + `<!-- 波动率指数 (VIX) -->` (2 行 OK)

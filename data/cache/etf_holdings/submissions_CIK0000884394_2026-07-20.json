@@ -1,0 +1,42 @@
+{
+  "cik": "0000884394",
+  "name": "SPDR S&P 500 ETF TRUST",
+  "ticker": "SPY",
+  "recent_filings": [
+    {
+      "form": "N-30D",
+      "filing_date": "2026-05-29",
+      "report_date": "2026-03-31",
+      "accession_number": "0001193125-26-247066",
+      "primary_document": "d75559dn30d.htm"
+    },
+    {
+      "form": "NPORT-P",
+      "filing_date": "2026-05-28",
+      "report_date": "2026-03-31",
+      "accession_number": "0001410368-26-055357",
+      "primary_document": "xslFormNPORT-P_X01/primary_doc.xml"
+    },
+    {
+      "form": "NPORT-P",
+      "filing_date": "2026-02-26",
+      "report_date": "2025-12-31",
+      "accession_number": "0001410368-26-020131",
+      "primary_document": "xslFormNPORT-P_X01/primary_doc.xml"
+    },
+    {
+      "form": "NPORT-P",
+      "filing_date": "2025-11-26",
+      "report_date": "2025-09-30",
+      "accession_number": "0001410368-25-031962",
+      "primary_document": "xslFormNPORT-P_X01/primary_doc.xml"
+    },
+    {
+      "form": "N-30D",
+      "filing_date": "2025-11-25",
+      "report_date": "2025-09-30",
+      "accession_number": "0001193125-25-297563",
+      "primary_document": "d18808dn30d.htm"
+    }
+  ]
+}

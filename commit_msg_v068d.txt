@@ -1,0 +1,52 @@
+v0.6.8d: Stage 2.1 of P-event-enrichment — SEC EDGAR ETF 持仓 raw 拉取
+
+按 roadmap 推 P-event-2 (P7-2 真修残差), Stage 2.1 done:
+- src/etf_holdings.py 新建 (~12KB, SEC EDGAR ETF 持仓公告 raw 拉取)
+- src/tickers_universe.py 新建 (~2KB, 15 ETF 列表: 4 指数 + 11 行业)
+- tests/test_smoke.py +1 断言 (30/30 pass)
+
+代码改动 (3 files, +460 / -2 lines):
+
+src/etf_holdings.py:
+- fetch_ticker_to_cik(): 拉 SEC tickers.json, 缓存 1d
+- fetch_etf_submissions(): 拉 submissions/CIK<10>.json, 找 NPORT-P / N-30D / N-CSR / N-Q
+- get_etf_filing_url(): 拼 N-CSR 文档 URL
+- fetch_etf_latest_filing(): 给 ticker, 返回最新 N-CSR/N-30D URL
+- WANTED_FORMS = ("NPORT-P", "N-30D", "N-CSR", "N-CSR/A", "N-Q", "N-Q/A", "N-1A", "N-1A/A")
+- DEFAULT_UA = "us-stock-causal research@example.com" (SEC fair access)
+- 0.5s rate limit (SEC 10 req/sec)
+- 优雅降级: 网络/JSON 失败返回 {}
+
+src/tickers_universe.py:
+- INDEX_ETFS = [DIA, QQQ, RSP, QQQE] (4 只)
+- SECTOR_ETFS = [XLK, XLF, XLE, XLY, XLP, XLV, XLI, XLU, XLB, XLRE, XLC] (11 只)
+- ETF_TICKERS = INDEX + SECTOR (15 只)
+- 注释: 49 ticker 中只有 15 ETF 有 N-CSR 持仓, 其他 (6 宏观 + 14 期货 + 14 现货) 不发
+
+tests/test_smoke.py:
+- test_etf_holdings_skeleton: 4 函数 + 15 ETF + WANTED_FORMS + URL 拼接 + UA + cache
+
+🪦 1 个真测时发现的设计错误 (v0.6.8b/c 教训延伸, "写代码不真测不知道"):
+1. **最初误以为 ETF 主发 N-CSR / N-Q / N-1A** (1933 Act 年度/季度报):
+   - 真测 SPY CIK 0000884394 拉 submissions 看到 274 filings
+   - 实际主发是 **NPORT-P** (1940 Act 月度持仓报告, 2020 SEC 新规)
+   - 2024 SEC 改规则, large ETF (SPY 500+) 不再月报 NPORT-P, 改半年 N-30D
+   - SPY 最新 filing 是 N-30D 2026-05-29 (1.16MB HTML)
+   - **fix**: WANTED_FORMS 改 "NPORT-P", "N-30D" 优先
+2. **缓存 stale**: 第一次 force_refresh=False 测时拿旧 cache (2004 N-CSR), 新代码没生效
+   - **fix**: --smoke 默认 force_refresh=True, 真测时拿新数据
+
+lesson (跟 v0.6.8b/c 教训连, "真测不写死"):
+- **写完 ETF-related API 必看实际 filings 列表**, 不能假设 form 类型
+- **2020 SEC 新规** NPORT-P + 2024 改 N-30D 是 ETF filing 习惯的最近变化
+- **HTML 解析更麻烦**, 但 N-30D 1.16MB HTML 含完整 Schedule of Investments (sector/holding/market value)
+- 2008 老 ETF 还发 N-CSR (我们代码兼容), 2020+ 新 ETF 主发 NPORT-P, 2024+ 大 ETF 改 N-30D
+
+Stage 2.2 (v0.6.8e, 待 user 拍):
+- 解析 N-30D 1.16MB HTML 拿 Schedule of Investments table
+- 调 FMP equity.profile (已 OK, 单只 sector 字段) 算 holdings sector
+- 写 src/weights.py: ETF ticker → sector weights dict
+- 集成 src/attribution.py: weights_source="live" 参数, 默认 "hardcode" 向后兼容
+- 跑残差回归, 目标 5d 残差 < 0.3% (目前 0.4-1.1%)
+
+CHANGELOG / ROADMAP 同步 v0.6.8e 后写

@@ -1,0 +1,60 @@
+v0.6.8g: P6-7 — SMA 连续性 fix, 200 SMA 在 1y 图首日就有效
+
+User 用 mavis skill 跑 examples/plot_gold.py 后反馈: 1y 黄金 K 线图
+的 200 SMA 要到 2026-02 (~6 个月) 才画, 不像 tradeview 等专业工具
+从图一开始就连续显示。
+
+## 根因
+
+`plot_single` 调 `df = df.iloc[-lookback_days:].copy()` 把老数据切掉,
+然后 `_draw_thresholds` 在切片后的 df 上算 `close.rolling(200).mean()`,
+前 200 个 rolling 值是 NaN, 1y 窗口 (365 天) 的前 ~200 天看不到 200 SMA。
+
+## fix
+
+不切片 df, 用 cache 全量数据画, 用 `ax.set_xlim(visible_start, last)`
+限定最后 `lookback_days` 天的显示窗口。这样 200 SMA 在完整 cache 上
+有 200 天 warmup, 1y 窗口全程都有效。
+
+## 要求
+
+cache 至少 `lookback_days + 200` 行 (2y 缓存能保证 1y 图 200 SMA 全程有效,
+3y 缓存更稳, 留 ~300 天 warmup buffer)。`fetch_all.py` 默认 `lookback_days=730`
+(2y), 已经够; 想保险可以跑 `scripts/fetch_gold_extended.py` 拉 3y (1100 天)。
+
+## 改动 (4 files, +102 / -8 lines, +1 script)
+
+- `src/kline.py` 改 `plot_single`:
+  - 删 `df = df.iloc[-lookback_days:].copy()`
+  - 加 `ax.set_xlim(visible_start, df.index[-1])` (visible window 限定)
+  - docstring 标注 cache 长度要求
+- `scripts/fetch_gold_extended.py` 新建 (~1.5KB): 拉 3y 缓存
+  (1100 日历天) 给金图 + GLD 用, 含 `force_refresh=True` 删旧 cache 重拉
+- `tests/test_smoke.py` +1 断言 (33/33 pass):
+  - `test_kline_sma_warmup_v068g` — 验证 cache 长度 >= 565 + 1y 窗口
+    200 SMA 在 xlim 第一天非 NaN + 100 SMA 同理
+- `CHANGELOG.md` 补 v0.6.8g 段
+
+## 实测 (2026-07-23, GC=F 拉 3y 缓存后)
+
+- cache: 757 trading days (2023-07-19 → 2026-07-22), 之前 509 days 不够
+- 200 SMA first valid: 2024-05-02 (row 200 of 757)
+- 1y 窗口起点: 2025-07-22 (row 392 of 757) → 200 SMA valid (2538.62)
+- 1y 窗口终点: 2026-07-22 (row 756) → 200 SMA valid (4476.85, 跟图例一致)
+- SVG 验证: 200 SMA path 起点 `M -1` (左边缘), 从图一开始就画
+
+## 设计决策
+
+- **不切 df**: 性能影响忽略不计 (757 行 < 1000 行, plot 几 ms)
+- **cache 长度是数据需求**: 不是代码问题, 跟 `fetch_all.py` 默认 2y 配置对齐
+- **新 smoke test 同时验证 cache 长度**: 防止以后 cache 默认改小, 1y 图又出现 NaN
+
+## Lesson (写进 future research discipline)
+
+- **数据可视化的"window ≠ data range"原则**: 1y 图是显示 1y, 但底层数据要
+  ≥ 1y + max_indicator_window (200 SMA + buffer 300) = 至少 1.5y cache
+- **测试指标要看 "display window 第一天" 而不是 "全 data 第一天"**
+- 类似的还有 EMA / WMA / RSI / MACD 等指标, warmup 需求不同
+  (EMA 短, RSI 需要 14 天)
+
+## Phase 6 进度: 7/7 done 🎉 (P6-1~6 + P6-7)

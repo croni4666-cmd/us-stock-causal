@@ -1,0 +1,44 @@
+v0.6.8h hotfix 2: Performance Dashboard y-tick 改 1 行 symbol + 中文名 annotation
+
+User 反馈 hotfix 1 后 y-tick 仍挤(2 行 label 16px/row 垂直重叠)。
+"你自己调完之后自己审核" — 自审看到 2 行 label 仍重叠,改方案:
+
+## 根因
+
+2 行 label (symbol + 中文名) 在 16-20px/row 高度下垂直重叠,
+因为 label 实际行高 > row 高度。
+
+## fix (更彻底)
+
+- y-tick label: `f"{symbol:8s} 中文名"` → 单纯 `{symbol}` (1 行, monospace, 不重叠)
+- bar 末端 annotation: `+X.XX%  中文名` (涨, 右端) / `中文名  -X.XX%` (跌, 左端)
+- 中文名缩短: `name.split(" (")[0]` 去掉括号注释 (e.g. "黄金期货 (COMEX)" → "黄金期货")
+- xlim 加宽 35% 给右端 annotation 留位置
+
+## 自审结果
+
+- 渲染 PNG 看了: 20 标的全部清晰,每行 [symbol | bar | % + 中文名] 排版整齐
+- y-tick 只有 5-7 字符 (^VIX/GC=F/XLB 等),完全不重叠
+- 涨跌色: 涨绿 (20 只) + 跌红 (1 只 XLV -0.82%)
+
+## 改动
+
+- `src/performance_dashboard.py` 改 `plot_performance_dashboard`:
+  - y-tick 1 行 symbol (monospace, fontsize=8)
+  - bar annotation `+X.XX%  中文名` (涨右) / `中文名  -X.XX%` (跌左)
+  - 中文名 split 缩短
+  - xlim += 35% 给 annotation 留位
+
+## 验证
+
+- 36/36 smoke test pass
+- PNG 自审: 20 行清晰,no overlap
+- VIX 顶部 +9.12% 涨绿, XLV 底部 -0.82% 跌红
+
+## 写进 discipline (新)
+
+- **图表 y-tick 标签 ≥ 15 字符要分行, 避免重叠** (上版 25+ 字符, 2 行 16px/row 仍重叠)
+- **更彻底方案: 不要硬塞 label 到 y-tick, 用 bar annotation 放详细文本**
+- **自审 discipline: 改完不能光看测试通过, 要看实际渲染效果**
+  - 用 read tool 直接读 PNG/SVG 验证
+  - 用户在 mavis skill 看图, 跟本地渲染一致才算 fix

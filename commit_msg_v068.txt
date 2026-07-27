@@ -1,0 +1,27 @@
+v0.6.8: P6-4 done — 报告顶部 1 行 → 3 行 (1d/5d/20d)
+
+按 roadmap 跑 P6-4, 顶部 1 行扩成 3 行 markdown bullet list, 短期/中期/长期 1 眼看全。
+
+代码改动 (2 files, ~60 lines):
+- src/macro.py: macro_snapshot 加 lookback_days 参数 + topline 加 horizons 参数
+- tests/test_smoke.py: +1 断言 test_topline_multi_horizon (27/27 pass)
+
+设计决策:
+- 不挤 5 段 (5 段默认 5d 不变), 顶部扩成 3 行
+- P6-3 配套: 顶部 1d/5d/20d 跟归因多窗口对齐
+- 用 || 分隔 macro 和 indices, 不挤在一行
+- markdown bullet list 比纯 1 行密 3 倍, 视觉更清晰
+
+实测 (2026-07-15):
+- 1d: VIX +9.12% (panic 飙升), 4 指数 +0.03~+0.37% (小涨)
+- 5d: VIX +5.33%, 4 指数 -0.40~+1.81% (差异明显)
+- 20d: VIX -15.64% (月线降, 反转信号), 4 指数 +3.76~+5.25% (一致上涨)
+
+VIX 反转信号: 1d 急升 +9% vs 20d 累计 -16%, 配合 4 指数 20d 累计
++3.76~+5.25%, 老 1 行需要 30s 反复对照才看得到, 3 行 5s 看清楚。
+
+Phase 6 进度: 6/6 done 🎉
+- P6-1 ✅ 事件线 | P6-2 ✅ HTML 合并 | P6-3 ✅ 多窗口归因
+- P6-4 ✅ 顶部 3 行 | P6-5 ✅ hover OHLCV | P6-6 ✅ 5 SMA + SVG
+
+Next: Phase 7 P7-1 装 openbb-etf (P6-3 诊断的真修路径)
