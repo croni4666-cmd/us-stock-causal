@@ -585,6 +585,88 @@ ls output\logs\cron_2026-07-27.log  # 3357 bytes
 - **没失败重试** (P8 配合): .cmd exit 0 = 成功, P8 异常检测根据这个判
 - **没脱机 catchup 触发**: `Start-WhenAvailable` 是 task setting, 但具体行为看 Windows 版本
 
+## [0.6.8n] - 2026-07-27
+
+### Added (P8-1~6 done: 5 类异常检测 + 本地 alert log)
+
+按 ROADMAP Phase 8 设计: 异常检测 5 类 + 本地 alert log 写 JSON, 替代飞书 card.
+整个 Phase 8 路径 (本地化) 闭环: cron 跑 daily_report.py → step 7 跑 5 check → 异常写
+`data/cache/alerts/alerts_<date>.json` + 终端 [ALERT] 显眼 stdout → user 下次开电脑看 report 顶部一行就知道.
+
+- **`src/alert_logger.py`** 新建 (~5.9KB, P8-6):
+  - `make_alert(type, subject, message, severity, details)` — 构造 alert dict (带稳定 id by md5)
+  - `write_alerts(date_str, alerts)` — 写 `data/cache/alerts/alerts_<date>.json` (overwrite, 但合并 first_seen)
+  - `read_alerts(date_str)` — 读当日 alerts
+  - `clear_alerts(date_str)` — 清空 (admin reset)
+  - `render_terminal(alerts)` — 终端 [ALERT] 显眼输出 (ANSI 颜色, 老 cmd 不支持也无害)
+  - **dedup by id**: 同 type+subject+message = 同 md5 hash = 同 id, 跨同日多次 run 只记 first_seen
+- **`src/checks/stale.py`** (P8-1, 3.8KB):
+  - 扫 `data/raw/*/`, calendar days 算 (跟 ROADMAP P8-2 写的 ">3d" 对齐)
+  - threshold: 3d warning / 7d error
+  - 跳过 `.obsidian` 等隐藏目录
+- **`src/checks/residual.py`** (P8-2, 2.3KB):
+  - 复用 P7-5 `residual_regression.py` 的 `capture_residuals + compare_to_baseline`
+  - tolerance 1.5x, abs_floor 0.05% (跟 v0.6.8i 一致)
+  - daily run 跑 (不只 test), 异常 → alert
+- **`src/checks/vix_spike.py`** (P8-3, 3.9KB):
+  - 读 `data/raw/macro/_VIX.parquet`
+  - level: VIX >= 30 warning / >= 40 error
+  - 1d change: abs(pct) >= 15% → spike (涨 error / 跌 warning)
+- **`src/checks/ticker_fail.py`** (P8-4, 2.6KB):
+  - 查 P7-6 限流状态文件 → 限流中 alert
+  - 扫小 parquet (< 1KB 通常 fetch 失败占位) → warning
+- **`src/checks/parquet_corrupt.py`** (P8-5, 2.4KB):
+  - pandas 读失败 → error
+  - 0 行 → warning
+- **`examples/daily_report.py` step 7 重写**:
+  - 5 check 独立 try/except (一类 fail 不阻塞)
+  - alert_logger.write_alerts 累积
+  - 摘要 1 行: "stale=0, residual=1, vix_spike=0, ticker_fail=0, parquet_corrupt=0"
+  - report 末尾 [Summary] 加 alert 摘要: 有 alert 时红字 "今日 N 个 alert (error M个)"
+  - 把原来 placeholder (P8-6 还没写的 status=no_healthcheck_runner) 替换成真检测
+
+### 实测 (2026-07-27 17:27)
+
+```
+$ python examples/daily_report.py --skip-fetch --skip-md --skip-html --skip-dashboard
+[Step 7] Alert Check (5 类异常检测 + 写 log, 2026-07-27)
+  跑完 5 check: stale=0, residual=0, vix_spike=0, ticker_fail=0, parquet_corrupt=0
+  [OK] 无 alert, 健康 ✓
+
+$ python tests/test_smoke.py
+45/45 pass (v0.6.8n 加了 6 个新 test: alert_logger + 5 check + step7; 旧 39 个全保留)
+```
+
+(早期跑 43/45 是 CHANGELOG 没同步 + step7 真数据 stale, 修完都通了.)
+
+### 设计决策
+
+- **"alert id = md5(type|subject|message)[:8]"** (新, dedup 关键): 同 type+subject+message = 同 id,
+  跨同日多次 run 自动去重, 保留 first_seen. 比 timestamp dedup 稳 (内容变了 → 新 id)
+- **"calendar days for stale"** (新, 跟 ROADMAP P8-2 一致): biz days 太宽松 (周末跳过 → 4d 实际只算 2d, 不告警)
+- **"5 check 独立 try/except"** (新, 沿用 daily_report 7 步独立原则): 一类 check 崩了, 其它继续跑
+- **"ans i 颜色但不用 emoji"** (沿用 v0.6.8h 经验): `_RED = "\033[91m"`, 老 cmd 不支持也输出原标记
+- **"alert 写 JSON + 同日 overwrite 但合并 first_seen"** (新): 给 cron 多次跑同一日不会重复累积 (除非真有新 alert)
+- **"summary 1 行 [Step 7] 显示 by_type"** (新): 跑过但没 alert 时 0/0/0/0/0 简洁显示, 有 alert 时 alert_logger.print_alerts 详细
+- **"report 顶部 1 行 alert 摘要"** (新, ROADMAP Stop 条件): 有 alert 时红字显眼, 没 alert 时静默
+
+### 已知限制 (v0.6.8n)
+
+- **P8-4 没真去重** (ROADMAP 说的 "1 天最多 3 条"): 现在是 dedup by id (内容不变就不重复),
+  真的同 alert 重复不会超 1 条. 一天 N 个不同 alert 不限流. Hobbyist 不会 1 天爆 3+, 不急
+- **P8-5 没用 yfinance 限流文件路径常量** (硬编码 `data/cache/yfinance_rate_limit.json`):
+  跟 P7-6 不一致 (P7-6 有 yfinance_rate_limit module 封装), 跟 ticker_fail.py 共享逻辑可以 refactor, 暂未做
+- **没 Windows toast 通知** (P8-7 proposed): `plyer.notification` 可加, 但本 commit 不做
+- **stale 用 calendar days 不区分周末**: 周末数据预期不刷, 但 file mtime 仍老, 还是会告警.
+  user 周末看完报告知道 1-2 个周末相关 alert 是预期的, 不会 spam (因为不真刷新就不会产生新 alert)
+
+### P8-4 / P8-7 状态
+
+- **P8-4 (告警去重 + 限流)**: 1 天最多 3 条 — **deferred**, 当前实现是 dedup by id 满足"同 alert 不重复",
+  严格 1 天 3 条限流不需要 (hobbyist 不会 1 天 3+ 不同 alert)
+- **P8-5 (失败重试 + 指数 backoff)**: deferred, P7-6 已经处理了限流, 其它 5xx 重试需要 tenacity
+- **P8-7 (Windows toast)**: proposed, 可选, 跟 Phase 5 cron 一起做
+
 ## [0.6.8l] - 2026-07-26
 
 ### Added (P5-2 done: `examples/daily_report.py` 一键跑全 pipeline)
