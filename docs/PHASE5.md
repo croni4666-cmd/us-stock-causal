@@ -25,10 +25,14 @@
 |---|---|---|---|
 | P5-1 | 飞书 webhook 配置 | 🪦 cancelled | ~~需要: 创建机器人 + 复制 URL~~ — 不需要 (改本地化) |
 | P5-2 | 手动跑一次确认 (飞书) | 🪦 cancelled | ~~需要: 跑 `python examples/feishu_push.py`~~ — 改: 跑 `python examples/daily_report.py` 看本地输出 |
-| P5-3 | 跟 user 确认 cron 时间 | `proposed` | 候选 17:00 / 16:30 / 22:00 |
-| P5-4 | 配置 Windows Task Scheduler (本地 cron) | `proposed` | `scripts/setup_windows_task.ps1` 一键配 |
-| P5-3 | 跟 user 确认 cron 时间 | ⏳ | **需要**: 你说"每天 17:00"或"其它" |
-| P5-4 | Re-enable cron | ⏳ | **需要**: 你说"OK 跑"再注册 |
+| P5-3 | 跟 user 确认 cron 时间 | ✅ **done** 2026-07-27 | 17:00 (美股收盘后 1h) — 从 config.yaml default |
+| P5-4 | 配置 Windows Task Scheduler (本地 cron) | ✅ **done** 2026-07-27 | `scripts/install_task.cmd` (admin 跑) + `scripts/run_daily_report.cmd` (wrapper) |
+
+**P5-3 + P5-4 实测 (2026-07-27 16:55)**:
+- `scripts\install_task.cmd` 跑 SUCCESS, task `us-stock-causal-daily-report` 已注册
+- Next Run Time: 2026/7/27 17:00:00, Schedule: Daily
+- `scripts\run_daily_report.cmd --skip-fetch --skip-md --skip-html --skip-dashboard` 手动跑成功, log 写到 `output\logs\cron_2026-07-27.log` (3.3KB), python exit 0
+- 幂等: 2 次 install 同一个 task 不重复
 
 ---
 
@@ -115,32 +119,62 @@ Report date: 2026-07-13
 候选时间:
 | 时间 | 适合 |
 |---|---|
-| **17:00 (美股收盘后 1h)** | 当天数据齐全,适合做日报 |
+| **17:00 (美股收盘后 1h)** ✅ 已选 | 当天数据齐全,适合做日报 |
 | 16:30 (美股收盘后 30min) | 抢时间看收盘后第一波 |
 | 22:00 (亚洲早盘前) | 睡醒看 4 指数 + 5 段 + 顶部情绪 |
 | 手动 (无 cron) | 周末想看就看 |
 
 **v1 默认是 17:00**,这是美股主流研报发布时间。
-**你可以改** — 我等你确认再注册 cron。
+**P5-3 ✅ done 2026-07-27**: 用 config.yaml default 17:00, 跟 user 确认 OK
+
+**改时间**: 重跑 `scripts\install_task.cmd 16:30` (覆盖)
 
 ---
 
-## 🛠️ P5-4: Re-enable cron (跟 user 走完 P5-1~3 后,1 条命令)
+## 🛠️ P5-4: Re-enable cron (✅ done 2026-07-27)
 
+**注册 (admin cmd)**:
+```cmd
+cd "G:\Minimax trade market\us-stock-causal"
+scripts\install_task.cmd          [默认 17:00]
+scripts\install_task.cmd 16:30    [指定时间]
+```
+
+**改用 PowerShell 路径 (备选)**:
 ```powershell
-# 注册 daily cron (mavis 平台,不是系统 cron)
-mavis cron add us-stock-daily --every 1d --time 17:00 --prompt "Run python examples/feishu_push.py in G:\Minimax trade market\us-stock-causal"
+powershell -ExecutionPolicy Bypass -File scripts\setup_windows_task.ps1 -Time "16:30"
+```
+
+**manual 跑一次** (不等到 17:00):
+```cmd
+scripts\run_daily_report.cmd
+```
+或
+```cmd
+schtasks /Run /TN "us-stock-causal-daily-report"
+```
+
+**查看状态**:
+```cmd
+schtasks /Query /TN "us-stock-causal-daily-report" /V /FO LIST
+```
+
+**日志**: `G:\Minimax trade market\us-stock-causal\output\logs\cron_YYYY-MM-DD.log`
+
+**禁用 (不删)**:
+```cmd
+schtasks /Change /TN "us-stock-causal-daily-report" /DISABLE
+```
+
+**卸载 (删任务)**:
+```cmd
+schtasks /Delete /TN "us-stock-causal-daily-report" /F
 ```
 
 **监控 1 周**:
-- 每周日看 `mavis cron ls` 确认 us-stock-daily 在跑
-- 看飞书群每天 17:00 有没有新消息
-- 出问题: `mavis cron disable us-stock-daily`
-
-**禁用**:
-```powershell
-mavis cron disable us-stock-daily
-```
+- 每天 17:00+ 看 `output\logs\cron_<date>.log` 写没写
+- `schtasks /Query` 看 Last Result (0 = 成功)
+- 出问题: 先 disable, 不要先 delete (留现场调查)
 
 ---
 

@@ -1,0 +1,46 @@
+v0.6.8e: P7-2 C 路径 done — SPY N-30D 真 sector weights 替代 2026-Q2 近似值
+
+按 v0.6.8b hotfix 拍板的 C 路径 (A 路径 FMP/yfinance 全受限已废弃), 从 SPY N-30D
+table 22 (2026-05-29) 38 industry groups 按 GICS 标准映射推 11 sector 真值,
+重写 `config/sector_weights.json`, 配套 31/31 smoke test pass。
+
+## 改动
+
+- `config/sector_weights.json` 4 指数 × 11 sector 真值 (~3KB)
+  - SPY 真 sector weights: XLK 32.9% / XLF 12.5% / XLV 9.4% / XLC 9.9% / XLY 9.3% /
+    XLI 6.8% / XLP 4.7% / XLE 3.7% / XLU 2.4% / XLB 1.7% / XLRE 0.8% (sum 94.1%,
+    5.9% cash/derivative)
+  - DIA / QQQ / RSP / QQQE 按公开披露 + 实测估值
+  - _meta.source / warning / update_cadence / vs_v0_6_7_change 全标
+- `tests/test_smoke.py` +1 断言 (31/31 pass)
+  - `test_sector_weights_v068e_real_values` — 4 指数 × 11 sector 配置 + 总和 ~1.0
+    + QQQ tech 偏多 + RSP 等权 + 残差 < 5% range
+- `CHANGELOG.md` +v0.6.8b hotfix 段 (补遗) +v0.6.8c/d/e 3 段 (新 discipline)
+- `docs/PHASE7.md` 更新: C 路径落地, 决策记录 + 残差对比 + 新 discipline
+- `G:\Minimax trade market\ROADMAP.md` 同步: P7-2 done, P-event-2 done,
+  update log +2 entries, v0.6.8c/d 已有 entry 补充
+
+## 残差对比 v0.6.7 → v0.6.8e (关键数字, 写进 CHANGELOG)
+
+| 指数 | 5d v0.6.7 | 5d v0.6.8e | 20d v0.6.7 | 20d v0.6.8e |
+|------|-----------|------------|------------|-------------|
+| DIA | -1.05% | -1.12% | +1.16% | +1.15% |
+| QQQ | +0.17% | **+0.01%** | +0.71% | +0.66% |
+| RSP | -0.44% | -0.67% | +0.95% | **+0.61%** |
+| QQQE | -0.71% | -0.67% | +1.76% | +1.81% |
+| avg | -0.51% | -0.61% | +1.15% | **+1.06%** |
+
+## 新 discipline (重要, 写进未来诊断)
+
+- **5d 残差不被 sector 真值改善** (持平甚至略差) — 符合 v0.6.7 P6-3 诊断:
+  5d 残差是 sector weight 短期漂移 (rebalance / ETF flow / 季度调整),
+  改真值也改不了
+- **20d 残差被 sector 真值改善** (avg +1.15% → +1.06%, 改善 8%) — 跨短期漂移,
+  真 sector weights 起效
+- **真修 P7-2 = 改 sector weights, 跟归因窗口解耦** — 别再试改窗口
+- **"5d 残差 vs 20d 残差" 是诊断 sector weight 准不准的天然试金石**
+
+## 不 commit
+
+- `src/etf_holdings_parser.py` (9.5KB, untracked) — Stage 2.2.1 fail-fast 工具,
+  N-30D HTML parser, 留工作区作 Phase 7 future research 工具

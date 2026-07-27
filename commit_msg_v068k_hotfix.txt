@@ -1,0 +1,17 @@
+v0.6.8k hotfix: README.md 飞书 archived 标注 (收尾)
+
+v0.6.8k commit 后扫尾: README.md 调度段还提 "cron + 飞书", 改
+"Windows Task Scheduler + 本地 alert log" + archived 标注。
+
+**改动** (1 file, 1 line):
+- `README.md` line 46: "cron + 飞书 (gated on 1-4)" → "Windows Task Scheduler +
+  本地 alert log (gated on 1-4) — 飞书 2026-07-26 archived"
+
+**验证**:
+- `grep 飞书|feishu` 项目内 5 个文件:
+  - `commit_msg_v068k.txt` (commit message 本身)
+  - `CHANGELOG.md` (5 处历史引用, 已加 archived 标注)
+  - `docs/PHASE5.md` (顶部 ARCHIVED banner)
+  - `archive/feishu_push.py` (archived reference)
+  - `README.md` (本 commit 改完, 唯一引用是 archived 标注)
+- 38/38 smoke test pass (没动功能)

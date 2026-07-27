@@ -34,6 +34,19 @@ python examples/demo_aapl.py
 #   output/AAPL_demo.png   (117 KB K 线 + 3 SMA)
 ```
 
+## 5 分钟配 cron (v0.6.8m)
+
+```cmd
+:: admin cmd (右键 cmd.exe - 以管理员身份运行)
+cd "G:\Minimax trade market\us-stock-causal"
+scripts\install_task.cmd          :: 注册 17:00 daily (美股收盘后 1h)
+scripts\install_task.cmd 16:30    :: 自定义时间
+```
+
+验证: `schtasks /Query /TN "us-stock-causal-daily-report"`
+日志: `output\logs\cron_YYYY-MM-DD.log`
+卸载: `schtasks /Delete /TN "us-stock-causal-daily-report" /F`
+
 ## 当前进度
 
 | Phase | 状态 | 关键交付物 |
@@ -43,7 +56,7 @@ python examples/demo_aapl.py
 | 2. 因果分析 | 📋 planned | 归因 + 模式匹配 + 阈值 |
 | 3. 简洁呈现 | 📋 planned | 5 段制报告 |
 | 4. 自分析 | 📋 planned | `pa export` + `pa notebook` |
-| 5. 调度 | 📋 planned | Windows Task Scheduler + 本地 alert log (gated on 1-4) — **飞书 2026-07-26 archived** |
+| 5. 调度 | ✅ done v0.6.8m | Windows Task Scheduler 17:00 daily + 本地 alert log — 飞书 2026-07-26 archived |
 
 ## 设计原则 (vs v1/v2)
 
@@ -70,3 +83,10 @@ v1/v2 (us-stock-daily) 失败原因: 输出了"看多/看空"投票结论,跟大
 ## License
 
 个人项目,非开源
+
+## 版本
+
+- **v0.6.8m** (2026-07-27): P5-3 + P5-4 done — Windows Task Scheduler 17:00 daily (`scripts\install_task.cmd`)
+- v0.6.8l (2026-07-26): P5-2 done — `examples/daily_report.py` 一键跑全 pipeline
+- v0.6.8k (2026-07-26): 飞书 archived — Phase 5/8 改本地化
+- 详见 `CHANGELOG.md`
