@@ -1,0 +1,39 @@
+v0.6.8c: Stage 1 done — GDELT 事件管道补全 (events.py + events_gdelt.py)
+
+按 roadmap 推 P-event-enrichment (Kansoku 借鉴触发), Stage 1 完成:
+- src/events_gdelt.py 新建 (~6KB, Kansoku skill 范式)
+- src/events.py upcoming_events/past_events 加 providers=["yaml", "gdelt"]
+- tests/test_smoke.py +2 断言 (29/29 pass)
+
+代码改动 (3 files, +260 / -25 lines):
+- src/events_gdelt.py: 拉 GDELT 2.0 Doc API, 转 MacroEvent
+  - 5 秒限流,免 key,clash proxy auto
+  - DEFAULT_KEYWORDS (Fed/FOMC/CPI/NFP/Powell/etc)
+  - ToneChart 模式,含情绪打分 (abs >= 5 = high impact)
+  - --smoke 自检入口 (Kansoku skill 范式)
+  - Lazy import (src.events / src.proxy 挪到函数内, 兼容 main 跑)
+- src/events.py: 加 providers 参数, 向后兼容
+  - 默认 ["yaml"] (老 callers 零改动)
+  - "yaml" + "gdelt" 同时拉, 合并去重按 (date, kind) 排序
+  - GDELT 拉过去 3 天 (不预测), 跟 yaml 未来事件合并
+- tests/test_smoke.py: +2 断言
+  - test_events_gdelt_graceful_degradation: 函数/参数/优雅降级
+  - test_events_providers_param: backward compat + 多 provider 合并
+
+🪦 3 个 bug 真测时发现 (v0.6.8b 教训延伸, "装 ≠ 能用" → "写代码不真测不知道"):
+1. **Query 语法缺括号**: `("Federal Reserve" OR "FOMC")` 必须 () 包, GDELT 报 "Queries containing OR'd terms must be surrounded by ()"
+2. **GDELT 限流返回 plain text 不是 JSON**: 之前 `resp.json()` 直接挂, 改 content-type check
+3. **Lazy import fix**: `from src.events import MacroEvent` 在 module 顶部, 直接 python 跑 main 时 src 不在 sys.path, 挪到函数内
+
+Lesson (v0.6.8c hotfix, 写进未来 research discipline):
+- "写完新 API 必跑 --smoke" — 之前 events.py 写完就 commit, 没真测 GDELT, 推到 3 个 bug
+- 跟 v0.6.8b (FMP free tier 受限) + v0.6.8b 借鉴 SEC EDGAR (跟 ETF universe 不匹配) 同一个根:
+  **"没真跑通 endpoint 就 commit 文档/代码"**
+
+P-event-enrichment 进度:
+- ✅ Stage 1 (v0.6.8c): GDELT 事件拉取 done
+- ⏳ Stage 2 (v0.6.8d): SEC EDGAR ETF 持仓拉取 (跟 P7-2 真修残差合并, 不是 events 管道)
+
+PHASE7.md / ROADMAP.md 同步:
+- 加 P-event-enrichment (v0.6.8c/d) 段
+- P7-2 重设计: 拉 ETF 持仓公告作为真 sector weights 源

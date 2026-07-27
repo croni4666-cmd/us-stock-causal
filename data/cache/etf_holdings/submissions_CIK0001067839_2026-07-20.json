@@ -1,0 +1,42 @@
+{
+  "cik": "0001067839",
+  "name": "INVESCO QQQ TRUST, SERIES 1",
+  "ticker": "QQQ",
+  "recent_filings": [
+    {
+      "form": "NPORT-P",
+      "filing_date": "2026-05-28",
+      "report_date": "2026-03-31",
+      "accession_number": "0001067839-26-000024",
+      "primary_document": "xslFormNPORT-P_X01/primary_doc.xml"
+    },
+    {
+      "form": "NPORT-P",
+      "filing_date": "2026-02-27",
+      "report_date": "2025-12-31",
+      "accession_number": "0001067839-26-000016",
+      "primary_document": "xslFormNPORT-P_X01/primary_doc.xml"
+    },
+    {
+      "form": "NPORT-P",
+      "filing_date": "2025-11-19",
+      "report_date": "2025-09-30",
+      "accession_number": "0001067839-25-000007",
+      "primary_document": "xslFormNPORT-P_X01/primary_doc.xml"
+    },
+    {
+      "form": "NPORT-P",
+      "filing_date": "2025-08-28",
+      "report_date": "2025-06-30",
+      "accession_number": "0001752724-25-211318",
+      "primary_document": "xslFormNPORT-P_X01/primary_doc.xml"
+    },
+    {
+      "form": "NPORT-P",
+      "filing_date": "2025-05-29",
+      "report_date": "2025-03-31",
+      "accession_number": "0001752724-25-127952",
+      "primary_document": "xslFormNPORT-P_X01/primary_doc.xml"
+    }
+  ]
+}

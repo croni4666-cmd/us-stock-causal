@@ -1,0 +1,38 @@
+v0.6.8b hotfix: PHASE7.md 修正 — A 路径错, Phase 7 重设计
+
+P7-1 research 第二轮 (2026-07-16):
+- 配 FMP key `pq3neDC...` 后实测 7 个 endpoint
+- 🪦 5/7 受限, A 路径失败:
+  - FMP obb.etf.sectors/holdings/info → 402 Restricted (free tier 不含)
+  - yfinance ticker.funds/info → YFRateLimitError (Yahoo 2026 限流)
+- ✅ 唯一免费 OK: FMP equity.profile (单只 sector/industry 字段)
+
+教训 (写进 PHASE7.md 顶部 hotfix 段):
+- "装" ≠ "能用", research 必须真跑 endpoint
+- 3rd-party API: 测 "register + use", 别只测 "import"
+- FMP / yfinance / 任何 SaaS: 先 free tier 跑通 1 个真实 query 再 commit guide
+
+新发现 — yfinance 限流 2026 持续:
+- ticker.history / .info / .funds 全部 YFRateLimitError
+- Phase 1 整个数据管道潜在风险 (cache miss 时拉新数据失败)
+- daily cron 增量也挂
+- 新加 P7-6 (限流检测 + 优雅降级) — 提前到 Phase 7 修
+
+3 选 1 (替代 A, 等 user 拍板):
+- C: hardcode SPY 500 + QQQ 100 sector mapping (0 钱, 1-2h 一次性投入)
+- D: FMP 付费订阅 $14/month Starter (信用卡 1 次, 真时)
+- E: 跳 Phase 7, 进 Phase 8 + 修 yfinance 限流 (接受 5d 残差 0.4-1.1% 现状)
+
+FMP key `pq3neDC...` 已配, 不浪费 user 5 分钟投入:
+- Phase 8 alert: 用 equity.profile 拉单只 sector 做 sanity check
+- P7-6 限流检测: FMP 当 yfinance fallback
+
+文件改动 (1 file, +85 / -90 lines):
+- docs/PHASE7.md: 顶部加 hotfix 段, 4 步指南标"历史"存档到 d868eeb,
+  进度表 1/5 done → 0/5, 3 选项 C/D/E 列出
+
+(注: ROADMAP.md workspace 根目录, 不进 git, 同步改了 Phase 7 段 + update log
+加 2026-07-16 行, 但 ROADMAP 是 user 单一事实源文档不进 git)
+
+Phase 6 6/6 done 🎉, Phase 7 0/5 (待 user 拍板 C/D/E)
+27/27 smoke test 仍过 (无代码改动)

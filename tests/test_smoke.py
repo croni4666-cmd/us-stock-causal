@@ -38,6 +38,8 @@ def test_version_match():
     v0.6.8 lesson: VERSION=0.6.8 写到 CHANGELOG 末尾, 第一个 ## [x.y.z] 仍是 v0.6.7
     (因为 v0.6.7 段紧跟 [Unreleased]), 原来 "== first match" 逻辑会 fail
     改为: VERSION 必须出现在 CHANGELOG 任意 [Unreleased] 之下的 ## [x.y.z] 段里
+
+    v0.6.8m lesson: 加 letter suffix (0.6.8a/b/c/.../m) 也支持
     """
     from pathlib import Path
     import re
@@ -45,15 +47,18 @@ def test_version_match():
     version = (project_root / 'VERSION').read_text().strip()
     changelog = (project_root / 'CHANGELOG.md').read_text(encoding='utf-8')
 
-    # 找 [Unreleased] 之后的所有 ## [x.y.z] 段
+    # 找 [Unreleased] 之后的所有 ## [x.y.z] 段 (支持 letter suffix e.g. 0.6.8m)
     unreleased_idx = changelog.find('## [Unreleased]')
     if unreleased_idx == -1:
         # 没有 [Unreleased] 段, fallback 找所有段
-        version_sections = re.findall(r'## \[(\d+\.\d+\.\d+)\]', changelog)
+        version_sections = re.findall(r'## \[(\d+\.\d+\.\d+[a-z]?(?:\s+hotfix)?)\]', changelog)
     else:
         # 只看 [Unreleased] 之后
         post = changelog[unreleased_idx:]
-        version_sections = re.findall(r'## \[(\d+\.\d+\.\d+)\]', post)
+        version_sections = re.findall(r'## \[(\d+\.\d+\.\d+[a-z]?(?:\s+hotfix)?)\]', post)
+
+    # normalize: strip ' hotfix' suffix (e.g. '0.6.8b hotfix' -> '0.6.8b')
+    version_sections = [v.replace(' hotfix', '').strip() for v in version_sections]
 
     assert version in version_sections, \
         f"VERSION {version} not in CHANGELOG released versions: {version_sections}"

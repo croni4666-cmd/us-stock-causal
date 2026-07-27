@@ -519,6 +519,72 @@ User 2026-07-26 决定: **暂停所有飞书相关开发**, 跟 user global "hob
 - `CHANGELOG.md` +24/-22 lines (5 处加 archived 标注 + 本段)
 - `ROADMAP.md` (workspace-level, 不进 git): Phase 5/8 整个重写 + 2026-07-26 update log
 
+## [0.6.8m] - 2026-07-27
+
+### Added (P5-3 + P5-4 done: Windows Task Scheduler 17:00 daily report)
+
+按 user 2026-07-27 决定: 用 config.yaml default 17:00 (美股收盘后 1h) 注册 Windows Task Scheduler。
+整个 Phase 5 路径 (本地化) 终于跑通: task 自动调 daily_report.py 7 步 pipeline,
+写本地 log, 失败 exit code 给 P8 异常检测用。
+
+- **`scripts/run_daily_report.cmd`** 新建 (~1.5KB, ASCII-only):
+  - 解析 PROJECT_ROOT (strip trailing `\` from `%~dp0` + `..` + absolute via `for %%I`)
+  - 用 PowerShell `(Get-Date -Format 'yyyy-MM-dd')` 拿稳定日期 (替代 wmic + substr)
+  - `output\logs\cron_<date>.log` 写当日 stdout+stderr (覆盖旧 log)
+  - exit code passthrough (P8 alert check 用)
+- **`scripts/install_task.cmd`** 新建 (~1.9KB, ASCII-only):
+  - `schtasks /Create /SC DAILY /TN "us-stock-causal-daily-report" /TR "\"<cmd_path>\"" /ST 17:00 /F`
+  - **幂等**: /F 覆盖, 重复跑不报错
+  - 失败提示: admin / 时间格式 / 路径特殊字符
+  - 默认 17:00, 可 `install_task.cmd 16:30` 覆盖
+- **`scripts/setup_windows_task.ps1`** 新建 (~4.1KB, ASCII-only):
+  - PowerShell 路径 (备选), `Register-ScheduledTask` 完整配置
+  - `-Time` 参数, `-Uninstall` 开关
+  - `Start-WhenAvailable` (笔记本 sleep 后补跑) + `RestartCount 3` (yfinance 限流重试)
+  - 注: 实际测试发现 PS 5.1 `Register-ScheduledTask` 在 non-elevated session 报 "Access is denied",
+    .cmd 走 schtasks 不需要这个 PS module 且在 admin cmd 下稳定, .ps1 保留作 reference
+- **`docs/PHASE5.md`** 更新:
+  - P5-3 / P5-4 ✅ done 2026-07-27 (candidate 17:00 选了)
+  - "监控 1 周" 流程: 看 `output\logs\cron_<date>.log` + `schtasks /Query ... Last Result`
+
+### 实测 (2026-07-27 16:55)
+
+```
+$ scripts\install_task.cmd
+=== Install Windows Task: us-stock-causal-daily-report ===
+  Time:        17:00 (every day)
+  Cmd:         G:\Minimax trade market\us-stock-causal\scripts\run_daily_report.cmd
+  WorkingDir:  G:\Minimax trade market\us-stock-causal
+SUCCESS: The scheduled task "us-stock-causal-daily-report" has successfully been created.
+[OK] task registered
+
+$ scripts\run_daily_report.cmd --skip-fetch --skip-md --skip-html --skip-dashboard
+EXIT: 0
+ls output\logs\cron_2026-07-27.log  # 3357 bytes
+```
+
+幂等: 跑 2 次 install_task.cmd, task 还是 1 个, Last Run Time / Next Run Time 更新正常.
+
+### 设计决策 (写进 user memory / future engineering)
+
+- **"ASCII-only in .cmd/.ps1"** (新, 跨项目): 含中文的 .cmd 在 PowerShell `&` 调用时会被 preprocess 成乱码
+  (PowerShell 把 .cmd 内容当 text 解析, 中文 byte 序列当命令名). 跟 us-stock-causal setup_vault.ps1 经验一致
+- **"admin cmd 跑 schtasks"** (新): `Register-ScheduledTask` (PS) 在 non-elevated session 报 "Access is denied",
+  `schtasks /Create` (cmd) 在 admin cmd 下稳定. 优先用 .cmd, .ps1 保留作备选
+- **"PROJECT_ROOT 解析 idiom"** (新, 跨 .cmd): `set P=%~dp0` + strip trailing `\` + `\..` + `for %%I in ("%P%") do set P=%%~fI`
+  解决 `for %%I in ("%~dp0.")` 不解析 `..` 的坑
+- **"log 路径用 PowerShell Get-Date"** (新): `wmic os get localdate` + `%VAR:~0,10%` 在某些 PS 5.1 + GBK 环境
+  出乱码 (变成 `cron_~0,10.log`), `for /f ... 'powershell ... (Get-Date ...)'` 更稳
+- **"exit code passthrough"** (新): .cmd 结尾 `exit /b %ERRORLEVEL%` 让 P8 alert check 能 catch cron 失败
+
+### 已知限制 (v0.6.8m)
+
+- **task 没设 Start In (working dir)**: schtasks /Create 不支持 set working dir, .cmd 内部 `pushd` 处理
+- **没 timezone-aware date**: log 日期用 Asia/Shanghai (machine local), 美股夏令时后可能差 1 天
+  (PHASE5.md v0.5.1 已知问题, 没修)
+- **没失败重试** (P8 配合): .cmd exit 0 = 成功, P8 异常检测根据这个判
+- **没脱机 catchup 触发**: `Start-WhenAvailable` 是 task setting, 但具体行为看 Windows 版本
+
 ## [0.6.8l] - 2026-07-26
 
 ### Added (P5-2 done: `examples/daily_report.py` 一键跑全 pipeline)
