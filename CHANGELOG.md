@@ -585,6 +585,101 @@ ls output\logs\cron_2026-07-27.log  # 3357 bytes
 - **没失败重试** (P8 配合): .cmd exit 0 = 成功, P8 异常检测根据这个判
 - **没脱机 catchup 触发**: `Start-WhenAvailable` 是 task setting, 但具体行为看 Windows 版本
 
+## [0.6.9] - 2026-07-27
+
+### Added (Phase 9.0: Pearl-style 因果分析)
+
+**重大架构转变**: 因果分析从 L1 关联 (attribution.py) 扩展到 L2 干预 + L3 反事实, 借鉴 Judea Pearl 因果论。attribution.py 保留做 L1 baseline, Pearl 在 daily_report 新增 step 8。
+
+按 ROADMAP Phase 9 设计: DAG 显式化 → do-calculus → 反事实 → 集成 daily_report。
+
+**核心 (Pearl 3 层因果阶梯)**:
+- **L1 关联** (attribution.py 已有): P(Y|X) — "看到"
+- **L2 干预** (本 commit, do-calculus): P(Y|do(X)) — "做"
+- **L3 反事实** (本 commit, econml 简化近似): P(Y_x|X',Y') — "如果当初"
+
+**5 节点 7 节点手工 DAG** (`config/causal_dag.yaml`):
+- ^TNX (10Y 国债) → 4 指数 (利率↓ → 估值↑)
+- ^VIX (恐慌) → 4 指数 (风险偏好)
+- DXY (美元) → 4 指数 (跨国企业, QQQ 受影响最大)
+- 7 节点 / 12 边 / acyclic
+- POC 简化: 无 mediator, 无 confounder, 无 latent
+
+**`src/causal.py`** (~12KB, Phase 9.0 POC):
+- `load_dag_config()` / `load_dag_graph()` — YAML + pydot → networkx DiGraph
+- `load_dag_data()` — 7 节点 parquet → 508 交易日 log return DataFrame (inner join)
+- `causal_query(treatment, outcome)` — DoWhy 4 步: model → identify → estimate → refute
+  - **estimate 用 statsmodels OLS (不用 DoWhy 自带 estimator, 已知返回 0 bug)**
+  - DAG 验证 + estimand 公式 + p-value + 3 重反驳 (random_common_cause / placebo / data_subset)
+- `counterfactual_query(date, treatment, outcome, counterfactual_value)` — econml CausalForestDML 简化近似 Pearl L3
+  - **用 RandomForestRegressor 实例 (不是 lambda, 之前 AttributeError)**
+  - 单位对齐修了: cate * (cf - actual) 无 ×100
+
+**`examples/causal_demo.py`** (~3.4KB):
+- 跑 2 个 L2 query (TNX→QQQ, VIX→QQQ) + 1 个 L3 counterfactual
+- 实测结果 (n=508, 2024-07-16 ~ 2026-07-24):
+  - L2 TNX→QQQ: ATE=+0.0968 (p=0.071, 弱正, 边缘显著)
+  - L2 VIX→QQQ: ATE=-0.1227 (p<0.001, 强负, **经济理论 confirmed**)
+  - L3 反事实 2026-07-24: VIX 跌 5% → QQQ 跌少 0.65% (合理)
+- 3 重反驳测试: 3/3 PASS
+
+**`examples/daily_report.py` step 8** (causal integration):
+- 跑 1 L2 query (VIX→QQQ) + 1 L3 counterfactual + 终端显眼打印
+- banner: "[Step 8] Causal Analysis (Pearl-style, {date})"
+- 慢: CausalForestDML fit ~40s, 后续可优化 (小 n_estimators)
+- daily_report 总耗时 43.7s, 全 4 OK / 4 SKIP / 0 FAIL
+
+**`tests/test_smoke.py` +5 测试**:
+- `test_causal_dag_loads_v069_p90` — 7 节点 12 边 acyclic
+- `test_causal_data_alignment_v069_p95` — 508 交易日 7 列 log return
+- `test_causal_query_v069_p92` — VIX→QQQ ATE < -0.05, p<0.001, 3 重反驳 ≥ 2 PASS
+- `test_causal_treatment_validation_v069_p93` — 错节点 ValueError
+- `test_causal_counterfactual_v069_p94` — VIX 跌多 5% → QQQ 跌少, delta > 0
+- `test_daily_report_v068l_p52` 改: 7 步 → 8 步 (含 causal), assert `len == 8`
+
+**50/50 tests pass, EXIT:0**
+
+### 设计决策 (P9.0 POC 阶段)
+- **手工 DAG 优先 (用户拍板)**: 不从数据学 DAG, 用经济理论 (利率/恐慌/美元 → 估值/风险/跨国), PC algorithm 留 Phase 9.1
+- **DoWhy + EconML (用户拍板)**: Microsoft py-why 同源, 文档互通, 装包简单 (causal-learn + cvxpy + scikit-learn 自动拉)
+- **叠加 (用户拍板)**: attribution.py 不退役, L1 baseline 保留做对比, daily_report step 8 加 L2/L3
+- **核心子图先行 (用户拍板)**: 49 ticker 4 层完整 DAG 太重, 7 节点 POC 验证方法论, 1 周首版
+- **DoWhy linear_regression 已知 bug**: 返回 0.0000 (跟 DAG 一起传时), 改用 statsmodels OLS 自己跑, DoWhy 仍算 estimand + 反驳
+- **Pearl L3 严格反事实需 SCM (structural causal model)**: DoWhy 有 `dowhy.do_calculus.counterfactual_query` 但需 4 elements, 用 econml CATE 简化近似, 标注"近似 Pearl L3, 不是严格反事实"
+- **CausalForestDML 慢 (n_estimators=200 ≈ 40s fit)**: POC 阶段可接受, Phase 9.1 优化: 降 n_estimators=100 + 缓存 fit 结果 (按 (T, O, controls) 缓存)
+
+### 依赖 (新装)
+- `dowhy==0.14` — Microsoft, MIT, 7.5k+ stars
+- `econml==0.16.0` — Microsoft, MIT, 3.7k+ stars (CausalForestDML 异质处理效应)
+- 间接: `causal-learn==0.1.4.8`, `cvxpy==1.9.2`, `pydot==4.0.1`, `graphviz==0.21`, `shap==0.48.0`, `sparse==0.19.0`, `osqp==1.1.3`, `clarabel==0.11.1`, `highspy==1.15.1`, `scs==3.2.11`, `slicer==0.0.8`, `sparsediffpy==0.3.0`, `qdldl==0.1.9.post1`, `momentchi2==0.1.8`
+- `scikit-learn` 1.6.1 升 (从 1.9.0; 跟现有 1.9.0 兼容)
+
+### 已知限制 (v0.6.9 POC)
+- **手工 DAG 无 mediator**: 实际 ^TNX → ^VIX → index, Phase 9.1 加
+- **手工 DAG 无 confounder**: 实际 GDP / CPI 也影响指数, Phase 9.1 加 (sector weights 通过 P2 attribution)
+- **Pearl L3 是近似**: 用 econml CATE, 严格 L3 需 SCM (dowhy.do_calculus.counterfactual_query) — Phase 9.1 试
+- **DoWhy 的 linear_regression estimator 已知 bug**: 返回 0.0000, 改 statsmodels OLS — 已规避
+- **CausalForestDML fit 慢 (40s)**: 适合 daily 跑, 实时不行 — Phase 9.1 优化 (降 n_estimators + cache)
+- **核心子图 7 节点**: 不覆盖 49 ticker 全部 4 层, 后续 Phase 9.2 扩到 11 行业 + 14 商品
+
+### Phase 9.1 计划 (下一步)
+- **结构学习**: PC algorithm / GES 从数据学 DAG, 跟手工对比, 验证假设
+- **DAG 扩展**: 加 mediator (^TNX → ^VIX → index) + confounder (CPI / GDP)
+- **严格 L3 反事实**: 试 `dowhy.do_calculus.counterfactual_query` (4-element)
+- **EconML DML 异质性**: 不止 ATE, 加 CATE (treatment effect 跨 sub-population 变化)
+- **CausalForestDML 性能优化**: n_estimators 100 + 按 (T, O) 缓存
+- **report 集成**: 第 6 段 "因果机制" 写到 daily_report markdown, 不只 banner 打印
+
+### 用户决定 (4 个 P9.0 关键决策)
+- **Scope**: 核心子图先行 (Fed rate → 4 指数) — 7 节点, 1 周首版
+- **Replace/Add**: 叠加 (attribution.py 保留, Pearl 加 step 8)
+- **DAG source**: 手工 DAG 优先, PC algorithm 留 Phase 9.1
+- **Tools**: DoWhy + EconML (Microsoft py-why)
+
+### Step count
+- v0.6.8l: 7 步 (fetch / attribution / regression / md / html / dashboard / check_alerts)
+- v0.6.9: 8 步 (+ causal, Phase 9)
+
 ## [0.6.8n] - 2026-07-27
 
 ### Added (P8-1~6 done: 5 类异常检测 + 本地 alert log)
