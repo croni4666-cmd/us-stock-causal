@@ -1,6 +1,0 @@
-{
-  "as_of": "2026-07-27",
-  "status": "no_healthcheck_runner",
-  "alerts": [],
-  "note": "P8-6 (本地 alert logger) 尚未实现, 此文件是 daily_report.py placeholder"
-}
