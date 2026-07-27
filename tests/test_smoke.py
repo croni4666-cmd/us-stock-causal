@@ -29,7 +29,7 @@ def test_module_imports():
         'src.thresholds', 'src.attribution', 'src.residual',
         'src.patterns', 'src.events', 'src.signals',
         'src.macro', 'src.kline', 'src.report', 'src.events_gdelt',
-        'src.etf_holdings', 'src.tickers_universe'
+        'src.etf_holdings', 'src.tickers_universe', 'src.causal'
     ]
     for m in modules:
         __import__(m)
@@ -971,16 +971,17 @@ def test_yfinance_rate_limit_v068j_p76():
 
 
 def test_daily_report_v068l_p52():
-    """v0.6.8l (P5-2 gate): examples/daily_report.py 跑通 + 7 步全 OK/SKIP
+    """v0.6.8l (P5-2 gate): examples/daily_report.py 跑通 + 8 步全 OK/SKIP (v0.6.9 加 causal step 8)
 
     验证 daily_report 编排:
     1. importable (函数 + main 入口)
     2. --skip-fetch + --skip-html + --skip-dashboard 模式跑通 (用 cache)
-    3. 7 步全过 (无 FAIL)
+    3. 8 步全过 (无 FAIL; 7 步 + v0.6.9 加的 causal)
     4. attribution 残差 ~ 0 (跟 v0.6.8f baseline 一致)
     5. residual_regression [OK]
     6. markdown_report 写到 output/report_<date>.md
-    7. check_alerts 写 placeholder (P8-6 还没实现)
+    7. check_alerts 写 (P8-6 已实现)
+    8. causal (v0.6.9 Pearl-style 因果分析)
     """
     from examples.daily_report import run_daily_report
     from datetime import datetime
@@ -1001,12 +1002,13 @@ def test_daily_report_v068l_p52():
     assert "steps" in result
     assert result["date"] == date_str
     assert result["elapsed_s"] > 0
-    assert len(result["steps"]) == 7  # 7 步
+    # v0.6.9 加 causal step 后 = 8 步
+    assert len(result["steps"]) == 8, f"应 8 步 (含 causal), got {len(result['steps'])}"
 
     # 2. 每步状态 (有 [OK] / [SKIP] / [FAIL])
     steps = result["steps"]
     for name in ["fetch", "attribution", "residual_regression", "markdown_report",
-                "html_report", "performance_dashboard", "check_alerts"]:
+                "html_report", "performance_dashboard", "check_alerts", "causal"]:
         assert name in steps, f"缺 step: {name}"
         assert "ok" in steps[name], f"step {name} 缺 ok 字段"
         assert "elapsed_s" in steps[name], f"step {name} 缺 elapsed_s 字段"
@@ -1016,12 +1018,13 @@ def test_daily_report_v068l_p52():
     assert steps["html_report"]["ok"] == "skip"
     assert steps["performance_dashboard"]["ok"] == "skip"
 
-    # 4. attribution / regression / md / alerts 应该是 OK
+    # 4. attribution / regression / md / alerts / causal 应该是 OK
     assert steps["attribution"]["ok"] is True, \
         f"attribution fail: {steps['attribution'].get('error')}"
     assert steps["residual_regression"]["ok"] is True
     assert steps["markdown_report"]["ok"] is True
     assert steps["check_alerts"]["ok"] is True
+    assert steps["causal"]["ok"] is True, f"causal fail: {steps['causal'].get('error')}"
 
     # 5. attribution 4 指数 × 3 窗口 = 12 结果
     attr_results = steps["attribution"]["results"]
@@ -1035,7 +1038,7 @@ def test_daily_report_v068l_p52():
     assert md_path.exists()
     assert md_path.stat().st_size > 1000  # 至少 1KB
 
-    # 7. alerts placeholder 创建
+    # 7. alerts 创建
     alert_path = steps["check_alerts"]["path"]
     assert alert_path.exists()
     import json as _json
@@ -1043,6 +1046,10 @@ def test_daily_report_v068l_p52():
     assert "as_of" in data
     assert "alerts" in data
     assert data["as_of"] == date_str
+
+    # 8. causal 跑过 (L2 query 至少 1 个)
+    causal_queries = steps["causal"].get("queries", [])
+    assert len(causal_queries) >= 1, f"causal step 至少 1 query, got {len(causal_queries)}"
 
 
 def test_events_providers_param():
@@ -1378,6 +1385,90 @@ def test_daily_report_step7_v068n_p86():
     # path 写入
     assert result["path"].exists()
     assert result["path"].name == f"alerts_{test_date}.json"
+
+
+# =============================================================================
+# Phase 9.0: Pearl-style 因果分析 (DoWhy + EconML)
+# =============================================================================
+
+def test_causal_dag_loads_v069_p90():
+    """P9.1: 手工 DAG 从 YAML 加载, networkx 验证 7 节点 12 边 acyclic"""
+    from src.causal import load_dag_config, load_dag_graph
+    cfg = load_dag_config()
+    g = load_dag_graph(cfg)
+    assert g.number_of_nodes() == 7, f"expected 7 nodes, got {g.number_of_nodes()}"
+    assert g.number_of_edges() == 12, f"expected 12 edges, got {g.number_of_edges()}"
+    # 节点
+    expected_nodes = {"TNX", "VIX", "DXY", "DIA", "QQQ", "RSP", "QQQE"}
+    assert set(g.nodes()) == expected_nodes
+    # acyclic
+    import networkx as nx
+    assert nx.is_directed_acyclic_graph(g), "DAG 有环"
+
+
+def test_causal_query_v069_p92():
+    """P9.3: causal_query 跑通 DoWhy 4 步, VIX→QQQ 强负, 经济理论 confirmed"""
+    from src.causal import load_dag_config, load_dag_data, causal_query
+    cfg = load_dag_config()
+    data = load_dag_data(cfg=cfg)
+    eff = causal_query(treatment="VIX", outcome="QQQ", data=data, cfg=cfg)
+    # VIX 应该强负相关 (恐慌↑ → 跌)
+    assert eff.estimate < 0, f"VIX→QQQ ATE 应为负, got {eff.estimate}"
+    assert eff.estimate < -0.05, f"应 < -0.05 (~-12%), got {eff.estimate}"
+    assert eff.p_value < 0.001, f"p 应 < 0.001 (n=508), got {eff.p_value}"
+    assert eff.n_obs == len(data)
+    # 3 重反驳至少 2 个 PASS
+    pass_count = sum(1 for v in eff.refutation.values() if "new_effect" in v)
+    assert pass_count >= 2, f"3 重反驳至少 2 个应通过, got {pass_count}"
+
+
+def test_causal_treatment_validation_v069_p93():
+    """P9.3: 错 treatment / outcome 应抛 ValueError"""
+    from src.causal import load_dag_config, load_dag_data, causal_query
+    cfg = load_dag_config()
+    data = load_dag_data(cfg=cfg)
+    # 不在 DAG 里的节点
+    try:
+        causal_query(treatment="FAKE", outcome="QQQ", data=data, cfg=cfg)
+        assert False, "应抛 ValueError"
+    except ValueError as e:
+        assert "FAKE" in str(e) or "不在 DAG" in str(e)
+    # 不在 data 里的列 (节点在 DAG 但列缺)
+    # (我们的 DAG 跟 data columns 1:1, 所以这个 case 不太能 trigger)
+
+
+def test_causal_counterfactual_v069_p94():
+    """P9.4: counterfactual_query 跑通, delta 方向符合经济理论 (VIX 跌→QQQ 涨)"""
+    from src.causal import load_dag_config, load_dag_data, counterfactual_query
+    cfg = load_dag_config()
+    data = load_dag_data(cfg=cfg)
+    # 用最近一天, 假设 VIX 比实际低 (恐慌小)
+    last_date = str(data.index[-1].date())
+    actual_vix = float(data.iloc[-1]["VIX"])
+    cf_vix = actual_vix - 0.05  # 比实际低 5% (log return unit)
+    cf = counterfactual_query(
+        date=last_date, treatment="VIX", outcome="QQQ",
+        counterfactual_value=cf_vix, data=data, cfg=cfg,
+    )
+    # VIX 跌多 (cf_vix < actual_vix) → QQQ 应该涨多 (delta > 0)
+    # 注意: VIX 跌 < 0, QQQ 涨 > 0; CATE 是 VIX→QQQ = 负; delta = CATE * (cf - actual) = 负 * 负 = 正
+    assert cf.delta > 0, f"VIX 跌应让 QQQ 涨 (delta > 0), got delta={cf.delta}"
+    # magnitude 应该合理 (< 5% 因为 VIX 只跌 5%)
+    assert abs(cf.delta) < 0.05, f"delta 应 < 5%, got {cf.delta}"
+
+
+def test_causal_data_alignment_v069_p95():
+    """P9.2: load_dag_data inner join 7 节点, 应该 ≥ 400 交易日 (P9.0 POC)"""
+    from src.causal import load_dag_config, load_dag_data
+    cfg = load_dag_config()
+    data = load_dag_data(cfg=cfg)
+    assert data.shape[1] == 7, f"应 7 列, got {data.shape[1]}"
+    assert data.shape[0] >= 400, f"应 ≥ 400 交易日, got {data.shape[0]}"
+    # 所有 7 节点都有
+    expected = {"TNX", "VIX", "DXY", "DIA", "QQQ", "RSP", "QQQE"}
+    assert set(data.columns) == expected
+    # 应该是 log return (绝对值 < 1.0 即 < 100% 日变化; VIX 单日能涨 50%+, 阈值放宽)
+    assert data.abs().max().max() < 1.0, f"log return 应 < 1.0 (放宽给 VIX 极端行情), got max {data.abs().max().max()}"
 
 
 if __name__ == "__main__":

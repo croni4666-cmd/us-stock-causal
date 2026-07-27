@@ -282,6 +282,73 @@ def step_check_alerts(date_str: str) -> dict:
     }
 
 
+def step_causal(date_str: str) -> dict:
+    """Step 8: Pearl-style 因果分析 (Phase 9)
+
+    跑 1 个 L2 干预 query (VIX→QQQ) + 1 个 L3 反事实, 不写 report 数字
+    (后续可加到 markdown report 第 6 段 "因果机制")
+
+    Pearl 3 层因果阶梯:
+      - L1 关联 (P2 attribution): P(Y|X)
+      - L2 干预 (本 step): P(Y|do(X)) — DoWhy + OLS
+      - L3 反事实 (本 step): P(Y_x|X',Y') — econml CausalForestDML 简化近似
+
+    DAG: config/causal_dag.yaml (7 节点: 3 macro + 4 指数, 手工)
+    """
+    from src import causal
+    _step_banner(8, f"Causal Analysis (Pearl-style, {date_str})")
+    t0 = time.time()
+
+    results = {"ok": True, "queries": [], "elapsed_s": 0}
+
+    try:
+        cfg = causal.load_dag_config()
+        data = causal.load_dag_data(cfg=cfg)
+
+        # L2 干预 query: VIX → QQQ (经济理论: 应强负)
+        vix_qqq = causal.causal_query(treatment="VIX", outcome="QQQ", data=data, cfg=cfg)
+        results["queries"].append({
+            "type": "L2_intervention",
+            "treatment": vix_qqq.treatment,
+            "outcome": vix_qqq.outcome,
+            "estimate": vix_qqq.estimate,
+            "p_value": vix_qqq.p_value,
+            "interpretation": vix_qqq.interpretation,
+        })
+        direction = "↑" if vix_qqq.estimate > 0 else "↓"
+        print(f"  [L2 do-calculus] VIX do(+1%) → QQQ: {direction}{abs(vix_qqq.estimate):.4f} "
+              f"({abs(vix_qqq.estimate)*100:+.2f}%, p={vix_qqq.p_value:.3f}, n={vix_qqq.n_obs})")
+        print(f"    反驳测试 PASS 数: {sum(1 for v in vix_qqq.refutation.values() if 'new_effect' in v)}/3")
+
+        # L3 反事实: 用最近一天, 假设 VIX 比实际低 (恐慌小, 应该利好)
+        last_date = str(data.index[-1].date())
+        actual_vix = float(data.iloc[-1]["VIX"])
+        cf_vix = actual_vix - 0.05
+        cf = causal.counterfactual_query(
+            date=last_date, treatment="VIX", outcome="QQQ",
+            counterfactual_value=cf_vix, data=data, cfg=cfg,
+        )
+        results["queries"].append({
+            "type": "L3_counterfactual",
+            "date": cf.date,
+            "treatment": cf.treatment,
+            "outcome": cf.outcome,
+            "actual_outcome": cf.actual_outcome,
+            "counterfactual_outcome": cf.counterfactual_outcome,
+            "delta": cf.delta,
+        })
+        print(f"  [L3 counterfactual] {cf.date}: 假设 VIX -5% (从 {actual_vix*100:+.2f}% 到 {cf_vix*100:+.2f}%)")
+        print(f"    QQQ 实际 {cf.actual_outcome*100:+.2f}%, 反事实 {cf.counterfactual_outcome*100:+.2f}%, 差 {cf.delta*100:+.2f}%")
+
+    except Exception as e:
+        results["ok"] = False
+        results["error"] = f"{type(e).__name__}: {e}"
+        print(f"  [WARN] causal 失败: {results['error']}")
+
+    results["elapsed_s"] = round(time.time() - t0, 2)
+    return results
+
+
 def print_summary(steps: dict, total_elapsed: float, date_str: str):
     """Step 8: 终端打印摘要"""
     print()
@@ -396,7 +463,10 @@ def run_daily_report(
     # 7. check alerts (P8-6 写, 本脚本读)
     steps["check_alerts"] = step_check_alerts(date_str)
 
-    # 8. summary
+    # 8. causal analysis (Phase 9 Pearl-style, 不写 report 数字, 只算 + 摘要打印)
+    steps["causal"] = step_causal(date_str)
+
+    # 9. summary
     total = round(time.time() - t_total, 1)
     if verbose:
         print_summary(steps, total, date_str)
