@@ -19,6 +19,7 @@ ENV/
 # Data (large, regenerable)
 data/raw/*.parquet
 data/cache/*.parquet
+data/cache/alerts/alerts_*.json
 *.parquet
 *.csv
 
@@ -60,5 +61,5 @@ desktop.ini
 # OpenBB cache (regenerable)
 .openbb/
 
-# Local commit message drafts (ÓÃ git commit -F ÒýÓÃ¼´¿É)
+# Local commit message drafts (ï¿½ï¿½ git commit -F ï¿½ï¿½ï¿½Ã¼ï¿½ï¿½ï¿½)
 commit_msg_*.txt

@@ -13,6 +13,9 @@ tests/test_smoke.py - 端到端 smoke test
   - 关键函数真实存在 + 数据快照准确
 """
 import sys
+import os
+import shutil
+import tempfile
 import inspect
 from pathlib import Path
 
@@ -1075,6 +1078,306 @@ def test_events_providers_param():
     up3 = upcoming_events(lookahead_days=30, providers=["gdelt"])
     # 限流时 0 条 OK
     assert isinstance(up3, list), "providers=['gdelt'] 应返回 list"
+
+
+# ============================================================
+# v0.6.8n: Phase 8 P8-1~6 — 5 类异常检测 + 本地 alert log
+# ============================================================
+
+def test_alert_logger_v068n_p86():
+    """alert_logger: make / write / read / dedup / clear"""
+    import time
+    from src import alert_logger
+
+    # 用 test date 隔离
+    test_date = "2099-12-31"
+    alert_logger.clear_alerts(test_date)
+
+    # 1. make_alert schema
+    a1 = alert_logger.make_alert("stale", "subj1", "msg1", "warning", {"k": "v"})
+    assert a1["id"].startswith("stale_")
+    assert a1["type"] == "stale"
+    assert a1["severity"] == "warning"
+    assert a1["subject"] == "subj1"
+    assert a1["message"] == "msg1"
+    assert a1["details"] == {"k": "v"}
+    assert "first_seen" in a1
+
+    # 2. invalid type / severity raise
+    try:
+        alert_logger.make_alert("invalid_type", "x", "y")
+        assert False, "应该 raise"
+    except ValueError:
+        pass
+    try:
+        alert_logger.make_alert("stale", "x", "y", "invalid_sev")
+        assert False, "应该 raise"
+    except ValueError:
+        pass
+
+    # 3. write / read
+    a2 = alert_logger.make_alert("vix_spike", "VIX level", "VIX 35", "warning")
+    alert_logger.write_alerts(test_date, [a1, a2])
+    read = alert_logger.read_alerts(test_date)
+    assert len(read) == 2
+    assert any(a["subject"] == "subj1" for a in read)
+    assert any(a["subject"] == "VIX level" for a in read)
+
+    # 4. dedup: re-write with same id
+    a1_dup = alert_logger.make_alert("stale", "subj1", "msg1", "warning", {"k": "new"})
+    assert a1_dup["id"] == a1["id"], "same subject+message 应同 id"
+    alert_logger.write_alerts(test_date, [a1_dup, a2])
+    read2 = alert_logger.read_alerts(test_date)
+    assert len(read2) == 2, f"dedup 后应 2 条, got {len(read2)}"
+    # first_seen 保留, details 更新
+    a1_kept = [a for a in read2 if a["id"] == a1["id"]][0]
+    assert a1_kept["details"] == {"k": "new"}, "新 details 应覆盖"
+
+    # 5. clear
+    assert alert_logger.clear_alerts(test_date) is True
+    assert alert_logger.read_alerts(test_date) == []
+    # 再 clear 不报错
+    assert alert_logger.clear_alerts(test_date) is False
+
+    # 6. render_terminal 非空
+    out = alert_logger.render_terminal([a1, a2], use_color=False)
+    assert "[ALERT]" in out
+    assert "stale" in out and "vix_spike" in out
+
+    # 7. render_terminal 空
+    assert alert_logger.render_terminal([]) == ""
+
+
+def test_checks_stale_v068n_p81():
+    """P8-1 stale check: 5 天老 → warning"""
+    import time
+    from src.checks import stale
+    from datetime import datetime, timedelta
+
+    # 用 today ref + 5 天前 mtime (避免 2099-12-31 ref 导致 26800d 算成 error)
+    ref_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    mtime_offset_days = 5
+
+    tmpdir = Path(tempfile.mkdtemp(prefix="dr_stale_"))
+    fake_dir = tmpdir / "data" / "raw" / "fake_cat"
+    fake_dir.mkdir(parents=True, exist_ok=True)
+    fake_pq = fake_dir / "fake.parquet"
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        table = pa.table({"date": [ref_date], "close": [100.0]})
+        pq.write_table(table, fake_pq)
+    except ImportError:
+        pytest.skip("pyarrow 没装")
+
+    # 改 mtime 到 ref_date - 5 days
+    ref_dt = datetime.strptime(ref_date, "%Y-%m-%d")
+    mtime_dt = ref_dt - timedelta(days=mtime_offset_days)
+    old = mtime_dt.timestamp()
+    os.utime(fake_pq, (old, old))
+
+    real_data_raw = stale.DATA_RAW
+    stale.DATA_RAW = tmpdir / "data" / "raw"
+    try:
+        alerts = stale.check(ref_date)
+    finally:
+        stale.DATA_RAW = real_data_raw
+
+    assert len(alerts) >= 1, f"应至少 1 alert, got 0"
+    assert any(a["type"] == "stale" for a in alerts)
+    fake_alerts = [a for a in alerts if "fake_cat" in a["subject"]]
+    assert len(fake_alerts) >= 1
+    # 5 天: >3d, <=7d → warning
+    assert fake_alerts[0]["severity"] == "warning", f"{mtime_offset_days}d 应 warning, got {fake_alerts[0]['severity']}"
+    assert f"{mtime_offset_days} days ago" in fake_alerts[0]["message"]
+
+    # 10 天: >7d → error (额外测)
+    old = (ref_dt - timedelta(days=10)).timestamp()
+    os.utime(fake_pq, (old, old))
+    stale.DATA_RAW = tmpdir / "data" / "raw"
+    try:
+        alerts = stale.check(ref_date)
+    finally:
+        stale.DATA_RAW = real_data_raw
+    fake_alerts = [a for a in alerts if "fake_cat" in a["subject"]]
+    assert any(a["severity"] == "error" for a in fake_alerts), "10d 应 error"
+
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_checks_vix_spike_v068n_p83():
+    """P8-3 vix_spike: VIX >= 30 → warning; 1d 涨幅 >= 15% → warning"""
+    from src.checks import vix_spike
+
+    # Mock _read_vix_series by patching
+    test_date = "2099-12-31"
+
+    # 1. VIX >= 30 → warning level
+    real_read = vix_spike._read_vix_series
+    vix_spike._read_vix_series = lambda: (["d1", "d2", "d3"], [20.0, 25.0, 32.0])
+    try:
+        alerts = vix_spike.check(test_date)
+    finally:
+        vix_spike._read_vix_series = real_read
+    # 32 >= 30 → 1 warning level
+    level_alerts = [a for a in alerts if a.get("details", {}).get("kind") == "level"]
+    assert len(level_alerts) >= 1, "VIX=32 应触发 level alert"
+    assert level_alerts[0]["severity"] == "warning"
+
+    # 2. VIX >= 40 → error
+    vix_spike._read_vix_series = lambda: (["d1", "d2"], [35.0, 45.0])
+    try:
+        alerts = vix_spike.check(test_date)
+    finally:
+        vix_spike._read_vix_series = real_read
+    level_alerts = [a for a in alerts if a.get("details", {}).get("kind") == "level"]
+    assert any(a["severity"] == "error" for a in level_alerts), "VIX=45 应 error"
+
+    # 3. 1d spike > 15% → spike alert
+    vix_spike._read_vix_series = lambda: (["d1", "d2"], [20.0, 25.0])  # +25% spike
+    try:
+        alerts = vix_spike.check(test_date)
+    finally:
+        vix_spike._read_vix_series = real_read
+    spike_alerts = [a for a in alerts if a.get("details", {}).get("kind") == "spike"]
+    assert len(spike_alerts) >= 1, "+25% 1d 应触发 spike"
+    assert spike_alerts[0]["severity"] == "error"  # 涨是 error, 跌是 warning
+
+
+def test_checks_ticker_fail_v068n_p84():
+    """P8-4 ticker_fail: yfinance 限流 + 小 parquet"""
+    from src.checks import ticker_fail
+    from src import yfinance_rate_limit
+
+    test_date = "2099-12-31"
+    # 1. 限流时 1 个 alert
+    yfinance_rate_limit.record_rate_limit("TEST", "test error", duration_hours=24)
+    try:
+        alerts = ticker_fail.check(test_date)
+    finally:
+        yfinance_rate_limit.clear_rate_limit()
+    rl_alerts = [a for a in alerts if "限流" in a["message"] or "rate limit" in a["subject"]]
+    assert len(rl_alerts) >= 1, f"限流时应至少 1 alert, got {alerts}"
+
+    # 2. 不限流时, 用 tmpdir 替换 DATA_RAW → 0 alert
+    yfinance_rate_limit.clear_rate_limit()
+    tmpdir = Path(tempfile.mkdtemp(prefix="dr_tf_test_"))
+    test_data_raw = tmpdir / "data" / "raw"
+    test_data_raw.mkdir(parents=True, exist_ok=True)
+    real_data_raw = ticker_fail.DATA_RAW
+    ticker_fail.DATA_RAW = test_data_raw
+    try:
+        alerts = ticker_fail.check(test_date)
+    finally:
+        ticker_fail.DATA_RAW = real_data_raw
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    assert len(alerts) == 0, f"不限流 + 空 tmpdir 应 0 alert, got {alerts}"
+
+
+def test_checks_parquet_corrupt_v068n_p85():
+    """P8-5 parquet_corrupt: 读失败 / 0 行"""
+    from src.checks import parquet_corrupt
+
+    test_date = "2099-12-31"
+    tmpdir = Path(tempfile.mkdtemp(prefix="dr_pqc_"))
+    test_dir = tmpdir / "data" / "raw" / "fake_corrupt"
+    test_dir.mkdir(parents=True, exist_ok=True)
+
+    real_data_raw = parquet_corrupt.DATA_RAW
+    parquet_corrupt.DATA_RAW = tmpdir / "data" / "raw"
+    try:
+        # 1. 写 1 个 valid parquet + 1 个 corrupt file
+        try:
+            import pyarrow as pa
+            import pyarrow.parquet as pq
+            good = test_dir / "good.parquet"
+            pq.write_table(pa.table({"x": [1, 2, 3]}), good)
+            bad = test_dir / "bad.parquet"
+            bad.write_bytes(b"not a parquet file at all")
+        except ImportError:
+            pytest.skip("pyarrow 没装")
+
+        alerts = parquet_corrupt.check(test_date)
+        # 至少 1 个 alert (bad.parquet 读失败)
+        assert any("bad.parquet" in a["subject"] for a in alerts), "corrupt file 应触发"
+        bad_alert = [a for a in alerts if "bad.parquet" in a["subject"]][0]
+        assert bad_alert["severity"] == "error"
+    finally:
+        parquet_corrupt.DATA_RAW = real_data_raw
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_daily_report_step7_v068n_p86():
+    """daily_report.py step 7 跑通 5 check + 写 alert log
+
+    注: 用 tmpdir 替换所有 check 的 DATA_RAW (避免依赖真数据),
+    用 mock patch 调 yfinance_rate_limit
+    """
+    from examples.daily_report import step_check_alerts
+    from src import alert_logger
+    from src.checks import stale, residual, vix_spike, ticker_fail, parquet_corrupt
+    from src import yfinance_rate_limit, residual_regression
+
+    test_date = "2099-12-30"
+    alert_logger.clear_alerts(test_date)
+
+    # 用空 tmpdir 替换所有 DATA_RAW (避免依赖真数据, 包括 residual baseline 也不在 tmpdir)
+    tmpdir = Path(tempfile.mkdtemp(prefix="dr_step7_"))
+    empty_raw = tmpdir / "data" / "raw"
+    empty_raw.mkdir(parents=True, exist_ok=True)
+
+    # mock residual_regression 用 fake data (避免真数据漂移)
+    real_capture = residual_regression.capture_residuals
+    real_load_baseline = residual_regression.load_baseline
+    residual_regression.capture_residuals = lambda d: {
+        "as_of": d, "indices": ["DIA"], "windows": [1],
+        "residuals": {"DIA": {"1": 0.01}}
+    }
+    residual_regression.load_baseline = lambda: {
+        "as_of": "baseline", "sector_weights_version": "test",
+        "indices": ["DIA"], "windows": [1],
+        "residuals": {"DIA": {"1": 0.01}}
+    }
+
+    orig = {
+        "stale.DATA_RAW": stale.DATA_RAW,
+        "ticker_fail.DATA_RAW": ticker_fail.DATA_RAW,
+        "vix_spike.VIX_PATH": vix_spike.VIX_PATH,
+        "parquet_corrupt.DATA_RAW": parquet_corrupt.DATA_RAW,
+    }
+    stale.DATA_RAW = empty_raw
+    ticker_fail.DATA_RAW = empty_raw
+    vix_spike.VIX_PATH = empty_raw / "macro" / "_VIX.parquet"  # 不存在 → 1 alert
+    parquet_corrupt.DATA_RAW = empty_raw
+    try:
+        result = step_check_alerts(test_date)
+    finally:
+        # restore
+        stale.DATA_RAW = orig["stale.DATA_RAW"]
+        ticker_fail.DATA_RAW = orig["ticker_fail.DATA_RAW"]
+        vix_spike.VIX_PATH = orig["vix_spike.VIX_PATH"]
+        parquet_corrupt.DATA_RAW = orig["parquet_corrupt.DATA_RAW"]
+        residual_regression.capture_residuals = real_capture
+        residual_regression.load_baseline = real_load_baseline
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    # 5 个 type 都在
+    assert "alert_count" in result
+    assert "by_type" in result
+    for t in ["stale", "residual", "vix_spike", "ticker_fail", "parquet_corrupt"]:
+        assert t in result["by_type"], f"by_type 应含 {t}"
+
+    # vix_spike 找不到 parquet → 1 alert (warning)
+    assert result["by_type"]["vix_spike"] >= 1, "缺 _VIX.parquet 应触发 vix_spike"
+    # 其它 4 个 type 在空 tmpdir → 0
+    assert result["by_type"]["stale"] == 0
+    assert result["by_type"]["ticker_fail"] == 0
+    assert result["by_type"]["parquet_corrupt"] == 0
+    assert result["by_type"]["residual"] == 0  # mock 后 baseline = current, 0 violation
+
+    # path 写入
+    assert result["path"].exists()
+    assert result["path"].name == f"alerts_{test_date}.json"
 
 
 if __name__ == "__main__":

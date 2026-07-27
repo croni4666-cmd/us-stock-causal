@@ -214,29 +214,72 @@ h1 {{ font-size: 18px; color: #202124; border-bottom: 2px solid #1a73e8; padding
 
 
 def step_check_alerts(date_str: str) -> dict:
-    """Step 7: 读今天 alert log (P8-6 写) — 0 alerts 暂时是 P8-6 还没写的 placeholder"""
-    _step_banner(7, "Alert Check (P8-6 读)")
-    t0 = time.time()
-    alert_file = ALERT_DIR / f"alerts_{date_str}.json"
-    if not alert_file.exists():
-        # P8-6 还没写, 写空 placeholder
-        ALERT_DIR.mkdir(parents=True, exist_ok=True)
-        if not alert_file.exists():
-            placeholder = {
-                "as_of": date_str,
-                "status": "no_healthcheck_runner",
-                "alerts": [],
-                "note": "P8-6 (本地 alert logger) 尚未实现, 此文件是 daily_report.py placeholder",
-            }
-            alert_file.write_text(json.dumps(placeholder, indent=2, ensure_ascii=False), encoding="utf-8")
+    """Step 7: 跑 5 类异常检测 (P8-1~5) + 写 alert log (P8-6) + 终端显眼 stdout
 
-    data = json.loads(alert_file.read_text(encoding="utf-8"))
-    alerts = data.get("alerts", [])
-    print(f"  [{len(alerts)} alerts] {alert_file}")
-    if alerts:
-        for a in alerts:
-            print(f"    [{a.get('severity', '?')}] {a.get('category', '?')}: {a.get('message', '?')}")
-    return {"ok": True, "alert_count": len(alerts), "path": alert_file, "elapsed_s": round(time.time() - t0, 1)}
+    5 类 check 跑法:
+      - stale: data/raw/*/ parquet LastWriteTime > 2 工作日
+      - residual: 当日归因残差 vs P7-5 baseline 偏差 > 1.5x
+      - vix_spike: VIX > 30 或 1 日涨幅 > 15%
+      - ticker_fail: yfinance 限流中 或 parquet < 1KB
+      - parquet_corrupt: pandas 读失败 或 0 行
+
+    任何 alert 写 data/cache/alerts/alerts_<date>.json (累积, dedup by id)
+    + 终端 [ALERT] 显眼输出 (替代飞书 card, 飞书 2026-07-26 archived)
+    """
+    from src import alert_logger
+    from src.checks import stale, residual, vix_spike, ticker_fail, parquet_corrupt
+    _step_banner(7, f"Alert Check (5 类异常检测 + 写 log, {date_str})")
+    t0 = time.time()
+
+    # 跑 5 check (独立 try/except, 一类 fail 不阻塞其它)
+    all_alerts = []
+    by_type = {}
+
+    checks = [
+        ("stale", stale.check),
+        ("residual", residual.check),
+        ("vix_spike", vix_spike.check),
+        ("ticker_fail", ticker_fail.check),
+        ("parquet_corrupt", parquet_corrupt.check),
+    ]
+    for name, fn in checks:
+        try:
+            alerts = fn(date_str)
+            by_type[name] = len(alerts)
+            all_alerts.extend(alerts)
+        except Exception as e:
+            # check 本身崩了 → 当成 1 个 error alert 写出去
+            err = alert_logger.make_alert(
+                alert_type=name,
+                subject=f"{name}.check()",
+                message=f"check 崩了: {type(e).__name__}: {e}",
+                severity="error",
+                details={"error": str(e), "traceback": str(e.__traceback__)[:500] if e.__traceback__ else ""},
+            )
+            by_type[name] = 1
+            all_alerts.append(err)
+
+    # 写 alert log (overwrite, 但合并 first_seen)
+    alert_logger.write_alerts(date_str, all_alerts)
+
+    # 终端显眼输出
+    print(f"  跑完 5 check: stale={by_type.get('stale', 0)}, residual={by_type.get('residual', 0)}, "
+          f"vix_spike={by_type.get('vix_spike', 0)}, ticker_fail={by_type.get('ticker_fail', 0)}, "
+          f"parquet_corrupt={by_type.get('parquet_corrupt', 0)}")
+    if all_alerts:
+        alert_logger.print_alerts(all_alerts)
+    else:
+        print(f"  [OK] 无 alert, 健康 ✓")
+
+    n_error = sum(1 for a in all_alerts if a.get("severity") == "error")
+    return {
+        "ok": n_error == 0,
+        "alert_count": len(all_alerts),
+        "error_count": n_error,
+        "by_type": by_type,
+        "path": alert_logger.ALERT_DIR / f"alerts_{date_str}.json",
+        "elapsed_s": round(time.time() - t0, 2),
+    }
 
 
 def print_summary(steps: dict, total_elapsed: float, date_str: str):
@@ -260,8 +303,19 @@ def print_summary(steps: dict, total_elapsed: float, date_str: str):
     n_ok = sum(1 for v in steps.values() if v.get("ok") is True)
     n_skip = sum(1 for v in steps.values() if v.get("ok") == "skip")
     n_fail = sum(1 for v in steps.values() if v.get("ok") is False)
+
+    # Alert 摘要 (P8-6) — user 看到这行就知道今天有不有异常
+    alert_info = steps.get("check_alerts", {})
+    n_alert = alert_info.get("alert_count", 0)
+    n_alert_err = alert_info.get("error_count", 0)
+
     print()
     print(f"  Total: {n_ok} OK / {n_skip} SKIP / {n_fail} FAIL, 耗时 {total_elapsed:.1f}s")
+    if n_alert > 0:
+        # 显眼色
+        _RED = "\033[91m"
+        _RESET = "\033[0m"
+        print(f"  {_RED}[ALERT] 今日 {n_alert} 个 alert (error {n_alert_err}个), 查看 data/cache/alerts/alerts_{date_str}.json{_RESET}")
     if n_fail > 0:
         print(f"  [WARN] {n_fail} 步失败, 详情见上")
     # 关键 alert 顶部 1 行
