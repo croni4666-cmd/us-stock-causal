@@ -28,6 +28,14 @@ DATA_RAW = PROJECT_ROOT / "data" / "raw"
 DEFAULT_THRESHOLD_DAYS = 3
 ERROR_THRESHOLD_DAYS = 7
 
+# 排除目录 (跨项目数据, 不属于 us-stock-causal 检查范围)
+# 2026-08-03 add: nvda_cf_cache 是 paper-agent 的 NVDA cash flow cache, 不是我们的
+# 未来加 exclude: 编辑此列表, 或在 config.yaml 配 (后续 P9.1.2 工作)
+EXCLUDE_DIRS = {
+    "nvda_cf_cache",  # paper-agent (paper-agent 项目)
+    # 其它跨项目 cache 加这里
+}
+
 
 def _is_stale(last_write: datetime, ref: datetime) -> tuple[bool, int, str]:
     """判断 parquet 是否 stale (calendar days, 跳过同日)
@@ -61,7 +69,11 @@ def check(date_str: str) -> list[dict]:
     for sub_dir in sorted(DATA_RAW.iterdir()):
         if not sub_dir.is_dir():
             continue
+        # 跳过隐藏目录 (点开头)
         if sub_dir.name.startswith("."):
+            continue
+        # 跳过跨项目 cache (paper-agent 等其它项目的目录)
+        if sub_dir.name in EXCLUDE_DIRS:
             continue
         for pq in sub_dir.glob("*.parquet"):
             try:

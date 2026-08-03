@@ -29,7 +29,7 @@ from src.attribution import attribute_all_indices, SECTOR_TICKERS  # noqa: F401
 
 
 BASELINE_DIR = PROJECT_ROOT / "data" / "baseline"
-DEFAULT_BASELINE = BASELINE_DIR / "residuals_v068f.json"
+DEFAULT_BASELINE = BASELINE_DIR / "residuals_v069.json"
 INDICES = ["DIA", "QQQ", "RSP", "QQQE"]
 WINDOWS = [1, 5, 20]
 
