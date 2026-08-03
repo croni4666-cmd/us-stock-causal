@@ -624,6 +624,109 @@ ls output\logs\cron_2026-07-27.log  # 3357 bytes
 
 **Cron 状态** (修后预期): 8/3 17:00 跑完应该 0 alert (HTML fix + stale fix + baseline 锁)
 
+## [0.6.9e] - 2026-08-03
+
+### Added (P9-1.3: 严格 Pearl L3 用 DoWhy gcm InvertibleStructuralCausalModel)
+
+v0.6.9 Phase 9.0 的 L3 是 econml CausalForestDML CATE 近似, 不严格。本 commit
+改用 DoWhy gcm InvertibleStructuralCausalModel 跑 Pearl 3-step 反事实:
+1. **Abduction**: 从 observed data 推断 exogenous noise (P(U | observed))
+2. **Action**: do(treatment=counterfactual_value), 修改 structural equation
+3. **Prediction**: 用新 treatment + 推断的 noise 算 outcome
+
+实测更严格 + 更快: SCM fit ~5ms + query ~3ms (vs econml 130ms + 15ms). 因为:
+- 用 DAG 结构 (每个节点只从 parents 学习), 跟手工 DAG 配置一致
+- AdditiveNoiseModel + LinearRegression 对 7 节点线性场景够用
+- 不需要学 CATE (更复杂的 RF), 走 Pearl 原教旨路径
+
+**`src/causal.py` 改动** (~140 lines):
+- 新增 `_SCM_CACHE: dict[tuple, gcm.InvertibleSCM]` + `_get_scm_cached(g, data)` (P9-1.5 同款 module-level cache 模式)
+  - key = (n_nodes, n_edges, n_obs, sorted_node_names) — DAG 变或数据窗口变 invalidate
+  - fit ~5ms, 重复 query < 1ms lookup
+- 新增 `_counterfactual_query_scm(date_ts, treatment, outcome, cf_value, data, cfg)` 私有 helper
+  - 调 `dowhy.gcm.InvertibleStructuralCausalModel(g)` + `gcm.fit()` + `gcm.counterfactual_samples()`
+  - 用 `InvertibleStructuralCausalModel` (不是 StructuralCausalModel) 因为要 noise abduction
+  - 闭包 `(lambda x, val=cf_value: val)` 显式 default arg 避免 Python 闭包坑
+- 保留 `_counterfactual_query_econml()` 作对照 (CATE 近似, P9-1.5 路径)
+- `counterfactual_query()` 新增 `method: str = "scm"` 参数
+  - `"scm"` (默认, P9-1.3 严格 Pearl L3) / `"econml"` (P9-1.5 CATE 近似)
+  - 旧 `counterfactual_value` API 不变 (绝对值, log return 单位)
+- `clear_caches()` + `get_cache_stats()` 同步加 `scm_cleared` / `scm_cache_size`
+- 修 docstring 反映 API: `counterfactual_value` = **绝对值** (不是 delta)
+  - 想 "VIX 比实际低 5%": 传 `actual_vix - 0.05`
+  - 旧 implementation 把这混在 docstring 里, 本 commit 显式分开
+
+**`tests/test_smoke.py` 改动**:
+- `test_causal_counterfactual_v069_p94`: docstring 加 "P9-1.3 默认 method='scm'"
+- `test_causal_fit_cache_v0915_p95a` / `test_causal_fit_cache_invalidation_v0915_p95b`:
+  显式传 `method="econml"` 因为默认变 "scm" 了, 测的 EconML cache 行为
+- +2 tests (55/55 pass, 5m32s):
+  - `test_causal_counterfactual_scm_v0913_p97`:
+    - 验证 SCM 方向 (VIX 跌 → QQQ 涨) + SCM vs EconML delta 量级一致 (ratio 0.1-10)
+    - cache stats: scm_cache_size=1
+  - `test_causal_scm_cache_v0913_p98`:
+    - cache hit < 50ms (SCM query ~3ms + Python overhead)
+    - 不同 (T, O) 共享同一 SCM cache entry (key 只看 n_nodes/edges/n_obs/node_names)
+- `VERSION` 0.6.9d → 0.6.9e
+
+**实测对比 (7 节点 512 交易日, 2026-07-31)**:
+| 方法 | fit | query | cache hit | delta (VIX -5% → QQQ) |
+|---|---|---|---|---|
+| **DoWhy SCM (P9-1.3)** | **5ms** | **3ms** | < 1ms | +0.61% ✅ |
+| EconML CATE (P9-1.5) | 130ms | 15ms | < 1ms | ~+0.20% (近似) |
+| 旧 econml (v0.6.9) | 130ms | 15ms | 重复 fit | 同上 |
+
+注: EconML delta 跟 SCM 略有差异, 因为 EconML CATE 是 RF 模型 (非线性) 在
+specific (T, O, controls) 条件下, SCM 是 linear ATE 平均. 两者方向一致, 数量级
+合理 (ratio 0.1-10).
+
+**Pearl 3 层因果阶梯 现在完整**:
+- L1 关联: `attribution.py` (P2)
+- L2 干预: `causal_query()` (DoWhy + statsmodels OLS, P9.0)
+- L3 反事实: `counterfactual_query(method='scm')` (DoWhy gcm InvertibleSCM, P9-1.3) ✅
+
+**API 演化**:
+```python
+# v0.6.9 (P9-1.5): econml CATE 近似
+cf = counterfactual_query(date, "VIX", "QQQ", cf_vix)
+
+# v0.6.9e (P9-1.3): 严格 Pearl L3 (新默认)
+cf = counterfactual_query(date, "VIX", "QQQ", cf_vix)  # 默认 method='scm'
+
+# 对照用 (P9-1.5 CATE 近似, 不推荐生产用)
+cf = counterfactual_query(date, "VIX", "QQQ", cf_vix, method="econml")
+```
+
+**P9 进度** (v0.6.9e):
+- [x] P9.1.0 Pearl-style 因果分析 (v0.6.9)
+- [x] P9.1.1 PC algorithm 结构学习 (v0.6.9d)
+- [x] P9.1.3 严格 Pearl L3 (v0.6.9e, 本 commit) — **done ✅**
+- [x] P9.1.5 CausalForestDML 性能 (v0.6.9c)
+- [x] P9.1.6 report 第 6 段"因果机制" (v0.6.9b)
+- [ ] P9.1.2 DAG 扩展 (mediator + confounder)
+- [ ] P9.1.4 CATE 异质性
+- [ ] P9.1.7 Phase 9.2 全 DAG 49 ticker (长期)
+
+**下一项推荐**: P9-1.2 DAG 扩展 (用 PC 发现的 overlap 重组, 减 10 条 manual_only 边;
+加 mediator ^TNX→^VIX→index 让 do-calculus 走前门/后门混合)
+或 L2 性能优化 (减 refutation / DoWhy 升级 / DAG cache) — 实际 cron 29s L2 是真瓶颈
+
+**教训 (写进 future engineering)**:
+1. **DoWhy 0.14 gcm.InvertibleStructuralCausalModel 是严格 Pearl L3 的官方路径**,
+   不是 `dowhy.do_calculus.counterfactual_query` (后者在 0.14 不存在, 移到 gcm).
+   ROADMAP P9-1.3 旧描述 "dowhy.do_calculus.counterfactual_query" 不准, 应更新
+2. **gcm 3 步反事实**: Abduction → Action → Prediction. 必须用 InvertibleSCM 才能做
+   abduction, StructuralCausalModel 不行 (报错 "needs noise_data")
+3. **Python 闭包坑**: `lambda x: cf` 在 loop 里捕获 reference 不是 value, 多个 lambda
+   全是最后那个 cf. 改 `lambda x, val=cf: val` (default arg 捕获 value) 解决
+4. **SCM fit ~5ms 本身已经够快**, cache 节省没 EconML 130ms 那么明显. 重点是 cache
+   提供"重复 query < 1ms" 的 deterministic 上限, 不是大幅度加速
+5. **counterfactual_value API 语义**: 绝对值 (log return 单位) 不是 delta. 想
+   "跌 5%" 传 `actual - 0.05`. 旧 implementation 这点混在 docstring 没说清,
+   本 commit 显式写 "绝对值"
+6. **P9-1.3 应该是 v0.6.9 的 L3 实现, 但当时不知道 dowhy.gcm, 才用 econml CATE 近似**.
+   v0.6.9 + v0.6.9a/b/c/d 都可以 (但 v0.6.9e 是更准确)
+
 ## [0.6.9d] - 2026-08-03
 
 ### Added (P9-1.1: PC algorithm 结构学习 + 跟手工 DAG 对比)
