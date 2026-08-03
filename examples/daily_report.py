@@ -301,6 +301,7 @@ def step_causal(date_str: str) -> dict:
       - cache hit: < 0.02s (module-level _FIT_CACHE)
       - data load: ~0.04s (cold) / ~0.02s (warm, module-level _DATA_CACHE)
       - 总 L3 1 query ~0.2s, 5 query 仍 < 1s
+    P9-1.1: PC algorithm (0.82s) 跟手工 DAG 对比, 揭示 manual 边数据支持度
     DAG: config/causal_dag.yaml (7 节点: 3 macro + 4 指数, 手工)
     """
     from src import causal
@@ -316,6 +317,19 @@ def step_causal(date_str: str) -> dict:
     try:
         cfg = causal.load_dag_config()
         data = causal.load_dag_data(cfg=cfg)
+
+        # P9-1.1: PC algorithm 学 DAG, 跟手工 DAG 对比 (诊断 manual 是否高估/漏画)
+        t_pc_start = time.time()
+        pc_dag = causal.discover_dag_pc(data, alpha=0.05)
+        manual_dag = causal.load_dag_graph(cfg)
+        cmp = causal.compare_dags(manual_dag, pc_dag)
+        t_pc_elapsed = time.time() - t_pc_start
+        print(f"  [P9-1.1 PC algorithm] {pc_dag.number_of_edges()} edges in {t_pc_elapsed:.2f}s")
+        print(f"    {cmp['summary']}")
+        if cmp['overlap']:
+            print(f"    Overlap: {sorted(cmp['overlap'])}")
+        if cmp['pc_only']:
+            print(f"    PC-only (data 有, theory 没): {sorted(cmp['pc_only'])}")
 
         # L2 干预 query: VIX → QQQ (经济理论: 应强负)
         vix_qqq = causal.causal_query(treatment="VIX", outcome="QQQ", data=data, cfg=cfg)

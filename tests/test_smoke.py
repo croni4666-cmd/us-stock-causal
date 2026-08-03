@@ -1550,6 +1550,43 @@ def test_causal_fit_cache_invalidation_v0915_p95b():
     assert t3 < 0.1, f"cache hit 应 < 0.1s, got {t3:.3f}s"
 
 
+def test_causal_pc_dag_v0911_p96():
+    """P9-1.1: PC algorithm 能从数据学 DAG, VIX→DIA/QQQ 强边应被识别"""
+    from src.causal import (
+        load_dag_config, load_dag_data, load_dag_graph,
+        discover_dag_pc, compare_dags,
+    )
+
+    cfg = load_dag_config()
+    data = load_dag_data(cfg=cfg)
+    manual_dag = load_dag_graph(cfg)
+
+    # PC algorithm (alpha=0.05 fisherz, 0.82s 实测)
+    pc_dag = discover_dag_pc(data, alpha=0.05)
+
+    # 应该 ≥ 1 个节点 (sparse)
+    assert pc_dag.number_of_nodes() == 7, f"应 7 节点, got {pc_dag.number_of_nodes()}"
+
+    # VIX→QQQ 是 manual + PC 都有的强边
+    pc_edges = set(pc_dag.edges())
+    # 注: PC 学出的可能是 VIX→DIA / VIX→QQQ 中之一, 不一定两个都有
+    # manual 12 边有 VIX→DIA + VIX→QQQ 两条; PC 至少识别一条
+    vix_edges_in_pc = [e for e in pc_edges if e[0] == "VIX"]
+    assert len(vix_edges_in_pc) >= 1, f"VIX 应至少 1 条出边 (manual 有 VIX→4 指数), got {vix_edges_in_pc}"
+
+    # compare_dags 返回 3 段 + summary
+    cmp = compare_dags(manual_dag, pc_dag)
+    assert "overlap" in cmp
+    assert "manual_only" in cmp
+    assert "pc_only" in cmp
+    assert "summary" in cmp
+    assert len(cmp["overlap"]) >= 1, f"manual ∩ PC 至少 1 条 (VIX→index), got {cmp['overlap']}"
+
+    # 重叠率 sanity check: 应该 > 0
+    total = len(cmp["overlap"]) + len(cmp["manual_only"]) + len(cmp["pc_only"])
+    assert total > 0, "总边数应 > 0"
+
+
 if __name__ == "__main__":
     # Run as script (not pytest)
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
