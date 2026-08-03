@@ -1409,7 +1409,10 @@ def test_causal_dag_loads_v069_p90():
 
 
 def test_causal_query_v069_p92():
-    """P9.3: causal_query 跑通 DoWhy 4 步, VIX→QQQ 强负, 经济理论 confirmed"""
+    """P9.3: causal_query 跑通 DoWhy 4 步, VIX→QQQ 强负, 经济理论 confirmed
+
+    P9-1.5.5: 默认 n_refutations=1 (省 ~18s vs 旧 3 重), backward compat n_refutations=3 跑全
+    """
     from src.causal import load_dag_config, load_dag_data, causal_query
     cfg = load_dag_config()
     data = load_dag_data(cfg=cfg)
@@ -1419,9 +1422,14 @@ def test_causal_query_v069_p92():
     assert eff.estimate < -0.05, f"应 < -0.05 (~-12%), got {eff.estimate}"
     assert eff.p_value < 0.001, f"p 应 < 0.001 (n=508), got {eff.p_value}"
     assert eff.n_obs == len(data)
-    # 3 重反驳至少 2 个 PASS
+    # 默认 1 重反驳至少 1 个 PASS (P9-1.5.5 优化)
     pass_count = sum(1 for v in eff.refutation.values() if "new_effect" in v)
-    assert pass_count >= 2, f"3 重反驳至少 2 个应通过, got {pass_count}"
+    assert pass_count >= 1, f"默认 1 重反驳应通过, got {pass_count}"
+
+    # 测 n_refutations=3 backward compat
+    eff_3 = causal_query(treatment="VIX", outcome="QQQ", data=data, cfg=cfg, n_refutations=3)
+    pass_count_3 = sum(1 for v in eff_3.refutation.values() if "new_effect" in v)
+    assert pass_count_3 == 3, f"n_refutations=3 应跑 3 重, got {pass_count_3}"
 
 
 def test_causal_treatment_validation_v069_p93():

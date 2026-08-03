@@ -50,16 +50,23 @@ _FIT_CACHE: dict[tuple, "CausalForestDML"] = {}  # type: ignore[name-defined]
 # key = (n_nodes, n_edges, n_obs, sorted_node_names) — DAG 变或数据窗口变 invalidate
 _SCM_CACHE: dict[tuple, "gcm.InvertibleStructuralCausalModel"] = {}  # type: ignore[name-defined]
 
+# P9-1.5.5: L2 refutation cache (random_common_cause 等)
+# 每重 ~10s, 默认 1 重省 ~18s vs 旧 3 重
+# key = (T, O, n_obs, n_refutations)
+_REFUTE_CACHE: dict[tuple, dict] = {}
+
 
 def clear_caches() -> dict:
     """清空 module-level caches (tests 用)."""
     n_data = len(_DATA_CACHE)
     n_fit = len(_FIT_CACHE)
     n_scm = len(_SCM_CACHE)
+    n_refute = len(_REFUTE_CACHE)
     _DATA_CACHE.clear()
     _FIT_CACHE.clear()
     _SCM_CACHE.clear()
-    return {"data_cleared": n_data, "fit_cleared": n_fit, "scm_cleared": n_scm}
+    _REFUTE_CACHE.clear()
+    return {"data_cleared": n_data, "fit_cleared": n_fit, "scm_cleared": n_scm, "refute_cleared": n_refute}
 
 
 def get_cache_stats() -> dict:
@@ -68,6 +75,7 @@ def get_cache_stats() -> dict:
         "data_cache_size": len(_DATA_CACHE),
         "fit_cache_size": len(_FIT_CACHE),
         "scm_cache_size": len(_SCM_CACHE),
+        "refute_cache_size": len(_REFUTE_CACHE),
         "fit_cache_keys": list(_FIT_CACHE.keys()),
     }
 
@@ -277,18 +285,81 @@ class CausalEffect:
         return asdict(self)
 
 
+def _get_refutation_cached(
+    treatment: str,
+    outcome: str,
+    data: pd.DataFrame,
+    g: "nx.DiGraph",  # type: ignore[name-defined]
+    n_refutations: int,
+) -> dict:
+    """P9-1.5.5 (L2 性能优化): 缓存 refutation 结果.
+
+    实测每重 ~10s (random_common_cause 10.47s + placebo 8.55s + data_subset 8.90s),
+    3 重 = 28s. 默认降到 1 重 (random_common_cause) 省 ~18s.
+
+    Cache key = (T, O, n_obs, n_refutations): 同 T, O 数据不变 → cache hit.
+    """
+    key = (treatment, outcome, len(data), n_refutations)
+    if key in _REFUTE_CACHE:
+        logger.debug(f"[causal] refutation cache hit T={treatment} O={outcome} (n_refutations={n_refutations}, cache size={len(_REFUTE_CACHE)})")
+        return _REFUTE_CACHE[key]
+
+    from dowhy import CausalModel
+    model = CausalModel(
+        data=data, treatment=treatment, outcome=outcome,
+        graph=g, common_causes=None, instruments=None,
+    )
+    identified = model.identify_effect(proceed_when_unidentifiable=True)
+    try:
+        do_estimate = model.estimate_effect(identified, method_name="backdoor.linear_regression")
+    except Exception:
+        do_estimate = None
+
+    if do_estimate is None:
+        result = {}
+    else:
+        # P9-1.5.5: 默认 1 重 (random_common_cause); 3 重全跑传 n_refutations=3
+        # 按耗时排序 (从快到慢) 让最短的先跑, 失败时已跑的仍记录
+        refuter_priority = {
+            1: ["random_common_cause"],
+            2: ["random_common_cause", "placebo_treatment_refuter"],
+            3: ["random_common_cause", "placebo_treatment_refuter", "data_subset_refuter"],
+        }
+        refuter_names = refuter_priority.get(n_refutations, refuter_priority[3])
+
+        result = {}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for refuter_name in refuter_names:
+                try:
+                    refute = model.refute_estimate(identified, do_estimate, method_name=refuter_name)
+                    result[refuter_name] = {"new_effect": float(refute.new_effect)}
+                except Exception as e:
+                    result[refuter_name] = {"error": str(e)}
+
+    _REFUTE_CACHE[key] = result
+    logger.info(f"[causal] refutation cached T={treatment} O={outcome} n_refutations={n_refutations} ({len(result)} refutations done, cache size={len(_REFUTE_CACHE)})")
+    return result
+
+
 def causal_query(
     treatment: str,
     outcome: str,
     data: pd.DataFrame | None = None,
     cfg: dict | None = None,
+    n_refutations: int = 1,
 ) -> CausalEffect:
     """跑 Pearl 4 步: model → identify → estimate → refute.
 
     实操:
       1. DoWhy 建 CausalModel + identify_effect 算 estimand (DAG 验证)
       2. 自己用 statsmodels 跑 OLS 算 ATE (避免 DoWhy estimator 已知 bug)
-      3. DoWhy 跑 3 重 refutation (random_common_cause / placebo / data_subset)
+      3. DoWhy 跑 n_refutations 重 refutation (P9-1.5.5 默认 1 重省 ~18s)
+
+    P9-1.5.5 性能优化 (实测):
+      - L2 实际瓶颈 = 3 重 refutation = 28s (random 10.5s + placebo 8.5s + data_subset 8.9s)
+      - 1 重 (random_common_cause) ~10s, 3 重 (旧默认) ~28s
+      - 加 _REFUTE_CACHE: 重复 query (T, O) 走 cache hit, 0s
 
     Phase 9.0 POC 简化: 用 OLS 当 estimate, 不做异质性 (CATE 是后续 EconML 阶段)
     DAG 假设: 无 confounder, backdoor set = 空, 所以 ATE = 简单回归系数 (与多变量回归系数相同)
@@ -298,6 +369,8 @@ def causal_query(
         outcome: e.g. "QQQ" (target 变量)
         data: load_dag_data() 出来的 DataFrame, None = 自动加载
         cfg: DAG config dict, None = 自动加载
+        n_refutations: 跑几重 refutation. P9-1.5.5 默认 1 (只 random_common_cause);
+                     3 是 v0.6.9 老默认 (3 重全跑)
 
     Returns:
         CausalEffect dataclass
@@ -316,20 +389,7 @@ def causal_query(
     if treatment not in data.columns or outcome not in data.columns:
         raise ValueError(f"[causal] data 缺 {treatment} 或 {outcome}")
 
-    # Step 1: DoWhy model + identify (验证 DAG, 拿 estimand)
-    from dowhy import CausalModel
-    model = CausalModel(
-        data=data,
-        treatment=treatment,
-        outcome=outcome,
-        graph=g,
-        common_causes=None,
-        instruments=None,
-    )
-    identified = model.identify_effect(proceed_when_unidentifiable=True)
-    estimand_str = str(identified)
-
-    # Step 2: 自己用 statsmodels 跑 OLS (Phase 9.0 POC, 因果 DAG 无 confounder, 简单回归系数 = ATE)
+    # Step 1+2: OLS (快, 0.001s) + Step 3: refutation (P9-1.5.5 加 cache)
     import statsmodels.api as sm
     X = sm.add_constant(data[[treatment]])
     y = data[outcome]
@@ -340,28 +400,16 @@ def causal_query(
     p_value = float(ols_result.pvalues[treatment])
     std_err = float(ols_result.bse[treatment])
 
-    # Step 3: DoWhy 反驳测试 (用 DoWhy 的 estimator 作为 baseline, 即使它返回 0)
-    refutation_results = {}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        # 拿一个 DoWhy estimate 给 refute 用 (即使它数值不对, refute 跑得动)
-        try:
-            do_estimate = model.estimate_effect(identified, method_name="backdoor.linear_regression")
-        except Exception:
-            do_estimate = None
-
-        if do_estimate is not None:
-            for refuter_name in ["random_common_cause", "placebo_treatment_refuter", "data_subset_refuter"]:
-                try:
-                    refute = model.refute_estimate(
-                        identified, do_estimate,
-                        method_name=refuter_name,
-                    )
-                    refutation_results[refuter_name] = {
-                        "new_effect": float(refute.new_effect),
-                    }
-                except Exception as e:
-                    refutation_results[refuter_name] = {"error": str(e)}
+    # Refutation (cached, 默认 1 重)
+    # 注: refutation 需要 identify estimand, 这里也跑一次 (快, 0.001s) 拿 estimand_str
+    from dowhy import CausalModel
+    model = CausalModel(
+        data=data, treatment=treatment, outcome=outcome,
+        graph=g, common_causes=None, instruments=None,
+    )
+    identified = model.identify_effect(proceed_when_unidentifiable=True)
+    estimand_str = str(identified)
+    refutation_results = _get_refutation_cached(treatment, outcome, data, g, n_refutations)
 
     # 人类可读解读
     direction = "↑" if ate > 0 else "↓"

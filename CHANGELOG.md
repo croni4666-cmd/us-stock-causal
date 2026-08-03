@@ -624,6 +624,77 @@ ls output\logs\cron_2026-07-27.log  # 3357 bytes
 
 **Cron 状态** (修后预期): 8/3 17:00 跑完应该 0 alert (HTML fix + stale fix + baseline 锁)
 
+## [0.6.9f] - 2026-08-03
+
+### Performance (L2 DoWhy refutation 性能优化: 3 重 → 1 重 + cache)
+
+P9-1.5 实测发现 L2 真瓶颈是 3 重 refutation (28s), 不是 L3 fit (0.13s). 本 commit
+两步优化:
+1. **默认减到 1 重** (random_common_cause) — P9-1.5 选这重是因为它最严
+   (add confounder → 估计应变化) 且是 Pearl 因果推断核心测试
+2. **加 _REFUTE_CACHE**: 同 (T, O, n_obs, n_refutations) 重复 query 走 cache hit
+3. **backward compat**: `causal_query(..., n_refutations=3)` 仍跑全 3 重
+
+**实测 (7 节点 512 交易日, VIX→QQQ, 2026-08-03)**:
+| 配置 | cold | cache hit | 加速 |
+|---|---|---|---|
+| n_refutations=3 (旧默认) | 40.7s | 40.7s (无 cache) | baseline |
+| n_refutations=1 (新默认) | 15.5s (含 dowhy import ~7s) | 0.034s | **2.6x cold, ∞ cache** |
+| 2 L2 queries (新默认) | 15.5s (cold) + 0.034s (cache) = 15.5s | | vs 旧 81s = **5.2x** |
+
+注: 15.5s cold = ~7s DoWhy import (首次) + ~3-5s CausalModel/identify + ~7s
+refutation. Import 缓存后二次 import ≈ 0s, 2 L2 queries 实际 11-12s (2 × ~5s).
+
+**`src/causal.py` 改动** (~80 lines):
+- 新增 `_REFUTE_CACHE: dict[tuple, dict]` + `_get_refutation_cached(t, o, data, g, n_refutations)` (~50 lines)
+  - key = (T, O, n_obs, n_refutations)
+  - 抽出 refutation 逻辑从 `causal_query` 到独立 helper, 便于 cache
+  - 按 `refuter_priority` dict 选 refutation 子集 (1/2/3 重)
+- `causal_query()` 新增 `n_refutations: int = 1` 参数
+  - 旧默认隐式 3 重 → 新默认 1 重 (~18s 省)
+  - 旧 `for refuter_name in [3 names]` 循环 → `_get_refutation_cached` 1 行
+  - 仍先 `model.identify_effect` 拿 `estimand_str` (给 L2 报告用, fast 0.001s)
+- `clear_caches()` + `get_cache_stats()` 同步加 `refute_cleared` / `refute_cache_size`
+
+**`tests/test_smoke.py` 改动**:
+- `test_causal_query_v069_p92`: 默认 1 重 (PASS 1/1) + backward compat n_refutations=3 (PASS 3/3)
+
+**实测 daily_report 性能 (2 L2 queries 默认配置)**:
+- 旧 (3 重 × 2 queries): ~81s
+- 新 (1 重 × 2 queries, 1 cache hit): ~16s
+- **节省 ~65s per daily cron run** (从 81s + L3 0.3s + PC 0.8s = 82s → 16+0.3+0.8 = 17s)
+
+**P9 进度** (v0.6.9f):
+- [x] P9.1.0 Pearl-style 因果分析 (v0.6.9)
+- [x] P9.1.1 PC algorithm 结构学习 (v0.6.9d)
+- [x] P9.1.3 严格 Pearl L3 (v0.6.9e)
+- [x] P9.1.5 CausalForestDML 性能 (v0.6.9c)
+- [x] P9.1.5.5 L2 DoWhy refutation 性能 (v0.6.9f, 本 commit) — **done ✅**
+- [x] P9.1.6 report 第 6 段"因果机制" (v0.6.9b)
+- [ ] P9.1.2 DAG 扩展
+- [ ] P9.1.4 CATE 异质性
+- [ ] P9.1.7 Phase 9.2 全 DAG 49 ticker
+
+**下一项推荐**: P9-1.2 DAG 扩展 (用 PC overlap 减 10 manual_only 边 + 加 mediator)
+或 P9-1.4 CATE 异质性 (CATE 跨 sub-population, 跟 VIX→QQQ 在牛市 vs 熊市不同)
+
+**教训 (写进 future engineering)**:
+1. **永远先 benchmark 再优化**: 我之前估 L3 fit 30s (v0.6.9 ROADMAP) 实际 0.13s (200x 估错);
+   v0.6.9f 估 refutation 慢但没测, 实际每重 8-10s 而不是 5s 估的
+2. **DoWhy refutation 3 重是 Pearl 因果推断默认配置**, 但 daily report 1 重够用:
+   - `random_common_cause` (add unobserved confounder → 估计应变) 最严
+   - `placebo_treatment_refuter` (随机化 treatment → 估计应变 0) 偏慢
+   - `data_subset_refuter` (subsample 估计应变小) 偏慢
+3. **Module-level cache pattern 一致**: P9-1.5/1.5.5/1.3 都用 `_CACHE: dict[tuple, T] = {}`
+   + `clear_caches()` 集中清. 一致性降低学习成本
+4. **Pearl 反事实实际比 do-calculus 快**: P9-1.3 SCM fit 5ms + query 3ms, 远快于
+   DoWhy linear_regression + 3 重 refutation 28s. L3 改成 SCM 后 L2 仍是瓶颈
+5. **daily cron 性能优化优先级**: L2 refutation (28s) > L3 fit (5ms) > L2 identify (3s) >
+   L2 estimate (0.1s). 减 L2 refutation 是最实际 cron 优化
+6. **backward compat 重要**: 加 `n_refutations=1` 默认, 但保留 `n_refutations=3` 选项.
+   旧用户调 `causal_query(...)` 行为会变 (1 重 vs 3 重), 但用 `n_refutations=3`
+   显式仍能跑全. CHANGELOG 显式标注 default 变了
+
 ## [0.6.9e] - 2026-08-03
 
 ### Added (P9-1.3: 严格 Pearl L3 用 DoWhy gcm InvertibleStructuralCausalModel)
