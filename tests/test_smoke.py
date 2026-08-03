@@ -1473,6 +1473,83 @@ def test_causal_data_alignment_v069_p95():
     assert data.abs().max().max() < 1.0, f"log return 应 < 1.0 (放宽给 VIX 极端行情), got max {data.abs().max().max()}"
 
 
+def test_causal_fit_cache_v0915_p95a():
+    """P9-1.5: CausalForestDML fit 缓存 — 重复 query (T, O) 不同 date 应该 cache hit, < 0.1s"""
+    import time
+    from src.causal import counterfactual_query, get_cache_stats, clear_caches
+    from src.causal import load_dag_config, load_dag_data
+
+    clear_caches()  # 清空确保从 cold start 测
+    cfg = load_dag_config()
+    data = load_dag_data(cfg=cfg)
+
+    # 用最近 2 天
+    last_date = str(data.index[-1].date())
+    prev_date = str(data.index[-2].date())
+
+    # 第 1 次: cold fit (~0.13s + import overhead)
+    t0 = time.time()
+    r1 = counterfactual_query(last_date, "VIX", "QQQ", -0.05, data=data, cfg=cfg)
+    t1 = time.time() - t0
+
+    # 第 2 次: 应该 cache hit (< 0.1s)
+    t0 = time.time()
+    r2 = counterfactual_query(prev_date, "VIX", "QQQ", -0.05, data=data, cfg=cfg)
+    t2 = time.time() - t0
+
+    # 同一 (T, O), fit 应一致, 只有 x_query 不同
+    # 注: 两次都是 VIX->QQQ 同 controls, cache hit → 不重 fit
+    assert t2 < 0.1, f"cache hit 应 < 0.1s, got {t2:.3f}s (cold={t1:.3f}s)"
+    speedup = t1 / t2 if t2 > 0 else float("inf")
+    assert speedup > 5, f"加速比应 > 5x, got {speedup:.1f}x (cold={t1:.3f}s, warm={t2:.3f}s)"
+
+    # cache 应该有 1 个 entry
+    stats = get_cache_stats()
+    assert stats["fit_cache_size"] == 1, f"应 1 个 cache entry, got {stats['fit_cache_size']}"
+
+    # delta 应该一致 (因为同 (T, O), CATE 在 controls 一样时一致)
+    # 注: prev_date vs last_date 的 controls 不同, 所以 delta 可能不同
+    # 但 cache 应该不重 fit, 所以 t2 < 0.1s 是关键 assertion
+
+
+def test_causal_fit_cache_invalidation_v0915_p95b():
+    """P9-1.5: n_obs 变化应该 invalidate cache (data window 变化)"""
+    import time
+    from src.causal import counterfactual_query, get_cache_stats, clear_caches
+    from src.causal import load_dag_config, load_dag_data
+
+    clear_caches()
+    cfg = load_dag_config()
+
+    # 全数据
+    data_full = load_dag_data(cfg=cfg)
+    # 缩短数据 (2026-01-01 起)
+    data_short = load_dag_data(start="2026-01-01", cfg=cfg)
+
+    last_date_full = str(data_full.index[-1].date())
+    last_date_short = str(data_short.index[-1].date())
+
+    # query 1: full data
+    t0 = time.time()
+    r1 = counterfactual_query(last_date_full, "VIX", "QQQ", -0.05, data=data_full, cfg=cfg)
+    t1 = time.time() - t0
+
+    # query 2: short data, 不同 n_obs → 应该新 fit
+    t0 = time.time()
+    r2 = counterfactual_query(last_date_short, "VIX", "QQQ", -0.05, data=data_short, cfg=cfg)
+    t2 = time.time() - t0
+
+    # cache 应有 2 个 entry (不同 n_obs)
+    stats = get_cache_stats()
+    assert stats["fit_cache_size"] == 2, f"应 2 个 cache entries (full + short), got {stats['fit_cache_size']}"
+
+    # query 3: 再次 short data → cache hit
+    t0 = time.time()
+    r3 = counterfactual_query(last_date_short, "VIX", "QQQ", -0.05, data=data_short, cfg=cfg)
+    t3 = time.time() - t0
+    assert t3 < 0.1, f"cache hit 应 < 0.1s, got {t3:.3f}s"
+
+
 if __name__ == "__main__":
     # Run as script (not pytest)
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

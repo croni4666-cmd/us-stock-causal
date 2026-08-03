@@ -296,14 +296,19 @@ def step_causal(date_str: str) -> dict:
       - L2 干预 (本 step): P(Y|do(X)) — DoWhy + OLS
       - L3 反事实 (本 step): P(Y_x|X',Y') — econml CausalForestDML 简化近似
 
-    include_l3=False: CausalForestDML 慢 (~30s), 留给 daily banner 即可, 不放 report
+    P9-1.5 性能:
+      - 冷 fit: ~0.13s (CausalForestDML n_estimators=100)
+      - cache hit: < 0.02s (module-level _FIT_CACHE)
+      - data load: ~0.04s (cold) / ~0.02s (warm, module-level _DATA_CACHE)
+      - 总 L3 1 query ~0.2s, 5 query 仍 < 1s
     DAG: config/causal_dag.yaml (7 节点: 3 macro + 4 指数, 手工)
     """
     from src import causal
     _step_banner(8, f"Causal Analysis (Pearl-style, {date_str})")
     t0 = time.time()
 
-    # CausalForestDML fit 慢 (~30s), 测试用 US_STOCK_CAUSAL_FAST=1 跳过 L3
+    # P9-1.5 性能优化后 L3 fast (~0.2s cold, < 0.02s warm via cache)
+    # US_STOCK_CAUSAL_FAST=1 仍可彻底跳 L3 (跟 P9-1.5 之前兼容, 测试/快速模式用)
     skip_l3 = os.environ.get("US_STOCK_CAUSAL_FAST", "").lower() in ("1", "true", "yes")
 
     results = {"ok": True, "queries": [], "elapsed_s": 0}
@@ -328,12 +333,16 @@ def step_causal(date_str: str) -> dict:
         print(f"    反驳测试 PASS 数: {sum(1 for v in vix_qqq.refutation.values() if 'new_effect' in v)}/3")
 
         # L3 反事实: 用最近一天, 假设 VIX 比实际低 (恐慌小, 应该利好)
+        # P9-1.5 跑 2 个 L3 query 演示 cache 价值 (第一 fit, 第二 hit)
         if skip_l3:
             print(f"  [L3 counterfactual] SKIPPED (US_STOCK_CAUSAL_FAST=1, 测试/快速模式)")
         else:
             last_date = str(data.index[-1].date())
+            prev_date = str(data.index[-2].date())
             actual_vix = float(data.iloc[-1]["VIX"])
             cf_vix = actual_vix - 0.05
+
+            # Query 1: 最近一天 (cold fit, ~0.13s)
             cf = causal.counterfactual_query(
                 date=last_date, treatment="VIX", outcome="QQQ",
                 counterfactual_value=cf_vix, data=data, cfg=cfg,
@@ -349,6 +358,15 @@ def step_causal(date_str: str) -> dict:
             })
             print(f"  [L3 counterfactual] {cf.date}: 假设 VIX -5% (从 {actual_vix*100:+.2f}% 到 {cf_vix*100:+.2f}%)")
             print(f"    QQQ 实际 {cf.actual_outcome*100:+.2f}%, 反事实 {cf.counterfactual_outcome*100:+.2f}%, 差 {cf.delta*100:+.2f}%")
+
+            # Query 2: 前一天同 (T, O) (cache hit, < 0.02s) — 演示 P9-1.5 价值
+            t_cache_start = time.time()
+            cf2 = causal.counterfactual_query(
+                date=prev_date, treatment="VIX", outcome="QQQ",
+                counterfactual_value=cf_vix, data=data, cfg=cfg,
+            )
+            t_cache_elapsed = time.time() - t_cache_start
+            print(f"  [L3 cache]        {cf2.date}: 同样 (T=VIX, O=QQQ), cache hit {t_cache_elapsed*1000:.0f}ms")
 
     except Exception as e:
         results["ok"] = False
