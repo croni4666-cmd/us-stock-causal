@@ -268,11 +268,38 @@ def render_causal_section(include_l3: bool = False) -> str:
             logger.warning(f"[causal section] L3 query 失败: {e}")
             lines.append(f"- L3 反事实: 查询失败 ({type(e).__name__}: {e})")
 
+    # P9-1.1: PC algorithm 跟手工 DAG 对比 (DAG 验证)
+    try:
+        manual_dag = causal_mod.load_dag_graph(cfg)
+        pc_dag = causal_mod.discover_dag_pc(data, alpha=0.05)
+        cmp = causal_mod.compare_dags(manual_dag, pc_dag)
+        n_overlap = len(cmp["overlap"])
+        n_manual = manual_dag.number_of_edges()
+        n_pc = pc_dag.number_of_edges()
+        overlap_rate = n_overlap / (n_overlap + len(cmp["manual_only"]) + len(cmp["pc_only"])) if (n_overlap + len(cmp["manual_only"]) + len(cmp["pc_only"])) > 0 else 0
+        if n_overlap >= 2:
+            dag_status = "✅"
+        elif n_overlap >= 1:
+            dag_status = "⚠️"
+        else:
+            dag_status = "❌"
+        overlap_str = ", ".join(f"{s}→{d}" for s, d in cmp["overlap"][:3])
+        if len(cmp["overlap"]) > 3:
+            overlap_str += f" 等 {n_overlap} 条"
+        lines.append(
+            f"- **DAG 验证 (P9-1.1 PC vs 手工)**: {dag_status} 重叠 {n_overlap}/{n_pc} 边 "
+            f"({overlap_rate*100:.0f}% 一致); PC 学出 {n_pc} 边, 手工 {n_manual} 边; "
+            f"主要重叠: {overlap_str if overlap_str else '无'}"
+        )
+    except Exception as e:
+        logger.warning(f"[causal section] PC DAG 验证失败: {e}")
+        lines.append(f"- DAG 验证: PC algorithm 失败 ({type(e).__name__}: {e})")
+
     # 引用 + 范围
     lines.append(
         f"\n*数据基础: {len(data)} 交易日 log return, "
         f"7 节点 DAG (3 macro × 4 指数), n=508 起, "
-        f"OLS regression + DoWhy DAG 验证 + 3 重 refutation. "
+        f"OLS regression + DoWhy DAG 验证 + 3 重 refutation + PC algorithm 对比. "
         f"Pearl L3 用 econml CATE 近似 (严格需 SCM, Phase 9.1.3 实施).*"
     )
 
