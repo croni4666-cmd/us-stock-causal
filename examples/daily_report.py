@@ -176,7 +176,9 @@ def step_html_report(date_str: str) -> dict:
             return {"ok": "skip", "reason": "no MD", "elapsed_s": round(time.time() - t0, 1)}
 
         md_content = md_path.read_text(encoding="utf-8")
-        html = render_html_report(md_content, [str(s) for s in svgs], title=f"us-stock-causal 报告 {date_str}")
+        # 传 Path list (render_html_report 内部 svg_path.exists() 要 Path 类型)
+        # v0.6.9 hotfix: 之前 [str(s) for s in svgs] 转 str 导致 render_html_report line 69 svg_path.exists() 抛 AttributeError
+        html = render_html_report(md_content, svgs, title=f"us-stock-causal 报告 {date_str}")
         html_path = OUTPUT_DIR / f"report_{date_str}.html"
         html_path.write_text(html, encoding="utf-8")
         kb = html_path.stat().st_size / 1024
