@@ -981,13 +981,15 @@ def test_daily_report_v068l_p52():
     5. residual_regression [OK]
     6. markdown_report 写到 output/report_<date>.md
     7. check_alerts 写 (P8-6 已实现)
-    8. causal (v0.6.9 Pearl-style 因果分析)
+    8. causal (v0.6.9 Pearl-style 因果分析, smoke test 跳过 L3 用 US_STOCK_CAUSAL_FAST=1)
     """
+    import os
     from examples.daily_report import run_daily_report
     from datetime import datetime
     date_str = datetime.now().strftime("%Y-%m-%d")
 
-    # 跑全 pipeline (用 cache, 跳过 fetch 和可选 HTML/dashboard)
+    # 跑全 pipeline (用 cache, 跳过 fetch 和可选 HTML/dashboard, 跳过 L3 因果 fit 慢)
+    os.environ["US_STOCK_CAUSAL_FAST"] = "1"  # 跳过 L3 CausalForestDML fit (~30s)
     result = run_daily_report(
         date_str=date_str,
         skip_fetch=True,

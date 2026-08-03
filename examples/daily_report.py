@@ -18,6 +18,7 @@
 """
 from __future__ import annotations
 
+import os
 import sys
 import time
 import json
@@ -288,18 +289,22 @@ def step_causal(date_str: str) -> dict:
     """Step 8: Pearl-style 因果分析 (Phase 9)
 
     跑 1 个 L2 干预 query (VIX→QQQ) + 1 个 L3 反事实, 不写 report 数字
-    (后续可加到 markdown report 第 6 段 "因果机制")
+    (markdown report 第 6 段 "因果机制" 由 render_full_report -> render_causal_section 写)
 
     Pearl 3 层因果阶梯:
       - L1 关联 (P2 attribution): P(Y|X)
       - L2 干预 (本 step): P(Y|do(X)) — DoWhy + OLS
       - L3 反事实 (本 step): P(Y_x|X',Y') — econml CausalForestDML 简化近似
 
+    include_l3=False: CausalForestDML 慢 (~30s), 留给 daily banner 即可, 不放 report
     DAG: config/causal_dag.yaml (7 节点: 3 macro + 4 指数, 手工)
     """
     from src import causal
     _step_banner(8, f"Causal Analysis (Pearl-style, {date_str})")
     t0 = time.time()
+
+    # CausalForestDML fit 慢 (~30s), 测试用 US_STOCK_CAUSAL_FAST=1 跳过 L3
+    skip_l3 = os.environ.get("US_STOCK_CAUSAL_FAST", "").lower() in ("1", "true", "yes")
 
     results = {"ok": True, "queries": [], "elapsed_s": 0}
 
@@ -323,24 +328,27 @@ def step_causal(date_str: str) -> dict:
         print(f"    反驳测试 PASS 数: {sum(1 for v in vix_qqq.refutation.values() if 'new_effect' in v)}/3")
 
         # L3 反事实: 用最近一天, 假设 VIX 比实际低 (恐慌小, 应该利好)
-        last_date = str(data.index[-1].date())
-        actual_vix = float(data.iloc[-1]["VIX"])
-        cf_vix = actual_vix - 0.05
-        cf = causal.counterfactual_query(
-            date=last_date, treatment="VIX", outcome="QQQ",
-            counterfactual_value=cf_vix, data=data, cfg=cfg,
-        )
-        results["queries"].append({
-            "type": "L3_counterfactual",
-            "date": cf.date,
-            "treatment": cf.treatment,
-            "outcome": cf.outcome,
-            "actual_outcome": cf.actual_outcome,
-            "counterfactual_outcome": cf.counterfactual_outcome,
-            "delta": cf.delta,
-        })
-        print(f"  [L3 counterfactual] {cf.date}: 假设 VIX -5% (从 {actual_vix*100:+.2f}% 到 {cf_vix*100:+.2f}%)")
-        print(f"    QQQ 实际 {cf.actual_outcome*100:+.2f}%, 反事实 {cf.counterfactual_outcome*100:+.2f}%, 差 {cf.delta*100:+.2f}%")
+        if skip_l3:
+            print(f"  [L3 counterfactual] SKIPPED (US_STOCK_CAUSAL_FAST=1, 测试/快速模式)")
+        else:
+            last_date = str(data.index[-1].date())
+            actual_vix = float(data.iloc[-1]["VIX"])
+            cf_vix = actual_vix - 0.05
+            cf = causal.counterfactual_query(
+                date=last_date, treatment="VIX", outcome="QQQ",
+                counterfactual_value=cf_vix, data=data, cfg=cfg,
+            )
+            results["queries"].append({
+                "type": "L3_counterfactual",
+                "date": cf.date,
+                "treatment": cf.treatment,
+                "outcome": cf.outcome,
+                "actual_outcome": cf.actual_outcome,
+                "counterfactual_outcome": cf.counterfactual_outcome,
+                "delta": cf.delta,
+            })
+            print(f"  [L3 counterfactual] {cf.date}: 假设 VIX -5% (从 {actual_vix*100:+.2f}% 到 {cf_vix*100:+.2f}%)")
+            print(f"    QQQ 实际 {cf.actual_outcome*100:+.2f}%, 反事实 {cf.counterfactual_outcome*100:+.2f}%, 差 {cf.delta*100:+.2f}%")
 
     except Exception as e:
         results["ok"] = False
