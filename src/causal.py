@@ -84,6 +84,102 @@ def load_dag_graph(cfg: dict | None = None) -> nx.DiGraph:
 
 
 # =============================================================================
+# P9-1.1 PC algorithm: 数据学 DAG vs 手工 DAG 对比
+# =============================================================================
+
+def discover_dag_pc(
+    data: pd.DataFrame,
+    alpha: float = 0.05,
+    indep_test: str = "fisherz",
+) -> nx.DiGraph:
+    """P9-1.1: 用 PC 算法 (Spirtes et al. 2000) 从数据学 DAG.
+
+    Args:
+        data: log return DataFrame, columns = 节点名
+        alpha: 显著性阈值, 默认 0.05 (越小越严格, 边越少)
+        indep_test: 'fisherz' (Pearson 相关, 假设线性高斯) / 'gsq' (G^2 检验, 离散)
+                  / 'chi2' (卡方, 离散)
+
+    Returns:
+        networkx DiGraph (best-effort, 部分边可能 undirected -> 我们默认方向, 见 implementation)
+
+    依赖: causal-learn (causallearn package). 安装: pip install causal-learn
+    """
+    from causallearn.search.ConstraintBased.PC import pc
+    from causallearn.graph.GeneralGraph import GeneralGraph
+
+    cg = pc(data.values, alpha=alpha, indep_test=indep_test,
+            node_names=list(data.columns), show_progress=False)
+
+    # 解析 causallearn GeneralGraph 到 networkx DiGraph
+    # causallearn adjacency matrix convention (从 GeneralGraph docstring + 实测):
+    #   graph[i,j] =  1, graph[j,i] = -1 → directed i → j (1=tail, -1=head)
+    #   graph[i,j] = -1, graph[j,i] = -1 → undirected i -- j
+    #   graph[i,j] =  0, graph[j,i] =  0 → 无边
+    n = cg.G.get_num_nodes()
+    node_names = list(data.columns)
+
+    g = nx.DiGraph()
+    g.add_nodes_from(node_names)
+
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue
+            a_ij = cg.G.graph[i, j]
+            a_ji = cg.G.graph[j, i]
+            if a_ij == 1 and a_ji == -1:
+                # directed i → j
+                g.add_edge(node_names[i], node_names[j])
+            elif a_ij == -1 and a_ji == -1 and i < j:
+                # undirected i -- j, 选字母序方向 (确定性, 便于 cache/diff)
+                if node_names[i] < node_names[j]:
+                    g.add_edge(node_names[i], node_names[j])
+                else:
+                    g.add_edge(node_names[j], node_names[i])
+
+    return g
+
+
+def compare_dags(
+    manual_dag: nx.DiGraph,
+    pc_dag: nx.DiGraph,
+) -> dict:
+    """P9-1.1: 对比手工 DAG vs PC 学出的 DAG.
+
+    Returns:
+        dict with:
+          - 'overlap': 两边都有的有向边 (强因果证据)
+          - 'manual_only': 手工有 PC 没有 (理论画了, 数据不显著 → 可能是 manual 高估)
+          - 'pc_only': PC 有手工没有 (数据有, 理论没画 → 可能是被忽略的因果或同期相关)
+          - 'summary': 文字摘要, 含重叠率
+    """
+    manual_edges = set(manual_dag.edges())
+    pc_edges = set(pc_dag.edges())
+
+    overlap = manual_edges & pc_edges
+    manual_only = manual_edges - pc_edges
+    pc_only = pc_edges - manual_edges
+
+    total = len(overlap) + len(manual_only) + len(pc_only)
+    overlap_rate = len(overlap) / total if total > 0 else 0
+
+    summary = (
+        f"Manual DAG: {len(manual_edges)} edges, PC DAG: {len(pc_edges)} edges. "
+        f"Overlap: {len(overlap)} ({overlap_rate*100:.0f}%). "
+        f"Manual only: {len(manual_only)} (理论画了数据不支持). "
+        f"PC only: {len(pc_only)} (数据有理论没画)."
+    )
+
+    return {
+        "overlap": sorted(overlap),
+        "manual_only": sorted(manual_only),
+        "pc_only": sorted(pc_only),
+        "summary": summary,
+    }
+
+
+# =============================================================================
 # DataFrame 准备
 # =============================================================================
 

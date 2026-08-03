@@ -624,6 +624,84 @@ ls output\logs\cron_2026-07-27.log  # 3357 bytes
 
 **Cron 状态** (修后预期): 8/3 17:00 跑完应该 0 alert (HTML fix + stale fix + baseline 锁)
 
+## [0.6.9d] - 2026-08-03
+
+### Added (P9-1.1: PC algorithm 结构学习 + 跟手工 DAG 对比)
+
+v0.6.9 Phase 9.0 用了手工 DAG (config/causal_dag.yaml, 经济理论画)。本 commit 加
+PC algorithm (Spirtes et al. 2000) 从数据自动学 DAG, 然后跟手工对比, 揭示
+manual 边的数据支持度。诊断价值高, 0.82s 跑完全部 7 节点。
+
+**`src/causal.py` 加 2 个新函数** (~95 lines):
+- `discover_dag_pc(data, alpha=0.05, indep_test='fisherz')`:
+  - 调 `causallearn.search.ConstraintBased.PC.pc()` 跑 PC algorithm
+  - 解析 GeneralGraph adjacency matrix 到 networkx DiGraph
+  - **causallearn matrix convention 踩坑** (本 commit 关键): `graph[i,j]=1, graph[j,i]=-1` = directed `i→j`; `graph[i,j]=-1, graph[j,i]=-1` = undirected `i--j`; `=0,=0` = 无边
+  - 第一次实现时条件写错 (`graph[j,i] != -1` 应该是 `== -1`), 把 directed 当 undirected
+  - undirected 边 fallback 用字母序方向 (确定性, 便于 cache/diff)
+  - 默认 alpha=0.05 (5% 显著性), `indep_test='fisherz'` (Pearson, 假设线性高斯)
+- `compare_dags(manual_dag, pc_dag) -> dict`:
+  - 返回 `{overlap, manual_only, pc_only, summary}` 4 段
+  - summary 含 3 段计数 + 文字摘要
+
+**`src/report.py` 加 P9-1.1 DAG 验证 bullet** (~25 lines):
+- `render_causal_section` 加第 4 段: "DAG 验证 (P9-1.1 PC vs 手工)"
+- 显示 overlap 边数 / PC 总边 / manual 总边 / 一致率
+- 状态 emoji: ≥2 overlap=✅, 1 overlap=⚠️, 0 overlap=❌
+- 主要重叠边列前 3 条, 多于 3 加 "等 N 条"
+
+**`examples/daily_report.py` step_causal 加 PC 算法 banner** (~14 lines):
+- L2 之前先跑 PC (0.82s)
+- banner 打 `[P9-1.1 PC algorithm] 7 edges in 0.82s`
+- 显示 overlap 边 + PC-only 边
+
+**`tests/test_smoke.py` +1 test** (53/53 pass, 7m25s):
+- `test_causal_pc_dag_v0911_p96`:
+  - 验证 `discover_dag_pc` 返回 7 节点 DiGraph
+  - VIX 至少 1 条出边 (manual 画了 VIX→4 指数)
+  - compare_dags 返回 3 段 + summary
+  - overlap ≥ 1 (VIX→index)
+
+**实测 (causallearn PC alpha=0.05 fisherz, 7 节点 512 交易日)**:
+- PC 边: VIX→DIA, VIX→QQQ, QQQ→DIA, QQQ→QQQE, DIA→RSP, QQQE→RSP, DXY→TNX (7 边)
+- Manual 边: 12 边 (3 macro × 4 指数)
+- **Overlap (2 边)**: VIX→DIA, VIX→QQQ ✅ 经济理论 confirmed
+- **Manual only (10 边)**: 理论画了数据不显著
+  - TNX→4 指数: 4 边 → 数据不显著 (美股近 2 年利率敏感度被其它因素覆盖)
+  - DXY→4 指数: 4 边 → 数据不显著 (DXY 跨国影响弱, 或被汇率对冲)
+  - VIX→QQQE/RSP: 2 边 → VIX 只显著影响 DIA/QQQ, 不显著影响 RSP/QQQE
+- **PC only (5 边)**: 数据有理论没画
+  - QQQ→DIA: 同期相关 (大科技股带动大盘)
+  - QQQ→QQQE: 同期相关 (QQQ + QQQE 高度共线)
+  - DIA→RSP, QQQE→RSP: undirected, 字母序 fallback
+  - DXY→TNX: undirected, 利率和汇率的相关性
+
+**P9 进度** (v0.6.9d):
+- [x] P9.1.0 Pearl-style 因果分析 (v0.6.9)
+- [x] P9.1.1 PC algorithm 结构学习 (v0.6.9d, 本 commit) — **done ✅**
+- [x] P9.1.5 CausalForestDML 性能 (v0.6.9c)
+- [x] P9.1.6 report 第 6 段"因果机制" (v0.6.9b)
+- [ ] P9.1.2 DAG 扩展 (mediator + confounder)
+- [ ] P9.1.3 严格 Pearl L3 (SCM)
+- [ ] P9.1.4 CATE 异质性
+- [ ] P9.1.7 Phase 9.2 全 DAG 49 ticker (长期)
+
+**下一项推荐**: P9-1.3 严格 Pearl L3 (现在 L3 是 econml CATE 简化近似, 严格 L3 需 SCM, 学术严谨性提升最大)
+或 P9-1.2 DAG 扩展 (用 PC 发现的 overlap 重组, 减 10 条 manual_only 边)
+
+**教训 (写进 future engineering)**:
+1. **causallearn GeneralGraph adjacency matrix convention 关键**: 1=tail, -1=head.
+   directed `i→j` = `graph[i,j]=1, graph[j,i]=-1`. undirected = 双方都 -1. 写错条件
+   (用 `!= -1` 而不是 `== -1`) 把 directed 当 undirected, 输出完全错
+2. **PC algorithm 默认** 留 undirected 边 (需要 background knowledge orient),
+   fallback 字母序方向是 best-effort, 不是真方向
+3. **PC + manual 对比是高价值诊断**: 1 行代码 (alpha=0.05) 跑出 0.82s, 揭示
+   "理论画了 12 边, 数据只支持 2 边" 这种 actionable 洞见
+4. **alpha 调参**: 当前 alpha=0.05 偏严, alpha=0.1 边数可能 +50%. 报告
+   PC 边数/overlap/manual 总边, 让用户自己判断 alpha 是否合适
+5. **PC 算法稳定性**: 3 次跑同一份数据结果一致 (deterministic given fixed data),
+   没随机种子. 但数据微调 (加减一天) 可能边变化, 需注意 cache key
+
 ## [0.6.9c] - 2026-08-03
 
 ### Added (P9-1.5: CausalForestDML fit cache + load_dag_data cache)
