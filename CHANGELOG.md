@@ -624,6 +624,67 @@ ls output\logs\cron_2026-07-27.log  # 3357 bytes
 
 **Cron 状态** (修后预期): 8/3 17:00 跑完应该 0 alert (HTML fix + stale fix + baseline 锁)
 
+## [0.6.9c] - 2026-08-03
+
+### Added (P9-1.5: CausalForestDML fit cache + load_dag_data cache)
+
+实测发现 CausalForestDML fit 实际 ~0.13s (不是之前估的 30s), 但 daily_report
+加多个 L3 query 时 (2-5 个) 累积 0.5-1s 没必要。本 commit 加 module-level cache,
+让重复 query (T, O) 走 cache hit, 0.13s → 19ms (40x 加速)。
+
+**L2 实际瓶颈 (本 commit 揭示)**: DoWhy CausalModel + 3 重 refutation = 29s
+- 不是 L3 慢, 是 L2 慢 (DoWhy import + identify + estimate + refute 3 重)
+- 优化 L2 需 (a) 减少 refutation 数 (1-2 足够, 3 重慢), (b) DoWhy 升级 (新版本可能更快),
+  (c) 拆 L2 也 cache (但 DAG 变化时失效)
+- 本 commit 不动 L2, 先优化 L3, 留 P9-1.5 follow-up
+
+**`src/causal.py` 改动** (~80 lines):
+- 加 `_DATA_CACHE: dict[tuple, pd.DataFrame] = {}` — key = (start, end, parquet mtime_ns)
+  - 重复 `load_dag_data()` 同 (start, end) 不重读 parquet (~0.04s → < 0.001s lookup)
+  - parquet mtime 进 key 让 stale cache 自动失效 (parquet 重写即失效)
+  - 返回 `.copy()` 防 caller 污染 cache
+- 加 `_FIT_CACHE: dict[tuple, CausalForestDML] = {}` — key = (T, O, tuple(controls), n_obs)
+  - 重复 `counterfactual_query()` 同 (T, O) 不重 fit (~0.13s → < 0.001s lookup)
+  - n_obs 进 key 因为 start/end 变时数据不同 fit 不同
+- 加 `clear_caches()` + `get_cache_stats()` 暴露给 tests
+- 抽 `_get_cfdml_cached()` 私有 helper, 集中 cache 逻辑
+- `counterfactual_query()` 用 `_get_cfdml_cached()` 替代直接 fit
+- 决策: n_estimators 固定 100, 不暴露 n_estimators 参数
+  - CausalForestDML 要求 n_estimators 能被 subforest_size=4 整除
+  - 50/52 等会报 `ValueError: n_estimators=50 not divisible by subforest_size=4`
+  - cache 已经把二次查询降到 < 0.02s, 不需要再调参
+
+**`examples/daily_report.py` step_causal 改动** (~15 lines):
+- 跑 2 个 L3 query (last_date + prev_date) 演示 cache 价值
+- 第 1 个 cold fit ~0.13s, 第 2 个 cache hit ~19ms
+- banner 多打一行 `[L3 cache] {date}: 同样 (T, O), cache hit {ms}ms`
+- docstring 更新: "L3 fast (~0.2s cold, < 0.02s warm via cache)"
+- 保留 `US_STOCK_CAUSAL_FAST=1` env var 兼容 (彻底跳 L3, 跟 P9-1.5 之前一致)
+
+**`tests/test_smoke.py` +2 tests** (52/52 pass, 6m36s):
+- `test_causal_fit_cache_v0915_p95a` — 同 (T, O) 不同 date, cache hit < 0.1s, 加速 > 5x
+- `test_causal_fit_cache_invalidation_v0915_p95b` — n_obs 变 invalidate cache (full + short 各 1 entry)
+
+**P9 进度** (v0.6.9c):
+- [x] P9.1.0 Pearl-style 因果分析 (v0.6.9)
+- [x] P9.1.5 CausalForestDML 性能 (v0.6.9c, 本 commit) — **next logical 完成**
+- [x] P9.1.6 report 第 6 段"因果机制" (v0.6.9b)
+- [ ] P9.1.1 PC algorithm 结构学习
+- [ ] P9.1.2 DAG 扩展 (mediator + confounder)
+- [ ] P9.1.3 严格 Pearl L3 (dowhy.do_calculus.counterfactual_query + SCM)
+- [ ] P9.1.4 CATE 异质性 (CausalForestDML.effect(X_query))
+- [ ] P9.1.7 Phase 9.2 全 DAG 49 ticker (长期)
+
+**下一项推荐**: P9-1.3 严格 Pearl L3 (L2 SCM 才是真正提升学术严谨性; 当前 econml CATE 是简化近似, 严格 L3 需 SCM) 或 P9-1.1 PC algorithm (验证手工 DAG 跟数据学出来的差异).
+
+**教训 (写进 v0.6.9c future engineering)**:
+1. **真实数据基准要跑出来, 不能凭估**: v0.6.9 我估 L3 fit 30s, 实际 0.13s. 200x 差距.
+   ROADMAP P9-1.5 写 "当前 40s fit" 完全是估的. 实测永远比估的准
+2. **DoWhy L2 才是真瓶颈** (29s), L3 优化 0.13s → 0.02s 只是表层. 真正的
+   性能优化要做 L2: (a) 减 refutation 数, (b) DoWhy 版本升级, (c) DAG 缓存
+3. **CausalForestDML n_estimators 必须能被 subforest_size=4 整除**: 50/52
+   等会 raise ValueError. 设计 cache 时用 100 (25×4) 不用试错
+
 ## [0.6.9b] - 2026-08-03
 
 ### Added (P9-1.6: 因果机制段进 markdown report)

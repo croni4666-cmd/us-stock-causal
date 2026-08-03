@@ -33,6 +33,38 @@ CACHE_ROOT = PROJECT_ROOT / "data" / "raw"
 
 
 # =============================================================================
+# Module-level caches (P9-1.5 性能优化)
+# =============================================================================
+
+# data cache: 同一个 start/end 多次 load, OS 帮我们 fast read 0.017s
+# 但 init parquet + log return + concat 仍然 ~0.04s, cache 掉
+_DATA_CACHE: dict[tuple, pd.DataFrame] = {}
+
+# CausalForestDML fit cache: key = (T, O, tuple(controls), n_obs)
+# 第一次 fit ~0.13s, 重复 query (不同 date 同 T/O) < 0.001s lookup
+# P9-1.5 核心: 让 L3 default mode (多个反事实) 实际可行
+_FIT_CACHE: dict[tuple, "CausalForestDML"] = {}  # type: ignore[name-defined]
+
+
+def clear_caches() -> dict:
+    """清空 module-level caches (tests 用)."""
+    n_data = len(_DATA_CACHE)
+    n_fit = len(_FIT_CACHE)
+    _DATA_CACHE.clear()
+    _FIT_CACHE.clear()
+    return {"data_cleared": n_data, "fit_cleared": n_fit}
+
+
+def get_cache_stats() -> dict:
+    """看 cache 当前状态 (debug / tests 用)."""
+    return {
+        "data_cache_size": len(_DATA_CACHE),
+        "fit_cache_size": len(_FIT_CACHE),
+        "fit_cache_keys": list(_FIT_CACHE.keys()),
+    }
+
+
+# =============================================================================
 # DAG 加载
 # =============================================================================
 
@@ -66,12 +98,26 @@ def load_dag_data(
 ) -> pd.DataFrame:
     """读所有 DAG 节点的 parquet, 算 daily log returns, 对齐到共同 date index.
 
+    P9-1.5: 加 module-level cache, 同一 (start, end, parquet 文件 mtime) 重复 load 直接返回。
+
     Returns: DataFrame with columns: TNX, VIX, DXY, DIA, QQQ, RSP, QQQE
              (用 close 价格的 log return, 单位 = 0.01 = 1%)
     """
     if cfg is None:
         cfg = load_dag_config()
     parquet_map = cfg["nodes"]["parquet_map"]
+
+    # P9-1.5 cache key: 包含 (start, end, 所有 parquet mtime) 让 stale 失效
+    cache_key_parts = [start, end]
+    for node, rel_path in parquet_map.items():
+        pq = PROJECT_ROOT / rel_path
+        if pq.exists():
+            cache_key_parts.append((node, pq.stat().st_mtime_ns))
+    cache_key = tuple(cache_key_parts)
+
+    if cache_key in _DATA_CACHE:
+        logger.debug(f"[causal] load_dag_data cache hit ({len(_DATA_CACHE[cache_key])} 行)")
+        return _DATA_CACHE[cache_key].copy()  # 返回 copy 避免 caller 污染 cache
 
     returns = {}
     for node, rel_path in parquet_map.items():
@@ -100,7 +146,9 @@ def load_dag_data(
     aligned.columns = list(returns.keys())
     aligned = aligned.dropna(how="any")
     logger.info(f"[causal] {len(aligned)} 个交易日, {len(aligned.columns)} 个节点")
-    return aligned
+
+    _DATA_CACHE[cache_key] = aligned
+    return aligned.copy()
 
 
 # =============================================================================
@@ -253,6 +301,45 @@ class CounterfactualResult:
         return asdict(self)
 
 
+def _get_cfdml_cached(
+    treatment: str,
+    outcome: str,
+    data: pd.DataFrame,
+    controls: list[str],
+) -> "CausalForestDML":  # type: ignore[name-defined]
+    """P9-1.5: 缓存 CausalForestDML fit 结果, key = (T, O, tuple(controls), n_obs).
+
+    第一次 fit ~0.13s, 重复 query (不同 date 同 T/O) < 0.001s lookup.
+    让 L3 default mode (多个反事实 query 在同一 report) 实际可行.
+
+    n_obs 进 key 是因为数据窗口 (start/end) 变化时 fit 必然不同.
+    n_estimators 固定 100 (P9-1.5 决策: cache 已经够用, 不要再调参; subforest_size=4 要求 n_estimators 能被 4 整除, 50/52 等会报错).
+    """
+    key = (treatment, outcome, tuple(controls), len(data))
+    if key in _FIT_CACHE:
+        logger.debug(f"[causal] CausalForestDML cache hit T={treatment} O={outcome} n={len(data)} (cache size={len(_FIT_CACHE)})")
+        return _FIT_CACHE[key]
+
+    from econml.dml import CausalForestDML
+    from sklearn.ensemble import RandomForestRegressor
+    est = CausalForestDML(
+        model_y=RandomForestRegressor(n_estimators=20, max_depth=4, random_state=42),
+        model_t=RandomForestRegressor(n_estimators=20, max_depth=4, random_state=42),
+        n_estimators=100,  # P9-1.5: 固定 100, cache 解决重复 fit 问题
+        random_state=42,
+    )
+    X = data[controls].values
+    T = data[treatment].values
+    Y = data[outcome].values
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        est.fit(Y=Y, T=T, X=X, W=X)  # X=W=controls (POC 简化, 实际应区分)
+
+    _FIT_CACHE[key] = est
+    logger.info(f"[causal] CausalForestDML fit cached T={treatment} O={outcome} n={len(data)} (cache size={len(_FIT_CACHE)})")
+    return est
+
+
 def counterfactual_query(
     date: str,
     treatment: str,
@@ -265,6 +352,9 @@ def counterfactual_query(
 
     方法: 训练 econml CausalForestDML 估计 CATE (条件平均处理效应),
     在 (date, treatment=counterfactual_value) 条件下预测 outcome.
+
+    P9-1.5 优化: 用 module-level cache 缓存 fit 结果, 重复 query 不同 date
+    但同 (T, O) 不用重 fit, 0.13s → < 0.001s lookup.
 
     注: 严格 Pearl L3 反事实需要 structural causal model (SCM), DoWhy 有
     `dowhy.do_calculus.counterfactual_query` 但需要 4 个 elements:
@@ -304,22 +394,8 @@ def counterfactual_query(
     treatments = cfg["nodes"]["treatments"]
     controls = [c for c in treatments if c != treatment]
 
-    X = data[controls].values
-    T = data[treatment].values
-    Y = data[outcome].values
-
-    # CausalForestDML (用 RandomForestRegressor 实例, 不是 lambda; n_estimators 降 100 提速)
-    from econml.dml import CausalForestDML
-    from sklearn.ensemble import RandomForestRegressor
-    est = CausalForestDML(
-        model_y=RandomForestRegressor(n_estimators=20, max_depth=4, random_state=42),
-        model_t=RandomForestRegressor(n_estimators=20, max_depth=4, random_state=42),
-        n_estimators=100,
-        random_state=42,
-    )
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        est.fit(Y=Y, T=T, X=X, W=X)  # X=W=controls (POC 简化, 实际应区分)
+    # P9-1.5: 用 fit cache (固定 n_estimators=100, subforest_size=4 要求整除)
+    est = _get_cfdml_cached(treatment, outcome, data, controls)
 
     # 在该天 controls 不变条件下, 算 CATE (treatment 变化 1 单位的效应)
     x_query = data.loc[[date_ts], controls].values
