@@ -1440,7 +1440,10 @@ def test_causal_treatment_validation_v069_p93():
 
 
 def test_causal_counterfactual_v069_p94():
-    """P9.4: counterfactual_query 跑通, delta 方向符合经济理论 (VIX 跌→QQQ 涨)"""
+    """P9.4: counterfactual_query 跑通, delta 方向符合经济理论 (VIX 跌→QQQ 涨)
+
+    P9-1.3: 默认 method='scm' (严格 Pearl L3, DoWhy gcm InvertibleSCM)
+    """
     from src.causal import load_dag_config, load_dag_data, counterfactual_query
     cfg = load_dag_config()
     data = load_dag_data(cfg=cfg)
@@ -1453,10 +1456,95 @@ def test_causal_counterfactual_v069_p94():
         counterfactual_value=cf_vix, data=data, cfg=cfg,
     )
     # VIX 跌多 (cf_vix < actual_vix) → QQQ 应该涨多 (delta > 0)
-    # 注意: VIX 跌 < 0, QQQ 涨 > 0; CATE 是 VIX→QQQ = 负; delta = CATE * (cf - actual) = 负 * 负 = 正
+    # P9-1.3 SCM: 严格 Pearl 3-step 反事实, 数值上跟 econml CATE 近似一致
     assert cf.delta > 0, f"VIX 跌应让 QQQ 涨 (delta > 0), got delta={cf.delta}"
     # magnitude 应该合理 (< 5% 因为 VIX 只跌 5%)
     assert abs(cf.delta) < 0.05, f"delta 应 < 5%, got {cf.delta}"
+
+
+def test_causal_counterfactual_scm_v0913_p97():
+    """P9-1.3: 严格 Pearl L3 用 dowhy.gcm.InvertibleStructuralCausalModel, 验证方向 + magnitude
+
+    实测 7/31: VIX actual -6.65% → cf -11.65%, QQQ 实际 +0.65% → cf +1.26% (delta +0.61%)
+    """
+    from src.causal import (
+        load_dag_config, load_dag_data, counterfactual_query, get_cache_stats, clear_caches,
+    )
+
+    clear_caches()
+    cfg = load_dag_config()
+    data = load_dag_data(cfg=cfg)
+
+    last_date = str(data.index[-1].date())
+    actual_vix = float(data.iloc[-1]["VIX"])
+    cf_vix = actual_vix - 0.05
+
+    # method='scm' (默认)
+    cf_scm = counterfactual_query(
+        date=last_date, treatment="VIX", outcome="QQQ",
+        counterfactual_value=cf_vix, data=data, cfg=cfg, method="scm",
+    )
+    assert cf_scm.delta > 0, f"SCM: VIX 跌应让 QQQ 涨 (delta > 0), got {cf_scm.delta}"
+
+    # cache 应该有 1 个 SCM entry
+    stats = get_cache_stats()
+    assert stats["scm_cache_size"] == 1, f"应 1 个 SCM cache entry, got {stats['scm_cache_size']}"
+
+    # method='econml' (P9-1.5 旧方法, 保留作对照)
+    cf_econml = counterfactual_query(
+        date=last_date, treatment="VIX", outcome="QQQ",
+        counterfactual_value=cf_vix, data=data, cfg=cfg, method="econml",
+    )
+    assert cf_econml.delta > 0, f"EconML: VIX 跌应让 QQQ 涨 (delta > 0), got {cf_econml.delta}"
+
+    # SCM vs EconML delta 量级一致 (允许 5x 内差异, 因为 EconML 是 CATE 近似)
+    ratio = abs(cf_scm.delta) / abs(cf_econml.delta) if cf_econml.delta != 0 else float("inf")
+    assert 0.1 < ratio < 10, f"SCM / EconML ratio 应 0.1-10, got {ratio:.2f} (SCM={cf_scm.delta:.4f}, EconML={cf_econml.delta:.4f})"
+
+
+def test_causal_scm_cache_v0913_p98():
+    """P9-1.3: SCM cache 工作 — 重复 query 走 cache, < 0.05s
+
+    注: SCM fit 本身只 ~5ms, cache 节省 fit() 时间 + DAG build, 总节省约 5-10ms
+    (vs EconML fit 130ms, cache 节省更多). 所以 speedup 没 CausalForestDML 明显.
+    重点验证: cache hit 存在 + 重复 query 不重 fit.
+    """
+    import time
+    from src.causal import (
+        load_dag_config, load_dag_data, counterfactual_query, get_cache_stats, clear_caches,
+    )
+
+    clear_caches()
+    cfg = load_dag_config()
+    data = load_dag_data(cfg=cfg)
+
+    last_date = str(data.index[-1].date())
+    prev_date = str(data.index[-2].date())
+    actual_vix = float(data.iloc[-1]["VIX"])
+    cf_vix = actual_vix - 0.05
+
+    # Query 1: cold
+    t0 = time.time()
+    cf1 = counterfactual_query(last_date, "VIX", "QQQ", cf_vix, data=data, cfg=cfg, method="scm")
+    t1 = time.time() - t0
+
+    # Query 2: warm (cache hit)
+    t0 = time.time()
+    cf2 = counterfactual_query(prev_date, "VIX", "QQQ", cf_vix, data=data, cfg=cfg, method="scm")
+    t2 = time.time() - t0
+
+    # cache hit 极快 (< 50ms) — SCM query 3ms + Python overhead
+    assert t2 < 0.05, f"SCM cache hit 应 < 0.05s, got {t2:.3f}s (cold={t1:.3f}s)"
+
+    # cache 节省 fit() (~5ms) + DAG build (~0ms), 但 query overhead 主导
+    # 所以 speedup 不显著是合理的, 重点是 cache 不空
+    stats = get_cache_stats()
+    assert stats["scm_cache_size"] == 1, f"SCM cache 应 1 entry (跟 (T, O) 无关), got {stats['scm_cache_size']}"
+
+    # 3rd query 应该继续走 cache, 不增加 entries
+    cf3 = counterfactual_query(last_date, "TNX", "DIA", 0.0, data=data, cfg=cfg, method="scm")
+    stats2 = get_cache_stats()
+    assert stats2["scm_cache_size"] == 1, f"SCM cache 应仍 1 entry (不同 (T, O) 共享), got {stats2['scm_cache_size']}"
 
 
 def test_causal_data_alignment_v069_p95():
@@ -1474,7 +1562,10 @@ def test_causal_data_alignment_v069_p95():
 
 
 def test_causal_fit_cache_v0915_p95a():
-    """P9-1.5: CausalForestDML fit 缓存 — 重复 query (T, O) 不同 date 应该 cache hit, < 0.1s"""
+    """P9-1.5: CausalForestDML fit 缓存 — 重复 query (T, O) 不同 date 应该 cache hit, < 0.1s
+
+    P9-1.3: counterfactual_query 默认 method='scm', 显式传 method='econml' 才用 CausalForestDML
+    """
     import time
     from src.causal import counterfactual_query, get_cache_stats, clear_caches
     from src.causal import load_dag_config, load_dag_data
@@ -1489,12 +1580,12 @@ def test_causal_fit_cache_v0915_p95a():
 
     # 第 1 次: cold fit (~0.13s + import overhead)
     t0 = time.time()
-    r1 = counterfactual_query(last_date, "VIX", "QQQ", -0.05, data=data, cfg=cfg)
+    r1 = counterfactual_query(last_date, "VIX", "QQQ", -0.05, data=data, cfg=cfg, method="econml")
     t1 = time.time() - t0
 
     # 第 2 次: 应该 cache hit (< 0.1s)
     t0 = time.time()
-    r2 = counterfactual_query(prev_date, "VIX", "QQQ", -0.05, data=data, cfg=cfg)
+    r2 = counterfactual_query(prev_date, "VIX", "QQQ", -0.05, data=data, cfg=cfg, method="econml")
     t2 = time.time() - t0
 
     # 同一 (T, O), fit 应一致, 只有 x_query 不同
@@ -1513,7 +1604,10 @@ def test_causal_fit_cache_v0915_p95a():
 
 
 def test_causal_fit_cache_invalidation_v0915_p95b():
-    """P9-1.5: n_obs 变化应该 invalidate cache (data window 变化)"""
+    """P9-1.5: n_obs 变化应该 invalidate cache (data window 变化)
+
+    P9-1.3: 用 method='econml' 显式触发 CausalForestDML 路径
+    """
     import time
     from src.causal import counterfactual_query, get_cache_stats, clear_caches
     from src.causal import load_dag_config, load_dag_data
@@ -1531,12 +1625,12 @@ def test_causal_fit_cache_invalidation_v0915_p95b():
 
     # query 1: full data
     t0 = time.time()
-    r1 = counterfactual_query(last_date_full, "VIX", "QQQ", -0.05, data=data_full, cfg=cfg)
+    r1 = counterfactual_query(last_date_full, "VIX", "QQQ", -0.05, data=data_full, cfg=cfg, method="econml")
     t1 = time.time() - t0
 
     # query 2: short data, 不同 n_obs → 应该新 fit
     t0 = time.time()
-    r2 = counterfactual_query(last_date_short, "VIX", "QQQ", -0.05, data=data_short, cfg=cfg)
+    r2 = counterfactual_query(last_date_short, "VIX", "QQQ", -0.05, data=data_short, cfg=cfg, method="econml")
     t2 = time.time() - t0
 
     # cache 应有 2 个 entry (不同 n_obs)
@@ -1545,7 +1639,7 @@ def test_causal_fit_cache_invalidation_v0915_p95b():
 
     # query 3: 再次 short data → cache hit
     t0 = time.time()
-    r3 = counterfactual_query(last_date_short, "VIX", "QQQ", -0.05, data=data_short, cfg=cfg)
+    r3 = counterfactual_query(last_date_short, "VIX", "QQQ", -0.05, data=data_short, cfg=cfg, method="econml")
     t3 = time.time() - t0
     assert t3 < 0.1, f"cache hit 应 < 0.1s, got {t3:.3f}s"
 
