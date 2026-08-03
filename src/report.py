@@ -163,18 +163,25 @@ def render_markdown(report: dict) -> str:
 
 
 def render_full_report(symbols: list[str], layer: str = "indices") -> str:
-    """渲染 4 指数完整 5 段制报告"""
+    """渲染 4 指数完整 5 段制报告 + 因果机制段 (Phase 9)"""
     today = date.today()
     lines = [
         f"# 📊 美股每日分析报告 (5 段制) — {today}",
         f"\n**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"**模型**: Phase 2 全套 + Phase 3 顶部情绪 (归因 v0.3.0 + 阈值/残差 v0.3.1 + 模式/事件 v0.3.2 + 信号/5段 v0.3.3 + 情绪 v0.4.1)",
-        f"**字数**: 每标的 ~600 字,5 段结构 (行情 / 归因 / 阈值 / 相似 / 风险)",
+        f"**模型**: Phase 2 全套 + Phase 3 顶部情绪 + Phase 9 Pearl 因果",
+        f"**字数**: 每标的 ~600 字,5 段结构 (行情 / 归因 / 阈值 / 相似 / 风险) + 1 段因果机制",
         f"\n---\n",
     ]
     # 顶部情绪 1 行 (Phase 3.2 P3-3)
     lines.append(macro_topline())
     lines.append("\n---\n")
+    # 因果机制 1 段 (Phase 9.0, v0.6.9+)
+    # 默认 include_l3=False (L3 CausalForestDML 慢 ~30s, daily report 怕超 cron timeout)
+    # Phase 9.1.5 优化 CausalForestDML 性能 + 加缓存后可改回 True
+    causal_section = render_causal_section(include_l3=False)
+    if causal_section:
+        lines.append(causal_section)
+        lines.append("\n---\n")
     for sym in symbols:
         report = five_segment_report(sym, layer=layer)
         lines.append(render_markdown(report))
@@ -183,6 +190,92 @@ def render_full_report(symbols: list[str], layer: str = "indices") -> str:
         "\n*免责声明:本报告由自动化分析生成,基于历史数据 + 公开 sector weights。"
         "**不构成投资建议**。信号矛盾 score 越高,越要谨慎。事件前 1 周内的预测需打折。*\n"
     )
+    return "\n".join(lines)
+
+
+def render_causal_section(include_l3: bool = False) -> str:
+    """v0.6.9 (P9.1.6) 渲染 Pearl-style 因果机制段
+
+    Pearl 3 层因果阶梯 (L1 关联 = Phase 2 attribution 已写在每段报告里):
+      - L2 干预 P(QQQ | do(VIX/TNX+1%)) — DoWhy + OLS
+      - L3 反事实 P(QQQ_x | 实际值, cf值) — econml CATE 近似
+
+    数据来自 7 节点手工 DAG (config/causal_dag.yaml: ^TNX/^VIX/DXY → DIA/QQQ/RSP/QQQE)
+    约 500 交易日 log return 数据, 用 statsmodels OLS (绕开 DoWhy linear_regression 已知 bug)
+
+    Args:
+        include_l3: 是否含 L3 反事实 (慢, 约 30s CausalForestDML fit)
+
+    Returns:
+        Markdown 字符串 (~200-300 字), 失败时返回 ""
+    """
+    try:
+        from src import causal as causal_mod
+    except ImportError as e:
+        logger.warning(f"[causal section] import 失败: {e}")
+        return ""
+
+    cfg = causal_mod.load_dag_config()
+    try:
+        data = causal_mod.load_dag_data(cfg=cfg)
+    except FileNotFoundError as e:
+        logger.warning(f"[causal section] 缺 parquet: {e}")
+        return ""
+
+    lines = ["## 因果机制 (Phase 9.0 Pearl-style)\n"]
+
+    # L2 do-calculus 2 个最 robust 的 query
+    try:
+        for treatment, outcome, label in [
+            ("VIX", "QQQ", "恐慌指数 (VIX)"),
+            ("TNX", "QQQ", "10Y 国债 (^TNX)"),
+        ]:
+            eff = causal_mod.causal_query(
+                treatment=treatment, outcome=outcome, data=data, cfg=cfg
+            )
+            direction = "↑" if eff.estimate > 0 else "↓"
+            sig = "显著" if eff.p_value < 0.05 else "不显著"
+            refute_pass = sum(1 for v in eff.refutation.values() if "new_effect" in v)
+            lines.append(
+                f"- **L2 干预**: {label} `do(+1%)` → {outcome} 预期{direction} "
+                f"{abs(eff.estimate):.4f} ({abs(eff.estimate)*100:+.2f}%, "
+                f"p={eff.p_value:.3f} {sig}); "
+                f"反驳测试 {refute_pass}/3 通过"
+            )
+    except Exception as e:
+        logger.warning(f"[causal section] L2 query 失败: {e}")
+        lines.append(f"- L2 干预: 查询失败 ({type(e).__name__}: {e})")
+
+    # L3 反事实 (可选, 慢)
+    if include_l3:
+        try:
+            last_date = str(data.index[-1].date())
+            actual_vix = float(data.iloc[-1]["VIX"])
+            cf_vix = actual_vix - 0.05  # 假设 VIX 比实际低 5%
+            cf = causal_mod.counterfactual_query(
+                date=last_date, treatment="VIX", outcome="QQQ",
+                counterfactual_value=cf_vix, data=data, cfg=cfg,
+            )
+            lines.append(
+                f"- **L3 反事实** (近似, 用 econml CATE 严格 L3 需 SCM): "
+                f"{cf.date} 假设 VIX -{abs(cf_vix-actual_vix)*100:.1f}% "
+                f"(从 {actual_vix*100:+.2f}% 到 {cf_vix*100:+.2f}%), "
+                f"{cf.outcome} 实际 {cf.actual_outcome*100:+.2f}% → "
+                f"反事实 {cf.counterfactual_outcome*100:+.2f}% "
+                f"(差 {cf.delta*100:+.2f}%)"
+            )
+        except Exception as e:
+            logger.warning(f"[causal section] L3 query 失败: {e}")
+            lines.append(f"- L3 反事实: 查询失败 ({type(e).__name__}: {e})")
+
+    # 引用 + 范围
+    lines.append(
+        f"\n*数据基础: {len(data)} 交易日 log return, "
+        f"7 节点 DAG (3 macro × 4 指数), n=508 起, "
+        f"OLS regression + DoWhy DAG 验证 + 3 重 refutation. "
+        f"Pearl L3 用 econml CATE 近似 (严格需 SCM, Phase 9.1.3 实施).*"
+    )
+
     return "\n".join(lines)
 
 
