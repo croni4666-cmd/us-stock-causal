@@ -1553,16 +1553,17 @@ def test_causal_dag_loads_v069_p90():
 
     P9-1.2 (v0.6.9g): 边数 12 → 13 (加 TNX→VIX mediator)
     P9-1.7 batch 1 (v0.6.9i): 节点 7 → 11 (加 XLK/XLF/XLV/XLE), 边 13 → 41
-    P9-1.7 batch 2 (v0.6.9i 加): 节点 11 → 18 (加剩 7 行业), 边 41 → 90
+    P9-1.7 batch 2 (v0.6.9i): 节点 11 → 18 (加剩 7 行业), 边 41 → 90
+    P9-1.7 batch 3 (v0.6.9j): **DEFERRED** (性能问题, L2 refutation 21 节点 175s 爆降 30x)
     """
     from src.causal import load_dag_config, load_dag_graph
     cfg = load_dag_config()
     g = load_dag_graph(cfg)
-    # P9-1.7 batch 2: 11 → 18 节点 (加 7 行业)
-    assert g.number_of_nodes() == 18, f"expected 18 nodes (P9-1.7 batch 2), got {g.number_of_nodes()}"
+    # P9-1.7 batch 3 deferred: 保持 18 节点, 等 L2 性能优化后回归
+    assert g.number_of_nodes() == 18, f"expected 18 nodes (P9-1.7 batch 2 stable, batch 3 deferred), got {g.number_of_nodes()}"
     # P9-1.7 batch 2: 41 → 90 边 (加 21 macro→industry + 28 industry→index)
     assert g.number_of_edges() == 90, f"expected 90 edges (P9-1.7 batch 2), got {g.number_of_edges()}"
-    # 节点
+    # 节点 (18 节点, 不含 batch 3 国债)
     expected_nodes = {"TNX", "VIX", "DXY", "DIA", "QQQ", "RSP", "QQQE",
                       "XLK", "XLF", "XLV", "XLE",
                       "XLY", "XLP", "XLI", "XLU", "XLB", "XLRE", "XLC"}
@@ -1718,10 +1719,10 @@ def test_causal_scm_cache_v0913_p98():
     t2 = time.time() - t0
 
     # cache hit 极快 — SCM query 3ms + Python overhead
-    # 阈值随节点数放宽: 7 节点 < 0.1s, 18 节点 (P9-1.7 batch 1+2) < 0.25s
+    # 阈值随节点数放宽: 7 节点 < 0.12s, 18 节点 < 0.23s, 21 节点 < 0.26s
     # (test suite 全跑时 OS load 高 flake, 单跑 < 0.005s)
     n_nodes = data.shape[1]
-    cache_threshold = 0.05 + 0.01 * n_nodes  # 7 节点: 0.12s, 18 节点: 0.23s
+    cache_threshold = 0.05 + 0.01 * n_nodes
     assert t2 < cache_threshold, f"SCM cache hit 应 < {cache_threshold}s (n_nodes={n_nodes}), got {t2:.3f}s (cold={t1:.3f}s)"
 
     # cache 节省 fit() (~5ms) + DAG build (~0ms), 但 query overhead 主导
@@ -1736,11 +1737,11 @@ def test_causal_scm_cache_v0913_p98():
 
 
 def test_causal_data_alignment_v069_p95():
-    """P9.2: load_dag_data inner join 18 节点 (P9-1.7 batch 1+2 加 11 行业), 应该 ≥ 400 交易日 (P9.0 POC)"""
+    """P9.2: load_dag_data inner join 18 节点 (P9-1.7 batch 1+2, batch 3 deferred), 应该 ≥ 400 交易日"""
     from src.causal import load_dag_config, load_dag_data
     cfg = load_dag_config()
     data = load_dag_data(cfg=cfg)
-    assert data.shape[1] == 18, f"应 18 列 (P9-1.7 batch 1+2), got {data.shape[1]}"
+    assert data.shape[1] == 18, f"应 18 列 (P9-1.7 batch 2), got {data.shape[1]}"
     assert data.shape[0] >= 400, f"应 ≥ 400 交易日, got {data.shape[0]}"
     # 所有 18 节点都有
     expected = {"TNX", "VIX", "DXY", "DIA", "QQQ", "RSP", "QQQE",
@@ -1848,8 +1849,8 @@ def test_causal_pc_dag_v0911_p96():
     # PC algorithm (alpha=0.05 fisherz, 0.82s 实测)
     pc_dag = discover_dag_pc(data, alpha=0.05)
 
-    # 应该 ≥ 1 个节点 (sparse). P9-1.7 batch 1+2: 7 → 18 节点 (含 11 行业)
-    assert pc_dag.number_of_nodes() == 18, f"应 18 节点 (P9-1.7 batch 1+2), got {pc_dag.number_of_nodes()}"
+    # 应该 ≥ 1 个节点 (sparse). P9-1.7 batch 1+2: 7 → 18 节点 (含 11 行业, batch 3 deferred)
+    assert pc_dag.number_of_nodes() == 18, f"应 18 节点 (P9-1.7 batch 2), got {pc_dag.number_of_nodes()}"
 
     # P9-1.7 batch 1+2: 加 11 行业后, PC 算法可能把 VIX→index direct 边吸收到 VIX→industry→index
     # mediator chain. 所以 PC 不一定有 VIX→index 边, 但应该有 VIX→industry 或 industry→index 边

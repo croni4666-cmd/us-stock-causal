@@ -1,13 +1,13 @@
 ## [Unreleased]
 
 ### Current
-- **HEAD**: v0.6.9i (commit pending, 2026-08-04) — P9-1.7 batch 1 (DAG 7→11 节点, 加 4 行业)
-- **Phase 9.1 状态** (v0.6.9 + a..h, 8 commits): 8/8 P9.1.x done
-- **P9-1.7 状态** (v0.6.9i batch 1, 本次): 11 节点 41 边, 7+4 行业 (XLK/XLF/XLV/XLE), 后续 batch 加剩 7 行业
+- **HEAD**: v0.6.9j (commit pending, 2026-08-04) — P9-1.7 batch 3 实施 + 性能问题 revert
+- **P9-1.7 batch 3 状态**: 实施 21 节点 135 边 (加 ^IRX/^FVX/^TYX 3 国债), L2 cold 175s 性能爆降 30x, **revert 到 18 节点**, batch 3 deferred 待 L2 性能优化
 
 ### Planned
-- v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值) — P7-1
-- v0.8.x: P9-1.7 batch 2~n (增量加 7 行业 → 18 节点) + 14 期货 + 14 现货
+- v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值) — P7-1 (但 v0.6.8b 实证 A 路径受限, 走不通)
+- v0.8.x: P9-1.7 batch 3 重做 (加 3 国债, **待 L2 refutation 性能优化后回归**)
+- v0.8.x: P9-1.7 batch 4 (14 期货, 需先建 data/raw/commodities/ 管道)
 - v0.8.x: P5 增强 (失败重试 / timezone) — **飞书 2026-07-26 archived, 改本地化**
 
 ### Done (2026-08-04 之前)
@@ -15,8 +15,66 @@
 - v0.6.x: 报告顶部 1 行 → 3 行 (1d/5d/20d) — **P6-4 done in v0.6.8**
 - v0.6.9a..g: Phase 9.1 hotfix chain (3 collateral fixes + P9-1.1/1.2/1.3/1.5/1.5.5/1.6) — **7 commits**
 - v0.6.9h: Phase 9.1 收尾 batch (P7-4 + P7-5 + P8-7 + P9-1.4)
-- v0.6.9i: P9-1.7 batch 1 (DAG 7 → 11 节点, 加 4 行业) — **本 commit**
+- v0.6.9i: P9-1.7 batch 1+2 (DAG 7 → 18 节点, 加 11 行业)
+- v0.6.9j: P9-1.7 batch 3 调研 (21 节点 175s 性能问题, revert 18 节点) — **本 commit**
 - v0.6.9: Phase 9.0 Pearl-style 因果分析 (DoWhy + EconML 集成)
+
+## [0.6.9j] - 2026-08-04
+
+### Investigated (P9-1.7 batch 3 调研: 21 节点 135 边 性能爆降 30x, revert)
+
+按 ROADMAP P9-1.7 batch 3 计划, 加 3 国债 (^IRX 13W / ^FVX 5Y / ^TYX 30Y 完整 yield curve).
+实施到 21 节点 135 边, **L2 cold 175s 性能爆降 30x** vs 18 节点 ~6s, 远超 60s daily cron budget.
+revert 到 18 节点, batch 3 显式 deferred 待 L2 性能优化.
+
+#### 实施 (revert 前的实测)
+- **DAG**: 18 → 21 节点 (加 IRX/FVX/TYX 3 国债), 90 → 135 边
+  - 3 国债 → 4 指数: 12 边 (跟 TNX→指数 模式一致)
+  - 3 国债 → 11 行业: 33 边 (跟 TNX→行业 模式一致, yield curve shape 影响行业)
+  - total +45 边 (从 90 → 135)
+- **数据**: 512 交易日 21 列全齐, DAG acyclic ✓
+- **L2 VIX→QQQ ATE = -0.1232 (跟 18 节点一样)**: ATE 总效应守恒
+
+#### 性能爆降实测 (21 节点 135 边 512 交易日)
+| 操作 | 18 节点 (90 边) | 21 节点 (135 边) | 退化 |
+|---|---|---|---|
+| L2 cold (DoWhy 1 重 refutation) | ~6s | **175s** | 30x 慢 ⚠️ |
+| L2 cache hit | ~50ms | 2.6s | 52x 慢 |
+| L3 SCM cold | ~200ms | 326ms | 1.6x 慢 |
+| L3 SCM cache hit | ~80ms | 405ms | 5x 慢 |
+| CATE 异质性 (3 群) | ~1.5s | 1.6s | 持平 |
+| PC algorithm | ~0.1s | 0.84s | 8x 慢 |
+
+#### 性能爆降根因
+- **DoWhy `random_common_cause` refuter 跑 N 次 full causal model**, control 变量越多越慢 (21 vs 18)
+- L2 cache hit 也慢 (2.6s vs 50ms), 因为 cache miss 时存的 refutation result 计算耗时, cache hit 也要 reproduce
+- OLS regression 21 control 变量 vs 18 control 变量, 慢 5-10x
+- backdoor adjustment: 18 → 21 节点, 后门集合 3x 大小, 调整时间 ~3x
+
+#### Revert 决策
+- 21 节点 cold 175s 远超 60s daily cron budget (P5-4 设计 cron 17:00 daily 跑)
+- 即使 cache 命中 (3s), daily 2 L2 queries = 6s 加上其它 step ~25s, 仍 < 60s, 可接受
+- **但 cold path 风险**: cron 第 1 次跑 或 cache clear 后 175s, user 会被惊到
+- **决策**: revert 到 18 节点, 保留 21 节点配置 (注释掉), batch 3 **deferred** 等 L2 refutation 性能优化
+
+#### 性能优化方向 (后续)
+- P9-1.5.5 已有 `_REFUTE_CACHE`, 但 cache key 是 (T, O, n_obs, n_refutations), 没考虑 DAG 节点数
+- 优化方案 1: 减少 refutation 用的 controls (只取 5 个最相关, 不是全 21 个)
+- 优化方案 2: L2 重写用 statsmodels OLS 直接算, 跳过 DoWhy refutation (减少 ~80% 时间, 但失去 refutation 验证)
+- 优化方案 3: daily report 跑 0 重 refutation (P9-1.5.5 旧默认 1 重), 改 US_STOCK_CAUSAL_FAST=1 风格
+- 优化方案 4: 节点数 ≥ 20 触发 P9-1.5.5 `n_refutations=0` 自动 (config 阈值)
+
+#### 教训 (写进 agent memory, 跨项目)
+1. **DAG 节点数跟 L2 refutation 时间非线性**: 18 → 21 节点 (3 control 多) → 30x 慢, 因为 refutation 跑 N 次 full model 每次多 3 control. 任何 DAG 扩展都要先 bench, 不能凭"只加 3 节点"就假设 < 2x 慢
+2. **P9-1.5.5 cache 优化没解决根本问题**: cache 只省重复 query, 不省 refutation 单次计算. 真优化要做 refutation 内部 (减 controls / 改算法)
+3. **18 节点是当前性能甜区**: daily cron 18 节点 ~25s, 21 节点 ~175s. 50 节点 (49 ticker) 估计 > 60min, 完全不可用. P9-1.7 batch 4+ 需先解决 L2 refutation 性能再扩展
+4. **节点数 < 20 是 hard ceiling** for L2 refutation 1 重 < 60s. 超过需 0 重 (失去验证) 或换算法 (gcm SCM 仍 O(n^3) 慢)
+5. **DoWhy 1.16+ refutation 性能改进未必能解决**: DoWhy upstream 也在优化, 但 21 节点 → 175s 数量级太大, 不像单纯算法问题. 可能是 DoWhy 内部 enumerate backdoor set 时复杂度爆炸
+
+#### 下一步
+- **P9-1.7 batch 3 重做**: 等 L2 性能优化 (P9-1.5.5 升级 / DoWhy 升级 / statsmodels fallback) 后回归
+- **替代方案**: P9-1.7 batch 4 (14 期货) 改 batch 3 重做, 因为 21 节点已卡性能, 35 节点 batch 4 会更慢
+- **P7-1 openbb-etf** 也走不通 (A 路径受限), batch 3 重做是 P9-1.7 唯一增量
 
 ## [0.6.9i] - 2026-08-04
 
