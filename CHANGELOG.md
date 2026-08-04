@@ -624,6 +624,79 @@ ls output\logs\cron_2026-07-27.log  # 3357 bytes
 
 **Cron 状态** (修后预期): 8/3 17:00 跑完应该 0 alert (HTML fix + stale fix + baseline 锁)
 
+## [0.6.9g] - 2026-08-03
+
+### Added (P9-1.2: DAG 扩展 — 加 VIX mediator for TNX)
+
+v0.6.9 Phase 9.0 POC 的手工 DAG 假设 "no mediator", 但实际利率→恐慌→指数的
+**前门路径** (front-door) 在经济理论上是重要的:
+- TNX ↑ → 风险情绪紧 → 恐慌 ↑ → 指数 ↓ (TNX→VIX→index)
+- 这是利率影响指数的**间接渠道**, 之前模型忽略
+
+本 commit 加 1 mediator 边 (TNX→VIX), 让 do-calculus 区分:
+- **总效应** (total effect) of TNX on index = direct + indirect (via VIX)
+- **直接效应** (front-door) = held VIX constant
+- **间接效应** (mediation) = TNX → VIX → index
+
+PC algorithm 验证 (v0.6.9d):
+- VIX→DIA, VIX→QQQ 是 manual + PC 都有的强因果 (2/12)
+- 10 manual 边 (TNX→4 指数 + DXY→4 指数 + VIX→RSP/QQQE) PC 不显著
+- 实际市场 2024-2026 弱相关 (被其它因素覆盖)
+- 留 manual 边用作理论先验, PC 当诊断
+
+**`config/causal_dag.yaml` 改动**:
+- DOT 边数 12 → 13 (加 TNX→VIX)
+- 新增 `mediators: [VIX]` 字段 (P9-1.2 标注)
+- `dag_name` 改: "Phase 9.0 POC + 9.1.2: Macro → Equity with VIX mediator"
+- 顶部 comment 块加 mediator 经济学解释 + P9-1.2 query 示例
+
+**`tests/test_smoke.py` 改动**:
+- `test_causal_dag_loads_v069_p90`: 12 → 13 edges, 加 `g.has_edge("TNX", "VIX")` 断言
+- `test_causal_scm_cache_v0913_p98`: 0.05s → 0.1s 阈值 (test suite 全跑时 OS load 高 flaky)
+
+**实测 (P9-1.2 mediator 验证)**:
+- VIX→QQQ ATE = -0.1232 (不变, 跟 P9.0 一样; VIX 现在既是 treatment 又是 mediator,
+  简单回归给的是 total effect of VIX on QQQ)
+- TNX→QQQ estimand = backdoor (DoWhy 识别 VIX 是 mediator 走前门/后门)
+- SCM 仍能跑 (5ms fit + 3ms query, 跟 P9-1.3 一样快)
+- DAG 仍 acyclic ✅ (mediator 不创造环)
+
+**P9 进度** (v0.6.9g):
+- [x] P9.1.0 Pearl-style 因果分析 (v0.6.9)
+- [x] P9.1.1 PC algorithm 结构学习 (v0.6.9d)
+- [x] P9.1.2 DAG 扩展 (TNX→VIX mediator, v0.6.9g, 本 commit) — **done ✅**
+- [x] P9.1.3 严格 Pearl L3 (v0.6.9e)
+- [x] P9.1.5 CausalForestDML 性能 (v0.6.9c)
+- [x] P9.1.5.5 L2 DoWhy refutation 性能 (v0.6.9f)
+- [x] P9.1.6 report 第 6 段"因果机制" (v0.6.9b)
+- [ ] P9.1.4 CATE 异质性
+- [ ] P9.1.7 Phase 9.2 全 DAG 49 ticker (长期)
+
+**pre-existing P7-5 baseline 漂移** (跟 P9-1.2 无关, 已在 v0.6.9a 锁 baseline):
+- 8 天市场异动 → 5d residual baseline 27x 超容差
+- 3 个 test 因 P7-5 baseline 漂移 fail (test_residual_regression_v068i_p75,
+  test_daily_report_v068l_p52, test_daily_report_step7_v068n_p86)
+- 修法: 重抓 baseline (data/baseline/residuals_v0<LATEST>.json) — 月度
+- 本 commit **不修**, 留 P9-1.x follow-up
+
+**下一项推荐**: P9-1.4 CATE 异质性 (跨 sub-population 评估 treatment effect,
+比如 "VIX 跌对 QQQ 影响在牛市 vs 熊市不同") — 用 P9-1.3 SCM + P9-1.2 mediator 加分群
+或 P9-1.7 Phase 9.2 全 DAG 49 ticker (长期)
+
+**教训 (写进 future engineering)**:
+1. **mediator vs confounder 区别**: mediator 在因果路径上 (X→M→Y, M 是 X 的后代),
+   confounder 是共同原因 (X←U→Y). DoWhy identify_effect 会自动识别, 但 L2 简单
+   回归 (ATE = coef) 没法区分 total/direct/indirect effect, 要用 mediation analysis
+2. **P9-1.2 mediator 加 1 边对现有 query 影响小**: VIX→QQQ ATE 不变 (本来就是 total effect),
+   TNX→QQQ estimand name 变 (从 backdoor 加 front-door 选项), 不破坏现有功能
+3. **DAG acyclic 验证永远跑**: 加边后立刻 `nx.is_directed_acyclic_graph(g)`, 防 cycle
+4. **3 重 refutation vs 1 重 实际生产价值**: v0.6.9f 减到 1 重后 daily cron 81s → 15.5s,
+   真 production 友好. 严格审稿场景才需要 3 重 (论文附录 full diagnostics)
+5. **smoke test 0.05s 阈值 flake**: 任何 timing-dependent 断言都有 flake 风险,
+   加 0.1s 余量 (单跑 < 0.005s, suite 全跑 < 0.1s 都够快, 但余量防止 OS load 误判)
+6. **P7-5 baseline 漂移 8 天 27x**: v0.6.9a 锁 v069.json 后 8 天, 市场异动让 5d residual
+   远超容差. P7-5 季度重算太慢, 实际月度. 这是个 recurring issue, 每月月初重抓一次
+
 ## [0.6.9f] - 2026-08-03
 
 ### Performance (L2 DoWhy refutation 性能优化: 3 重 → 1 重 + cache)
