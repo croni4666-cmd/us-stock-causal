@@ -1394,18 +1394,24 @@ def test_daily_report_step7_v068n_p86():
 # =============================================================================
 
 def test_causal_dag_loads_v069_p90():
-    """P9.1: 手工 DAG 从 YAML 加载, networkx 验证 7 节点 12 边 acyclic"""
+    """P9.1: 手工 DAG 从 YAML 加载, networkx 验证 7 节点 acyclic
+
+    P9-1.2 (v0.6.9g): 边数 12 → 13 (加 TNX→VIX mediator)
+    """
     from src.causal import load_dag_config, load_dag_graph
     cfg = load_dag_config()
     g = load_dag_graph(cfg)
     assert g.number_of_nodes() == 7, f"expected 7 nodes, got {g.number_of_nodes()}"
-    assert g.number_of_edges() == 12, f"expected 12 edges, got {g.number_of_edges()}"
+    # P9-1.2: 加 1 mediator 边 (TNX→VIX), 12 → 13
+    assert g.number_of_edges() == 13, f"expected 13 edges (P9-1.2 mediator), got {g.number_of_edges()}"
     # 节点
     expected_nodes = {"TNX", "VIX", "DXY", "DIA", "QQQ", "RSP", "QQQE"}
     assert set(g.nodes()) == expected_nodes
     # acyclic
     import networkx as nx
     assert nx.is_directed_acyclic_graph(g), "DAG 有环"
+    # P9-1.2: 验证 mediator 边存在 (TNX→VIX)
+    assert g.has_edge("TNX", "VIX"), "P9-1.2 mediator 边 TNX→VIX 应存在"
 
 
 def test_causal_query_v069_p92():
@@ -1541,8 +1547,9 @@ def test_causal_scm_cache_v0913_p98():
     cf2 = counterfactual_query(prev_date, "VIX", "QQQ", cf_vix, data=data, cfg=cfg, method="scm")
     t2 = time.time() - t0
 
-    # cache hit 极快 (< 50ms) — SCM query 3ms + Python overhead
-    assert t2 < 0.05, f"SCM cache hit 应 < 0.05s, got {t2:.3f}s (cold={t1:.3f}s)"
+    # cache hit 极快 — SCM query 3ms + Python overhead
+    # 放宽到 0.1s 因为 test suite 全跑时 OS load 高, 单跑时 < 0.005s
+    assert t2 < 0.1, f"SCM cache hit 应 < 0.1s, got {t2:.3f}s (cold={t1:.3f}s)"
 
     # cache 节省 fit() (~5ms) + DAG build (~0ms), 但 query overhead 主导
     # 所以 speedup 不显著是合理的, 重点是 cache 不空
