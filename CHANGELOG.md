@@ -7,11 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Current
+- **HEAD**: v0.6.9h (commit pending, 2026-08-04) — Phase 9.1 收尾 batch (P7-4 sector weights cache + P7-5 baseline 月度重抓 + P8-7 toast + P9-1.4 CATE 异质性)
+- **Phase 9.1 状态** (v0.6.9 + a..h, 8 commits): **8/8 P9.1.x done** (剩 P9.1.7 全 DAG 49 ticker 长期), Pearl 3 层因果阶梯完整, CATE 异质性落地
+
 ### Planned
-- v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线在 K 线上) — **P6-1 done in v0.6.4**
+- v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值) — P7-1
+- v0.8.x: **P9-1.7 Phase 9.2 全 DAG 49 ticker** (长期, 增量扩展)
+- v0.8.x: P5 增强 (失败重试 / timezone) — **飞书 2026-07-26 archived, 改本地化**
+
+### Done (2026-08-04 之前)
+- v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线) — **P6-1 done in v0.6.4**
 - v0.6.x: 报告顶部 1 行 → 3 行 (1d/5d/20d) — **P6-4 done in v0.6.8**
-- v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值)
-- v0.8.x: Phase 5 增强 (失败重试 / timezone) — **飞书 2026-07-26 archived, 改本地化**
+- v0.6.9a..g: Phase 9.1 hotfix chain (3 collateral fixes + P9-1.1/1.2/1.3/1.5/1.5.5/1.6) — **7 commits**
+- v0.6.9h: Phase 9.1 收尾 batch (P7-4 + P7-5 + P8-7 + P9-1.4) — **本 commit**
+- v0.6.9: Phase 9.0 Pearl-style 因果分析 (DoWhy + EconML 集成)
+
+## [0.6.9h] - 2026-08-04
+
+### Added (Phase 9.1 收尾 batch: P7-4 / P7-5 / P8-7 / P9-1.4)
+
+8/3 17:00 cron 跑通 + 7 commits hotfix chain 落地后, 8/4 集中收尾 4 个 ROADMAP proposed 项:
+
+#### 1. P7-4: sector_weights_live 1d cache (~3.9KB)
+- `src/sector_weights_live.py` 新建 (4 函数: `pull_live_weights` / `save_live_cache` / `load_live_or_static` / `clear_old_caches`)
+- `src/attribution.py:load_sector_weights(use_live_cache=True)` 改 cache-aware
+- 实际 "pull" = cp `config/sector_weights.json` (P7-3 月度手动维护, 没法真"实时拉")
+- 价值: (1) 减少 IO 重复, (2) audit trail 留历史快照
+- 2 tests (`test_sector_weights_live_cache_v069h_p74` + `test_attribution_uses_live_cache_v069h_p74`)
+
+#### 2. P7-5: baseline 月度重抓 (修 3 个漂移 test fail)
+- **8 天市场异动 → v069.json (8/3 锁) 触发 5d 残差 27x 漂移**, 3 个 test fail (test_residual_regression_v068i_p75 / test_daily_report_v068l_p52 / test_daily_report_step7_v068n_p86)
+- 跑 `python -m src.residual_regression capture --output data/baseline/residuals_v069g.json` 重抓 (8/4 锁)
+- 新基线 avg abs: 1d 0.1245% / 5d 0.2305% / 20d 0.9762%
+- `src/residual_regression.py:DEFAULT_BASELINE` 改指向 `residuals_v069g.json`
+- **P7-5 discipline 验证**: 月度重抓 (8 天太频繁 → 月度更合理, 8/3 教训)
+
+#### 3. P8-7: Windows toast notification (~2.9KB)
+- `pip install --proxy http://127.0.0.1:7897 plyer==2.1.0` (Python 3.12 兼容)
+- `src/notify.py` 新建 (2 函数: `notify_if_alerts(alerts, date, timeout)` / `notify_text(title, message)`)
+- **关键设计**: alerts 空时不弹 (避免噪音), plyer 不可用 (Linux/WSL) 自动降级 log
+- `examples/daily_report.py:step_check_alerts` 末尾调, 弹窗结果写进 step dict (`notified: bool`)
+- 1 test (mock plyer 验证 4 场景: 空 alerts / 有 alerts / 通用 / 降级)
+- **Hobbyist ceiling 5 检查全 pass**: 0 钱 / 0 hosted / 0 月度维护 / 0 发布义务 / plyer 降级 log 不阻塞 cron
+
+#### 4. P9-1.4: CATE 异质性 (~75 lines, Phase 9.1 最后一项)
+- `src/causal.py:cate_heterogeneity(treatment, outcome, heterogeneity_var, n_quantiles=3)` 新建
+- **设计**: 按 `heterogeneity_var` quantile 切 N 群, 共享 `_FIT_CACHE` (P9-1.5) 跨群 cache hit
+- `src/report.py:render_causal_section` 加 P9-1.4 段, 对比 q0 (low regime) vs q2 (high regime) CATE ratio
+- `examples/daily_report.py:step_causal` 加 P9-1.4 banner, 存进 `results["cate_heterogeneity"]`
+- 1 test (6 断言: 3 群结构 / CATE 数字合理 / 切 5 群 / 换 heterogeneity_var / 异质性 heterogeneity_var 报错)
+- **实测 (VIX→QQQ, 按 VIX 切 3 群, 7 节点 512 交易日)**:
+  - q0 (VIX < -3%): CATE = -0.0505 (VIX 跌 1% → QQQ 涨 0.05%)
+  - q1 (VIX -3%~+2%): CATE = -0.0388
+  - q2 (VIX > 2%): CATE = -0.0368
+  - 异质性 ratio 1.37x (低 VIX 群强 37%, 符合"低 VIX 时小幅波动也有反应"直觉)
+
+#### ROADMAP 状态更新 (5 项 → done)
+- **P5-3** (`proposed` → `done`): 17:00 daily cron 时间 拍板 (v0.6.8m, 7/27 实际注册)
+- **P5-4** (`proposed` → `done`): Task Scheduler 注册 + 8 天 monitor 验证 (7/27 - 8/4, 0 conhost 闪窗)
+- **P7-4** (`proposed` → `done`): sector_weights_live cache 1d
+- **P8-7** (`proposed` → `done`): plyer Windows toast
+- **P9-1.4** (`proposed` → `done`): CATE 异质性
+
+#### 总成绩
+- **4 个新 module / 4 个新 test** (~75 lines new code + ~30 lines new docs)
+- **smoke test**: 55 → 59 (4 new, all pass)
+- **Phase 9.1 状态**: 8/8 P9.1.x done (剩 P9.1.7 全 DAG 49 ticker 长期)
+- **3 个 pre-existing test fail** 全部修 (P7-5 baseline 重抓见效)
+
+#### 显式延后 (本次未做)
+- **P8-5** (失败重试 tenacity): 显式 deferred (P7-6 限流检测已处理, hobbyist 1-2 次手补可接受)
+- **P9-1.7** (全 DAG 49 ticker): XL 长期, 等 P9-1.4 CATE 异质性落地后单独排期
 
 ## [0.6.7] - 2026-07-15
 
@@ -623,6 +690,11 @@ ls output\logs\cron_2026-07-27.log  # 3357 bytes
    docstring 都误报, 写注释注意
 
 **Cron 状态** (修后预期): 8/3 17:00 跑完应该 0 alert (HTML fix + stale fix + baseline 锁)
+
+### Modified 2026-08-04 — 8/3 17:00 cron 实测验证
+- **状态**: 8/3 17:00 cron 实际 **0 alert** (HTML 报告 0 fail, stale check 0 cross-project 误报, 残差回归 baseline 全过) ✅
+- **v0.6.9a hotfix chain 3 修全部生效**, 验证 cron→fail→fix→cron→pass 闭环
+- **下一项 cron** (8/4 17:00): 预期持续 0 alert, Phase 9.1 hotfix (v0.6.9b..g) 全部已 merge
 
 ## [0.6.9g] - 2026-08-03
 

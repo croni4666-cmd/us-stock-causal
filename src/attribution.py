@@ -28,8 +28,16 @@ WEIGHTS_PATH = PROJECT_ROOT / "config" / "sector_weights.json"
 SECTOR_TICKERS = ["XLK", "XLF", "XLE", "XLY", "XLP", "XLV", "XLI", "XLU", "XLB", "XLRE", "XLC"]
 
 
-def load_sector_weights() -> dict:
-    """读 config/sector_weights.json"""
+def load_sector_weights(use_live_cache: bool = True) -> dict:
+    """读 sector weights — P7-4 加 1d cache 选项
+
+    Args:
+        use_live_cache: True (默认) 优先读 data/cache/sector_weights_live_<date>.json,
+                       过期走 pull (cp config/sector_weights.json). False 直接读 config
+    """
+    if use_live_cache:
+        from src.sector_weights_live import load_live_or_static
+        return load_live_or_static()
     with open(WEIGHTS_PATH, encoding="utf-8") as f:
         return json.load(f)
 

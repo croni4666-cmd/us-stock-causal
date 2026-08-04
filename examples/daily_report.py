@@ -275,11 +275,20 @@ def step_check_alerts(date_str: str) -> dict:
         print(f"  [OK] 无 alert, 健康 ✓")
 
     n_error = sum(1 for a in all_alerts if a.get("severity") == "error")
+
+    # P8-7: 弹 Windows toast (仅当有 alert 时, 无 alert 静默)
+    # 设计: plyer 不可用时降级 log, 不阻塞 cron
+    from src.notify import notify_if_alerts
+    notified = notify_if_alerts(all_alerts, date_str, timeout=10)
+    if notified:
+        print(f"  [notify] Windows toast 已弹出 ({len(all_alerts)} alert)")
+
     return {
         "ok": n_error == 0,
         "alert_count": len(all_alerts),
         "error_count": n_error,
         "by_type": by_type,
+        "notified": notified,
         "path": alert_logger.ALERT_DIR / f"alerts_{date_str}.json",
         "elapsed_s": round(time.time() - t0, 2),
     }
@@ -381,6 +390,24 @@ def step_causal(date_str: str) -> dict:
             )
             t_cache_elapsed = time.time() - t_cache_start
             print(f"  [L3 cache]        {cf2.date}: 同样 (T=VIX, O=QQQ), cache hit {t_cache_elapsed*1000:.0f}ms")
+
+        # P9-1.4: CATE 异质性 (跨 sub-population)
+        # 经典用法: VIX 跌 1% 对 QQQ 影响, 牛市 vs 熊市不同
+        print(f"  [P9-1.4 CATE heterogeneity] VIX→QQQ 按 VIX 水平分 3 群 (low/mid/high)")
+        cate_results = causal.cate_heterogeneity(
+            treatment="VIX", outcome="QQQ", heterogeneity_var="VIX",
+            n_quantiles=3, data=data, cfg=cfg,
+        )
+        for r in cate_results:
+            if r["cate"] is not None:
+                print(f"    q{r['quantile']} {r['label']}: CATE={r['cate']:+.4f} (n={r['n_obs']}, "
+                      f"VIX range [{r['range'][0]*100:+.2f}%, {r['range'][1]*100:+.2f}%])")
+            else:
+                print(f"    q{r['quantile']}: SKIP ({r.get('skipped', '?')})")
+        # 存进 results 给 report 用
+        results["cate_heterogeneity"] = [
+            {k: v for k, v in r.items() if k != "method"} for r in cate_results
+        ]
 
     except Exception as e:
         results["ok"] = False
