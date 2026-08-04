@@ -3,15 +3,26 @@
 #
 # 经济理论依据 (手工 DAG, 不从数据学):
 #   ^TNX (10Y 国债): 利率↓ → 折现率↓ → 股权估值↑ → 指数↑ (4 指数通用)
-#   ^VIX: 恐慌↑ → 风险偏好↓ → 指数↓ (4 指数通用)
+#     └→ ^VIX (P9-1.2 mediator): 利率↑ → 风险情绪紧 → 恐慌↑ → 指数↓
+#   ^VIX: 恐慌↑ → 风险偏好↓ → 指数↓ (4 指数通用, direct path)
 #   DXY (美元): 美元↑ → 跨国企业收入折算↓ → 指数↓
 #     - QQQ 含大量跨国科技公司, 受 DXY 影响最大 (系数最大)
 #     - DIA / RSP / QQQE 主要是美国本土公司, 影响较小
 #
+# P9-1.2 加 mediator (TNX → VIX → index):
+#   利率↑ → 风险情绪紧 → 恐慌↑ → 指数↓ (front-door path)
+#   让 do-calculus 区分 total effect = direct + indirect (via VIX)
+#
+# PC algorithm 验证 (v0.6.9d):
+#   - VIX→DIA, VIX→QQQ 是 manual + PC 都有的强因果 (2/12)
+#   - 10 边 PC 不显著 (TNX→4 指数, DXY→4 指数, VIX→RSP/QQQE) — 实际市场 2024-2026 弱相关
+#   - PC 发现的"contemporaneous" 边 (QQQ→DIA, QQQ→QQQE) 是同期相关非因果
+#   - 留 manual 边用作理论先验, PC 当诊断工具
+#
 # 简化假设 (POC, 后续 Phase 9.1+ 扩展):
-#   - 没有 mediator (e.g. ^TNX → ^VIX → 指数)
 #   - 没有 sector 中介 (Phase 7 真 sector weights 可加)
 #   - 没有 macro 之间相关性 (实际 ^TNX 和 ^VIX 强相关, Phase 9.1+ 加 latent confounder)
+#   - mediator: ^TNX → ^VIX (P9-1.2 加, 之前假设无 mediator)
 #
 # 节点命名 (跟 parquet 文件名一致):
 #   ^TNX → "_TNX.parquet" (data/raw/macro/)
@@ -19,11 +30,11 @@
 #   DXY  → "DXY.parquet"
 #   DIA/QQQ/RSP/QQQE → "data/raw/indices/{NAME}.parquet"
 
-dag_name: "Phase 9.0 POC: Macro → 4 Equity Indices"
+dag_name: "Phase 9.0 POC + 9.1.2: Macro → Equity with VIX mediator"
 
 # DOT 格式 (graphviz), DoWhy / networkx / causal-learn 都吃
 dot: |
-  digraph causal_poc {
+  digraph causal_p9_12 {
     // 节点
     TNX [label="^TNX (10Y)"];
     VIX [label="^VIX"];
@@ -33,13 +44,16 @@ dot: |
     RSP [label="RSP"];
     QQQE [label="QQQE"];
 
-    // 利率 → 股权估值
+    // 利率 → 股权估值 (direct)
     TNX -> DIA;
     TNX -> QQQ;
     TNX -> RSP;
     TNX -> QQQE;
 
-    // 风险偏好
+    // P9-1.2 mediator: 利率 → 风险情绪 → 恐慌
+    TNX -> VIX;
+
+    // 风险偏好 (direct + VIX 传递间接)
     VIX -> DIA;
     VIX -> QQQ;
     VIX -> RSP;
@@ -56,11 +70,18 @@ dot: |
 # Treatment 候选: TNX, VIX, DXY (3 macro 之一作为 do 变量)
 # Outcome 候选: DIA, QQQ, RSP, QQQE (4 指数之一作为 target)
 # POC 默认 query: P(QQQ | do(TNX=4.0%)) - "如果 10Y 降到 4%, QQQ 涨多少?"
+#
+# P9-1.2 query 示例 (用 mediator 算总效应 vs 直接效应):
+#   总效应 do(TNX) → QQQ = direct + indirect (via VIX)
+#   直接效应 do(TNX) → QQQ | VIX held constant (前门)
+#   间接效应 do(TNX) → VIX → QQQ (sequential)
 
 # 节点元数据 (方便脚本映射 parquet 路径)
 nodes:
   treatments: [TNX, VIX, DXY]
   outcomes: [DIA, QQQ, RSP, QQQE]
+  # P9-1.2: VIX 既是 treatment 又是 mediator (前门/后门都可能)
+  mediators: [VIX]
   parquet_map:
     TNX: "data/raw/macro/_TNX.parquet"
     VIX: "data/raw/macro/_VIX.parquet"
