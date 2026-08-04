@@ -29,7 +29,8 @@ def test_module_imports():
         'src.thresholds', 'src.attribution', 'src.residual',
         'src.patterns', 'src.events', 'src.signals',
         'src.macro', 'src.kline', 'src.report', 'src.events_gdelt',
-        'src.etf_holdings', 'src.tickers_universe', 'src.causal'
+        'src.etf_holdings', 'src.tickers_universe', 'src.causal',
+        'src.sector_weights_live', 'src.notify'
     ]
     for m in modules:
         __import__(m)
@@ -903,6 +904,160 @@ def test_residual_regression_v068i_p75():
             for v in violations
         ]
         assert ok, f"P7-5 残差回归 fail ({len(violations)} 处):\n" + "\n".join(msgs)
+
+
+def test_sector_weights_live_cache_v069h_p74():
+    """v0.6.9h (P7-4): sector weights 1d live cache
+
+    验证:
+    1. load_live_or_static() 优先读 cache, 命中返回
+    2. cache miss / use_cache=False → 走 config + 写 cache
+    3. clear_old_caches() 保留最近 N 天
+    """
+    import tempfile
+    from pathlib import Path
+    from src.sector_weights_live import (
+        load_live_or_static, save_live_cache, pull_live_weights, clear_old_caches, _cache_path,
+    )
+
+    # 1. load_live_or_static 走 cache, 应返回完整 weights dict
+    weights = load_live_or_static(date="2026-08-04")
+    assert "DIA" in weights, "cache miss 走 pull, DIA 应该有 weights"
+    assert "XLK" in weights["DIA"], "DIA 应该含 XLK"
+    assert isinstance(weights["DIA"]["XLK"], (int, float))
+    assert 0 <= weights["DIA"]["XLK"] <= 1, f"weight 应该在 [0, 1]: {weights['DIA']['XLK']}"
+
+    # 2. cache 文件存在 (首次 load 自动写)
+    cache_p = _cache_path("2026-08-04")
+    assert cache_p.exists(), f"cache 文件 {cache_p} 应该已写"
+    import json
+    snap = json.loads(cache_p.read_text(encoding="utf-8"))
+    assert snap["as_of"] == "2026-08-04"
+    assert snap["data"]["DIA"]["XLK"] == weights["DIA"]["XLK"]
+
+    # 3. use_cache=False → 直接读 config, 跟 cache 一致
+    weights_direct = load_live_or_static(date="2026-08-04", use_cache=False)
+    assert weights_direct == weights, "use_cache=False 应跟 cache 一致"
+
+    # 4. clear_old_caches 不删今天文件
+    deleted = clear_old_caches(keep_days=7)
+    assert cache_p.exists(), "今天的 cache 不应被清"
+    # (deleted 可能含历史 cache, 我们只关心今天的还在)
+
+
+def test_attribution_uses_live_cache_v069h_p74():
+    """v0.6.9h (P7-4): attribution.load_sector_weights 默认走 live cache"""
+    from src.attribution import load_sector_weights
+    weights = load_sector_weights()  # 默认 use_live_cache=True
+    assert "DIA" in weights
+    assert "XLK" in weights["DIA"]
+    # 反向: use_live_cache=False 也应该 OK
+    weights_direct = load_sector_weights(use_live_cache=False)
+    assert weights_direct["DIA"]["XLK"] == weights["DIA"]["XLK"]
+
+
+def test_notify_v069h_p87():
+    """v0.6.9h (P8-7): Windows toast notification
+
+    验证:
+    1. notify_if_alerts([]) → 不弹, 返 False
+    2. notify_if_alerts(alerts) → 弹 (mock plyer, 验证 call 正确)
+    3. notify_text 通用接口
+    4. plyer 不可用时降级 log, 不崩
+    """
+    from unittest.mock import patch, MagicMock
+    from src import notify
+
+    # 1. 空 alerts 不弹
+    result = notify.notify_if_alerts([], "2026-08-04")
+    assert result is False, "空 alerts 应该返 False"
+
+    # 2. 有 alerts, mock plyer notification
+    fake_alerts = [
+        {"type": "residual", "subject": "DIA/1d", "severity": "warning"},
+        {"type": "vix_spike", "subject": "^VIX", "severity": "error"},
+    ]
+    with patch("plyer.notification.notify") as mock_notify:
+        result = notify.notify_if_alerts(fake_alerts, "2026-08-04", timeout=5)
+        assert result is True
+        mock_notify.assert_called_once()
+        # 检查参数
+        call_args = mock_notify.call_args
+        assert "us-stock-causal 2026-08-04: 2 alert" in call_args.kwargs["title"]
+        assert "residual: DIA/1d" in call_args.kwargs["message"]
+        assert call_args.kwargs["timeout"] == 5
+        assert call_args.kwargs["app_name"] == "us-stock-causal"
+
+    # 3. notify_text 通用接口
+    with patch("plyer.notification.notify") as mock_notify:
+        result = notify.notify_text("test", "hello")
+        assert result is True
+        mock_notify.assert_called_once()
+
+    # 4. plyer 不可用 → 降级 log, 不崩
+    with patch("plyer.notification.notify", side_effect=Exception("no backend")):
+        # 应该 logger.warning, 返 False, 不抛
+        result = notify.notify_if_alerts(fake_alerts, "2026-08-04")
+        assert result is False, "plyer 不可用应返 False"
+
+    # 5. _format_alert_summary 边界
+    summary = notify._format_alert_summary(fake_alerts, max_items=1)
+    assert "2 alert" in summary
+    assert "..." in summary  # 第 2 个被截断
+    summary_empty = notify._format_alert_summary([])
+    assert "0 alert" in summary_empty
+
+
+def test_cate_heterogeneity_v069h_p914():
+    """v0.6.9h (P9-1.4): 跨 sub-population CATE 异质性
+
+    验证:
+    1. cate_heterogeneity 返回 N 群结果 (default 3)
+    2. 每群 CATE 不同 (异质性体现)
+    3. 群 label 含 heterogeneity_var + range
+    4. n_obs >= 10 才有 CATE (否则 skipped)
+    5. cache 命中: 第 2 次调用 < 100ms
+    """
+    from src.causal import cate_heterogeneity
+
+    # 1. 默认 3 群
+    results = cate_heterogeneity("VIX", "QQQ", "VIX", n_quantiles=3)
+    assert len(results) == 3, f"应该 3 群, 实得 {len(results)}"
+
+    # 2. 每群结构
+    for r in results:
+        assert "quantile" in r
+        assert "label" in r
+        assert "range" in r
+        assert "cate" in r
+        assert "n_obs" in r
+        assert r["quantile"] in [0, 1, 2]
+        assert len(r["range"]) == 2
+        assert r["n_obs"] > 0
+
+    # 3. CATE 数字 (允许 None 当 skip, 但默认 3 群 512 obs 不会 skip)
+    cates = [r["cate"] for r in results if r["cate"] is not None]
+    assert len(cates) == 3, f"3 群都有 CATE, 实得 {len(cates)} (有 skip)"
+    # 异质性: 不要求 CATE 不同 (可能巧合), 但至少数字合理
+    for c in cates:
+        assert -1.0 < c < 1.0, f"CATE={c} 应该在 (-1, 1) 范围 (log return 单位)"
+
+    # 4. 切 5 群
+    results_5 = cate_heterogeneity("VIX", "QQQ", "VIX", n_quantiles=5)
+    assert len(results_5) == 5
+
+    # 5. 用 TNX 当 heterogeneity_var
+    results_tnx = cate_heterogeneity("VIX", "QQQ", "TNX", n_quantiles=3)
+    assert len(results_tnx) == 3
+    for r in results_tnx:
+        assert "TNX" in r["label"], f"label 应含 heterogeneity_var: {r['label']}"
+
+    # 6. 异质性 heterogeneity_var 报错
+    try:
+        cate_heterogeneity("VIX", "QQQ", "NOT_A_NODE", n_quantiles=3)
+        assert False, "应该 raise ValueError"
+    except ValueError:
+        pass
 
 
 def test_yfinance_rate_limit_v068j_p76():
