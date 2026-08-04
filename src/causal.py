@@ -298,7 +298,12 @@ def _get_refutation_cached(
     3 重 = 28s. 默认降到 1 重 (random_common_cause) 省 ~18s.
 
     Cache key = (T, O, n_obs, n_refutations): 同 T, O 数据不变 → cache hit.
+
+    v0.6.9k (P9-1.5.5 升级): n_refutations=0 直接返空 dict (跳过 refutation).
     """
+    if n_refutations == 0:
+        # v0.6.9k: 大 DAG auto-fallback 0 重, 跳过 refutation
+        return {}
     key = (treatment, outcome, len(data), n_refutations)
     if key in _REFUTE_CACHE:
         logger.debug(f"[causal] refutation cache hit T={treatment} O={outcome} (n_refutations={n_refutations}, cache size={len(_REFUTE_CACHE)})")
@@ -342,12 +347,21 @@ def _get_refutation_cached(
     return result
 
 
+# v0.6.9k: P9-1.5.5 升级 — 节点数 ≥ 20 触发 L2 refutation 自动 fallback 到 0 重
+# 21 节点 1 重 refutation 实测 175s 性能爆降 30x (vs 18 节点 ~6s), 远超 60s daily cron budget.
+# 0 重 fallback: 跳过 refutation, 但 OLS ATE 仍算 (P9-1.5.5 默认 1 重降级 0 重, ~6s 总).
+# - hobbyist 1-2 次手补 OK, daily cron 不能再 60s+
+# - 严格审稿场景传 causal_query(..., n_refutations=3) 仍跑全 3 重
+LARGE_DAG_THRESHOLD = 20
+
+
 def causal_query(
     treatment: str,
     outcome: str,
     data: pd.DataFrame | None = None,
     cfg: dict | None = None,
     n_refutations: int = 1,
+    auto_reduce: bool = True,
 ) -> CausalEffect:
     """跑 Pearl 4 步: model → identify → estimate → refute.
 
@@ -361,6 +375,10 @@ def causal_query(
       - 1 重 (random_common_cause) ~10s, 3 重 (旧默认) ~28s
       - 加 _REFUTE_CACHE: 重复 query (T, O) 走 cache hit, 0s
 
+    v0.6.9k (P9-1.5.5 升级): 节点数 ≥ LARGE_DAG_THRESHOLD 自动 fallback n_refutations=0
+      - 21 节点 1 重 refutation 实测 175s (爆降 30x), 0 重 fallback ~6s 总 (跟 18 节点同)
+      - auto_reduce=True (默认) 启用 auto-fallback, False 强制跑 (审稿场景)
+
     Phase 9.0 POC 简化: 用 OLS 当 estimate, 不做异质性 (CATE 是后续 EconML 阶段)
     DAG 假设: 无 confounder, backdoor set = 空, 所以 ATE = 简单回归系数 (与多变量回归系数相同)
 
@@ -370,7 +388,8 @@ def causal_query(
         data: load_dag_data() 出来的 DataFrame, None = 自动加载
         cfg: DAG config dict, None = 自动加载
         n_refutations: 跑几重 refutation. P9-1.5.5 默认 1 (只 random_common_cause);
-                     3 是 v0.6.9 老默认 (3 重全跑)
+                     3 是 v0.6.9 老默认 (3 重全跑); 0 是 v0.6.9k 跳过 refutation
+        auto_reduce: True (默认) 节点数 ≥ LARGE_DAG_THRESHOLD 自动 fallback n_refutations=0
 
     Returns:
         CausalEffect dataclass
@@ -388,6 +407,16 @@ def causal_query(
         raise ValueError(f"[causal] treatment={treatment} 或 outcome={outcome} 不在 DAG 里")
     if treatment not in data.columns or outcome not in data.columns:
         raise ValueError(f"[causal] data 缺 {treatment} 或 {outcome}")
+
+    # v0.6.9k: 大 DAG 自动 fallback 到 0 重 refutation
+    n_nodes = g.number_of_nodes()
+    if auto_reduce and n_nodes >= LARGE_DAG_THRESHOLD and n_refutations > 0:
+        logger.warning(
+            f"[causal] DAG {n_nodes} 节点 ≥ LARGE_DAG_THRESHOLD={LARGE_DAG_THRESHOLD}, "
+            f"auto-fallback n_refutations {n_refutations} → 0 (P9-1.5.5 升级, 跳过 refutation 防 175s 性能爆降). "
+            f"传 n_refutations=3 + auto_reduce=False 强制跑全 3 重 (审稿场景)"
+        )
+        n_refutations = 0
 
     # Step 1+2: OLS (快, 0.001s) + Step 3: refutation (P9-1.5.5 加 cache)
     import statsmodels.api as sm
