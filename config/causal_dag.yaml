@@ -1,5 +1,5 @@
-# Phase 9.0 POC: 手工因果 DAG (DOT format)
-# 核心子图: macro (3) → equity (4 指数)
+# Phase 9.0 POC + 9.1.2 + 9.1.7 batch 1: 手工因果 DAG (DOT format)
+# 7 → 11 节点 (3 macro + 4 指数 + 4 行业)
 #
 # 经济理论依据 (手工 DAG, 不从数据学):
 #   ^TNX (10Y 国债): 利率↓ → 折现率↓ → 股权估值↑ → 指数↑ (4 指数通用)
@@ -8,19 +8,30 @@
 #   DXY (美元): 美元↑ → 跨国企业收入折算↓ → 指数↓
 #     - QQQ 含大量跨国科技公司, 受 DXY 影响最大 (系数最大)
 #     - DIA / RSP / QQQE 主要是美国本土公司, 影响较小
+#   **P9-1.7 batch 1**: 加 4 行业 (XLK 科技 32.9% / XLF 金融 12.5% / XLV 医疗 9.4% / XLE 能源 3.7%)
+#     - macro → 行业: 3 macro × 4 行业 = 12 边 (利率/恐慌/美元影响行业)
+#     - 行业 → 4 指数: 4 行业 × 4 指数 = 16 边 (P7-2 sector weights 表征)
+#     - 总 DAG 7+4=11 节点, 13+28=41 边
+#     - 中介链示例: TNX → XLK → QQQ (利率→科技股→纳指)
+#     - 中介链示例: VIX → XLK → QQQ (恐慌→科技股→纳指, 跨行业敏感度)
 #
 # P9-1.2 加 mediator (TNX → VIX → index):
 #   利率↑ → 风险情绪紧 → 恐慌↑ → 指数↓ (front-door path)
 #   让 do-calculus 区分 total effect = direct + indirect (via VIX)
 #
-# PC algorithm 验证 (v0.6.9d):
+# P9-1.7 batch 1 加行业中介 (3 macro → 4 行业 → 4 指数):
+#   行业是 macro 跟 4 指数之间的 mediator, do-calculus 走 industry-mediated path
+#   让 "TNX → QQQ" 拆成 direct (TNX→QQQ) + indirect (TNX→XLK→QQQ)
+#   跟 P7-2 sector weights 集成: industry weight 跟 industry return → index 贡献
+#
+# PC algorithm 验证 (v0.6.9d, 7 节点):
 #   - VIX→DIA, VIX→QQQ 是 manual + PC 都有的强因果 (2/12)
 #   - 10 边 PC 不显著 (TNX→4 指数, DXY→4 指数, VIX→RSP/QQQE) — 实际市场 2024-2026 弱相关
 #   - PC 发现的"contemporaneous" 边 (QQQ→DIA, QQQ→QQQE) 是同期相关非因果
 #   - 留 manual 边用作理论先验, PC 当诊断工具
 #
 # 简化假设 (POC, 后续 Phase 9.1+ 扩展):
-#   - 没有 sector 中介 (Phase 7 真 sector weights 可加)
+#   - 没有 sector 中介 → P9-1.7 batch 1 加 4 行业 (XLK/XLF/XLV/XLE), 后续 batch 加剩 7 行业
 #   - 没有 macro 之间相关性 (实际 ^TNX 和 ^VIX 强相关, Phase 9.1+ 加 latent confounder)
 #   - mediator: ^TNX → ^VIX (P9-1.2 加, 之前假设无 mediator)
 #
@@ -29,22 +40,38 @@
 #   ^VIX → "_VIX.parquet"
 #   DXY  → "DXY.parquet"
 #   DIA/QQQ/RSP/QQQE → "data/raw/indices/{NAME}.parquet"
+#   XLK/XLF/XLV/XLE → "data/raw/sectors/{NAME}.parquet"
 
-dag_name: "Phase 9.0 POC + 9.1.2: Macro → Equity with VIX mediator"
+dag_name: "Phase 9.0 + 9.1.2 + 9.1.7 batch 1+2: Macro → Industry → Equity"
 
 # DOT 格式 (graphviz), DoWhy / networkx / causal-learn 都吃
 dot: |
-  digraph causal_p9_12 {
-    // 节点
+  digraph causal_p9_17_b2 {
+    // 节点 — macro (3)
     TNX [label="^TNX (10Y)"];
     VIX [label="^VIX"];
     DXY [label="DXY"];
+
+    // 节点 — industry (11, P9-1.7 batch 1+2)
+    XLK [label="XLK (Tech)"];
+    XLF [label="XLF (Fin)"];
+    XLV [label="XLV (Health)"];
+    XLE [label="XLE (Energy)"];
+    XLY [label="XLY (Cons Disc)"];
+    XLP [label="XLP (Cons Stap)"];
+    XLI [label="XLI (Industrial)"];
+    XLU [label="XLU (Utility)"];
+    XLB [label="XLB (Material)"];
+    XLRE [label="XLRE (Real Estate)"];
+    XLC [label="XLC (Comm Svc)"];
+
+    // 节点 — index (4)
     DIA [label="DIA"];
     QQQ [label="QQQ"];
     RSP [label="RSP"];
     QQQE [label="QQQE"];
 
-    // 利率 → 股权估值 (direct)
+    // macro → index (direct path, P9.0 已有)
     TNX -> DIA;
     TNX -> QQQ;
     TNX -> RSP;
@@ -64,24 +91,49 @@ dot: |
     DXY -> QQQ;
     DXY -> RSP;
     DXY -> QQQE;
+
+    // P9-1.7 batch 1+2: macro → industry (3 macro × 11 industry = 33 边)
+    TNX -> XLK; TNX -> XLF; TNX -> XLV; TNX -> XLE; TNX -> XLY; TNX -> XLP; TNX -> XLI; TNX -> XLU; TNX -> XLB; TNX -> XLRE; TNX -> XLC;
+    VIX -> XLK; VIX -> XLF; VIX -> XLV; VIX -> XLE; VIX -> XLY; VIX -> XLP; VIX -> XLI; VIX -> XLU; VIX -> XLB; VIX -> XLRE; VIX -> XLC;
+    DXY -> XLK; DXY -> XLF; DXY -> XLV; DXY -> XLE; DXY -> XLY; DXY -> XLP; DXY -> XLI; DXY -> XLU; DXY -> XLB; DXY -> XLRE; DXY -> XLC;
+
+    // P9-1.7 batch 1+2: industry → index (11 industry × 4 index = 44 边)
+    XLK -> DIA; XLK -> QQQ; XLK -> RSP; XLK -> QQQE;
+    XLF -> DIA; XLF -> QQQ; XLF -> RSP; XLF -> QQQE;
+    XLV -> DIA; XLV -> QQQ; XLV -> RSP; XLV -> QQQE;
+    XLE -> DIA; XLE -> QQQ; XLE -> RSP; XLE -> QQQE;
+    XLY -> DIA; XLY -> QQQ; XLY -> RSP; XLY -> QQQE;
+    XLP -> DIA; XLP -> QQQ; XLP -> RSP; XLP -> QQQE;
+    XLI -> DIA; XLI -> QQQ; XLI -> RSP; XLI -> QQQE;
+    XLU -> DIA; XLU -> QQQ; XLU -> RSP; XLU -> QQQE;
+    XLB -> DIA; XLB -> QQQ; XLB -> RSP; XLB -> QQQE;
+    XLRE -> DIA; XLRE -> QQQ; XLRE -> RSP; XLRE -> QQQE;
+    XLC -> DIA; XLC -> QQQ; XLC -> RSP; XLC -> QQQE;
   }
 
 # DoWhy 查询模板 (用 dowhy.api.CausalModel)
-# Treatment 候选: TNX, VIX, DXY (3 macro 之一作为 do 变量)
-# Outcome 候选: DIA, QQQ, RSP, QQQE (4 指数之一作为 target)
+# Treatment 候选: TNX, VIX, DXY (3 macro) / 11 行业 (P9-1.7 batch 1+2)
+# Outcome 候选: DIA, QQQ, RSP, QQQE (4 指数)
 # POC 默认 query: P(QQQ | do(TNX=4.0%)) - "如果 10Y 降到 4%, QQQ 涨多少?"
 #
 # P9-1.2 query 示例 (用 mediator 算总效应 vs 直接效应):
 #   总效应 do(TNX) → QQQ = direct + indirect (via VIX)
 #   直接效应 do(TNX) → QQQ | VIX held constant (前门)
 #   间接效应 do(TNX) → VIX → QQQ (sequential)
+#
+# P9-1.7 batch 1+2 query 示例 (用 industry 拆 direct vs industry-mediated):
+#   总效应 do(TNX) → QQQ = direct (TNX→QQQ) + 11 industry-mediated paths (TNX→XLK→QQQ, ..., TNX→XLC→QQQ)
+#   直接效应 do(TNX) → QQQ | 11 industries held constant (前门)
+#   间接效应 do(TNX) → industry → QQQ (11 个 parallel path, 加权 by industry weight)
 
 # 节点元数据 (方便脚本映射 parquet 路径)
 nodes:
-  treatments: [TNX, VIX, DXY]
+  treatments: [TNX, VIX, DXY, XLK, XLF, XLV, XLE, XLY, XLP, XLI, XLU, XLB, XLRE, XLC]
   outcomes: [DIA, QQQ, RSP, QQQE]
   # P9-1.2: VIX 既是 treatment 又是 mediator (前门/后门都可能)
   mediators: [VIX]
+  # P9-1.7 batch 1+2: 11 行业全 (跟 P7-2 sector weights 11 行业对齐)
+  industries: [XLK, XLF, XLV, XLE, XLY, XLP, XLI, XLU, XLB, XLRE, XLC]
   parquet_map:
     TNX: "data/raw/macro/_TNX.parquet"
     VIX: "data/raw/macro/_VIX.parquet"
@@ -90,3 +142,14 @@ nodes:
     QQQ: "data/raw/indices/QQQ.parquet"
     RSP: "data/raw/indices/RSP.parquet"
     QQQE: "data/raw/indices/QQQE.parquet"
+    XLK: "data/raw/sectors/XLK.parquet"
+    XLF: "data/raw/sectors/XLF.parquet"
+    XLV: "data/raw/sectors/XLV.parquet"
+    XLE: "data/raw/sectors/XLE.parquet"
+    XLY: "data/raw/sectors/XLY.parquet"
+    XLP: "data/raw/sectors/XLP.parquet"
+    XLI: "data/raw/sectors/XLI.parquet"
+    XLU: "data/raw/sectors/XLU.parquet"
+    XLB: "data/raw/sectors/XLB.parquet"
+    XLRE: "data/raw/sectors/XLRE.parquet"
+    XLC: "data/raw/sectors/XLC.parquet"
