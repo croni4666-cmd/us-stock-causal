@@ -295,12 +295,34 @@ def render_causal_section(include_l3: bool = False) -> str:
         logger.warning(f"[causal section] PC DAG 验证失败: {e}")
         lines.append(f"- DAG 验证: PC algorithm 失败 ({type(e).__name__}: {e})")
 
+    # P9-1.4: CATE 异质性 (跨 sub-population)
+    try:
+        cate_h = causal_mod.cate_heterogeneity(
+            treatment="VIX", outcome="QQQ", heterogeneity_var="VIX",
+            n_quantiles=3, data=data, cfg=cfg,
+        )
+        # 找 q2 (high VIX, 熊市) 和 q0 (low VIX, 牛市) 对比
+        cates_valid = [r for r in cate_h if r["cate"] is not None]
+        if len(cates_valid) >= 2:
+            low = cates_valid[0]  # q0 = lowest VIX
+            high = cates_valid[-1]  # 末位 = highest VIX
+            ratio = abs(high["cate"]) / abs(low["cate"]) if low["cate"] != 0 else float("inf")
+            het_status = "✅" if ratio > 1.5 else ("≈" if 0.7 <= ratio <= 1.5 else "❌")
+            lines.append(
+                f"- **CATE 异质性 (P9-1.4)**: VIX→QQQ 跨 VIX 水平分 3 群 "
+                f"{het_status} q0 (VIX {low['range'][0]*100:+.1f}%~{low['range'][1]*100:+.1f}%) "
+                f"CATE={low['cate']:+.4f} vs q2 (VIX {high['range'][0]*100:+.1f}%~{high['range'][1]*100:+.1f}%) "
+                f"CATE={high['cate']:+.4f}, 高 VIX 群效应强度 {ratio:.2f}x"
+            )
+    except Exception as e:
+        logger.warning(f"[causal section] P9-1.4 CATE 异质性失败: {e}")
+
     # 引用 + 范围
     lines.append(
         f"\n*数据基础: {len(data)} 交易日 log return, "
-        f"7 节点 DAG (3 macro × 4 指数), n=508 起, "
-        f"OLS regression + DoWhy DAG 验证 + 3 重 refutation + PC algorithm 对比. "
-        f"Pearl L3 用 econml CATE 近似 (严格需 SCM, Phase 9.1.3 实施).*"
+        f"7 节点 DAG (3 macro × 4 指数, 13 边含 VIX mediator v0.6.9g), n=508 起, "
+        f"OLS regression + DoWhy DAG 验证 + 1 重 refutation + PC algorithm 对比. "
+        f"Pearl L3 用 DoWhy gcm.InvertibleSCM (严格 SCM, v0.6.9e), CATE 异质性 P9-1.4 (v0.6.9h).*"
     )
 
     return "\n".join(lines)

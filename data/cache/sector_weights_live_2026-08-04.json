@@ -1,0 +1,88 @@
+{
+  "as_of": "2026-08-04",
+  "source": "config\\sector_weights.json",
+  "data": {
+    "_meta": {
+      "as_of": "2026-07-23",
+      "v068f": "P7-3 done — 从硬编码 ETF 成分股派生 4 指数真 sector weights",
+      "source_dia": "data/static/etf_constituents.py DIA_30 (30 成分股 + 估算价格) → price-weighted",
+      "source_qqq": "data/static/etf_constituents.py QQQ_100 (100 成分股 + 估算市值) → cap-weighted",
+      "source_qqqe": "data/static/etf_constituents.py QQQ_100 → equal-weight (count/100)",
+      "source_rsp": "data/static/etf_constituents.py SP500_SECTOR_COUNTS (S&P 500 行业股票数) → equal-weight (count/503)",
+      "warning": "DIA 30 / QQQ 100 的成分股 + 价格 / 市值是模型知识 (cutoff 2026-01) + 粗估, 不是实时数据。季度手动维护时, 改 data/static/etf_constituents.py 然后重跑本脚本即可。",
+      "update_cadence": "quarterly (next: 2026-10, 改 etf_constituents.py + 重跑脚本)",
+      "sp500_503_basis": "S&P 500 实际 503 只 (含 dual class shares 算多只, 跟 Invesco RSP 公开口径一致)",
+      "v068e_kept": "SPY 仍按 v0.6.8e 真值 (从 N-30D table 22 推 11 sector), 见 SPY entry"
+    },
+    "SPY": {
+      "note": "S&P 500 cap-weighted — v0.6.8e SPY 真值保留 (从 N-30D table 22 推 11 sector, 最可靠)",
+      "XLK": 0.329,
+      "XLF": 0.125,
+      "XLV": 0.094,
+      "XLC": 0.099,
+      "XLY": 0.093,
+      "XLI": 0.068,
+      "XLP": 0.047,
+      "XLE": 0.037,
+      "XLU": 0.024,
+      "XLB": 0.017,
+      "XLRE": 0.008
+    },
+    "DIA": {
+      "note": "Dow Jones 30 — P7-3 从 DIA_30 + 价格派生 (price-weighted)",
+      "XLK": 0.1899,
+      "XLF": 0.2357,
+      "XLV": 0.1817,
+      "XLY": 0.1227,
+      "XLP": 0.0475,
+      "XLE": 0.0262,
+      "XLI": 0.1653,
+      "XLB": 0.0082,
+      "XLU": 0.0,
+      "XLC": 0.0229,
+      "XLRE": 0.0
+    },
+    "QQQ": {
+      "note": "Nasdaq-100 — P7-3 从 QQQ_100 + 市值派生 (cap-weighted, IT 集中度 ~50%)",
+      "XLK": 0.507,
+      "XLF": 0.005,
+      "XLV": 0.0367,
+      "XLY": 0.157,
+      "XLP": 0.0474,
+      "XLE": 0.0022,
+      "XLI": 0.035,
+      "XLB": 0.0,
+      "XLU": 0.007,
+      "XLC": 0.2027,
+      "XLRE": 0.0
+    },
+    "RSP": {
+      "note": "S&P 500 EQUAL WEIGHT — P7-3 从 S&P 500 sector stock count 派生 (count/503)",
+      "XLK": 0.152,
+      "XLI": 0.152,
+      "XLF": 0.1404,
+      "XLV": 0.1228,
+      "XLY": 0.0975,
+      "XLP": 0.0741,
+      "XLRE": 0.0604,
+      "XLU": 0.0585,
+      "XLB": 0.0546,
+      "XLE": 0.0448,
+      "XLC": 0.0429
+    },
+    "QQQE": {
+      "note": "Nasdaq-100 EQUAL WEIGHT — P7-3 从 QQQ_100 派生 (count/100)",
+      "XLK": 0.3465,
+      "XLF": 0.0198,
+      "XLV": 0.1188,
+      "XLY": 0.1386,
+      "XLP": 0.1089,
+      "XLE": 0.0099,
+      "XLI": 0.1089,
+      "XLB": 0.0,
+      "XLU": 0.0396,
+      "XLC": 0.1089,
+      "XLRE": 0.0
+    }
+  }
+}
