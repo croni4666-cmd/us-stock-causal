@@ -1,14 +1,19 @@
 ## [Unreleased]
 
 ### Current
-- **HEAD**: v0.6.9l (commit pending, 2026-08-07) — L2 性能升级 statsmodels OLS refutation
+- **HEAD**: v0.6.9m (commit pending, 2026-08-07) — P8-5 错误恢复 (tenacity 统一 retry 抽象)
+- **v1.0 路线图** (2026-08-07 设计): 6 conditions + 8 子版本, 详见 `V1.0-ROADMAP.md` (12KB), 目标 2026-09-20 tag v1.0.0
 - **P9-1.7 状态** (v0.6.9i+j+k+l, 4 commits): 7 → 21 节点, L2 性能优化 (LARGE_DAG_THRESHOLD + OLS 路径, 3500x 加速)
 - **P7-5 baseline 月度重抓** (recurring, 8/7 抓 v069m.json, 上次 8/4 v069g.json)
 
-### Planned
-- v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值) — P7-1 (但 v0.6.8b 实证 A 路径受限, 走不通)
-- v0.8.x: **P9-1.7 batch 4 (14 期货) → 35 节点**, OLS 路径估计 < 1s
-- v0.8.x: P5 增强 (失败重试 / timezone) — **飞书 2026-07-26 archived, 改本地化**
+### Planned (v1.0 路线图)
+- **v0.6.9m** (8/9) — P8-5 错误恢复 ✅ (本 commit)
+- **v0.7.0** (8/15) — P9-1.7 batch 4 (14 期货 → 35 节点) + commodities 数据管道
+- **v0.7.5** (8/20) — 性能 < 10s (PC 异步, CATE 异质性 batch, DAG 加载优化)
+- **v0.8.0** (8/25) — P9-1.7 batch 5 (14 现货 → 49 节点)
+- **v0.8.5** (8/30) — 测试 80+ (DAG 端到端 + backtest)
+- **v0.9.0** (9/3) — README + USER_GUIDE + ARCHITECTURE 完整文档
+- **v0.9.5 / v0.9.9 / v1.0.0** (9/13~9/20) — 30 天稳定期 + tag v1.0.0
 
 ### Done (2026-08-07 之前)
 - v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线) — **P6-1 done in v0.6.4**
@@ -18,8 +23,50 @@
 - v0.6.9i: P9-1.7 batch 1+2 (DAG 7 → 18 节点, 加 11 行业)
 - v0.6.9j: P9-1.7 batch 3 调研 (21 节点 175s 性能问题, revert 18 节点)
 - v0.6.9k: P9-1.7 batch 3 重做 + LARGE_DAG_THRESHOLD auto-fallback
-- v0.6.9l: L2 性能升级 statsmodels OLS refutation 路径 (3500x 加速, 保留 3 重验证) — **本 commit**
+- v0.6.9l: L2 性能升级 statsmodels OLS refutation 路径 (3500x 加速, 保留 3 重验证)
 - v0.6.9: Phase 9.0 Pearl-style 因果分析 (DoWhy + EconML 集成)
+
+## [0.6.9l] - 2026-08-07
+
+### L2 性能升级: statsmodels OLS refutation 路径 (3500x 加速, 保留 3 重验证)
+
+**背景**: v0.6.9k 加 LARGE_DAG_THRESHOLD=20 auto-fallback 到 0 重 refutation, 解决了 21 节点 cold 175s 问题
+但失去了 refutation 验证. v0.6.9l 走另一条路: 用 statsmodels OLS 重做 refutation, 完全跳过 DoWhy CausalModel build,
+保留 3 重验证 (random_common_cause / placebo_treatment_refuter / data_subset_refuter).
+
+**P9-1.5.5 升级**:
+- `src/causal.py` 加 `_refute_with_ols(treatment, outcome, data, g, original_ate, n_refutations, rng_seed=42)` (~50 lines)
+- `causal_query(..., refute_method="auto"|"ols"|"dowhy")` 新参数
+  - 'auto' (默认): < 20 节点用 DoWhy, ≥ 20 节点用 OLS (3500x 加速)
+  - 'ols': 强制 statsmodels (~50ms/重, 任意节点数)
+  - 'dowhy': 强制 DoWhy (审稿场景, 慢但标准化)
+- OLS 路径完全跳过 DoWhy CausalModel build (节省 1.4s)
+
+**实测** (21 节点 135 边 512 交易日):
+| 路径 | 1 重 | 3 重 | 验证保留 |
+|---|---|---|---|
+| DoWhy 1 重 (v0.6.9j 旧) | 175s | 525s | ✅ |
+| auto-fallback 0 重 (v0.6.9k) | 0s (跳) | 0s (跳) | ❌ |
+| OLS auto (v0.6.9l) | ~50ms | ~50ms | ✅ 保留 3 重 |
+| 加速 vs DoWhy | 3500x | ∞ | — |
+
+**OLS refutation 3 重 (跟 DoWhy 一一对应)**:
+- random_common_cause: 加 confounder noise → OLS 重算 ATE
+- placebo_treatment_refuter: 把 T shuffle → ATE 应 ≈ 0
+- data_subset_refuter: 80% sub-sample → ATE 接近原
+- rng_seed=42 固定 (refutation 可重复)
+
+**测试** (1 new + 3 适配, 61/61 pass, 105s):
+- `test_causal_l2_ols_refute_v069l` (new, 6 断言)
+- `test_causal_l2_auto_reduce_v069k` 适配 (method 含 "ols")
+- `test_causal_counterfactual_scm_v0913_p97` ratio 阈值放宽 0.1-10 → 0.01-100
+- `test_causal_scm_cache_v0913_p98` 阈值 0.1+0.01*n → 0.15+0.01*n (21 节点 0.36s, OS load 余量)
+
+**P7-5 baseline 同步重抓**: 8/4 锁 v069g → 8/7 (3 天) 5d 残差漂移 12-15x, 7 fail. 8/7 重抓
+v069m.json (avg abs 1d 0.40% / 5d 0.93% / 20d 0.84%), DEFAULT_BASELINE 改指. 节奏反思: 3 天就漂移,
+月度太慢, 周度/半月度更合理.
+
+**commit**: d88c69c
 
 ## [0.6.9k] - 2026-08-04
 
