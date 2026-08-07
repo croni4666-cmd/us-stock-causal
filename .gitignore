@@ -20,6 +20,7 @@ ENV/
 data/raw/*.parquet
 data/cache/*.parquet
 data/cache/alerts/alerts_*.json
+data/cache/retry_log.json
 *.parquet
 *.csv
 
