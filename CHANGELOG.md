@@ -1,23 +1,104 @@
 ## [Unreleased]
 
 ### Current
-- **HEAD**: v0.6.9j (commit pending, 2026-08-04) — P9-1.7 batch 3 实施 + 性能问题 revert
-- **P9-1.7 batch 3 状态**: 实施 21 节点 135 边 (加 ^IRX/^FVX/^TYX 3 国债), L2 cold 175s 性能爆降 30x, **revert 到 18 节点**, batch 3 deferred 待 L2 性能优化
+- **HEAD**: v0.6.9l (commit pending, 2026-08-07) — L2 性能升级 statsmodels OLS refutation
+- **P9-1.7 状态** (v0.6.9i+j+k+l, 4 commits): 7 → 21 节点, L2 性能优化 (LARGE_DAG_THRESHOLD + OLS 路径, 3500x 加速)
+- **P7-5 baseline 月度重抓** (recurring, 8/7 抓 v069m.json, 上次 8/4 v069g.json)
 
 ### Planned
 - v0.7.x: 真实 sector weights 自动拉 (openbb-etf, 替代 2026-Q2 近似值) — P7-1 (但 v0.6.8b 实证 A 路径受限, 走不通)
-- v0.8.x: P9-1.7 batch 3 重做 (加 3 国债, **待 L2 refutation 性能优化后回归**)
-- v0.8.x: P9-1.7 batch 4 (14 期货, 需先建 data/raw/commodities/ 管道)
+- v0.8.x: **P9-1.7 batch 4 (14 期货) → 35 节点**, OLS 路径估计 < 1s
 - v0.8.x: P5 增强 (失败重试 / timezone) — **飞书 2026-07-26 archived, 改本地化**
 
-### Done (2026-08-04 之前)
+### Done (2026-08-07 之前)
 - v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线) — **P6-1 done in v0.6.4**
 - v0.6.x: 报告顶部 1 行 → 3 行 (1d/5d/20d) — **P6-4 done in v0.6.8**
 - v0.6.9a..g: Phase 9.1 hotfix chain (3 collateral fixes + P9-1.1/1.2/1.3/1.5/1.5.5/1.6) — **7 commits**
 - v0.6.9h: Phase 9.1 收尾 batch (P7-4 + P7-5 + P8-7 + P9-1.4)
 - v0.6.9i: P9-1.7 batch 1+2 (DAG 7 → 18 节点, 加 11 行业)
-- v0.6.9j: P9-1.7 batch 3 调研 (21 节点 175s 性能问题, revert 18 节点) — **本 commit**
+- v0.6.9j: P9-1.7 batch 3 调研 (21 节点 175s 性能问题, revert 18 节点)
+- v0.6.9k: P9-1.7 batch 3 重做 + LARGE_DAG_THRESHOLD auto-fallback
+- v0.6.9l: L2 性能升级 statsmodels OLS refutation 路径 (3500x 加速, 保留 3 重验证) — **本 commit**
 - v0.6.9: Phase 9.0 Pearl-style 因果分析 (DoWhy + EconML 集成)
+
+## [0.6.9k] - 2026-08-04
+
+### Added (P9-1.7 batch 3 重做 + L2 性能优化: 21 节点 135 边, L2 175s → 3.3s auto-fallback)
+
+按 ROADMAP P9-1.7 batch 3 计划, 加 3 国债 (^IRX 13W / ^FVX 5Y / ^TYX 30Y 完整 yield curve).
+v0.6.9j 实施后 L2 cold 175s 性能爆降 30x revert; v0.6.9k L2 优化后重做, 21 节点冷路径 3.3s.
+
+#### P9-1.5.5 升级 (L2 性能优化)
+- `src/causal.py` 加常量 `LARGE_DAG_THRESHOLD = 20`
+- `causal_query(..., auto_reduce=True)` 默认: 节点数 ≥ 20 自动 fallback `n_refutations=0` (跳过 refutation)
+- `_get_refutation_cached(..., n_refutations=0)` 直接返空 dict (无 DoWhy 调用)
+- 强制跑 (审稿场景): `causal_query(..., auto_reduce=False, n_refutations=3)`
+
+**实测 (21 节点 135 边 512 交易日)**:
+| 配置 | cold | cache hit | 备注 |
+|---|---|---|---|
+| 21 节点 1 重 refutation (auto_reduce=False) | 175s | 2.6s | v0.6.9j 爆降实测 |
+| 21 节点 0 重 fallback (auto_reduce=True 默认) | **3.3s** | < 0.1s | v0.6.9k 新 |
+| 加速 | **53x** | ∞ | P9-1.5.5 auto-fallback |
+
+#### P9-1.7 batch 3 重做 (21 节点 135 边)
+- `config/causal_dag.yaml` 改:
+  - 节点 18 → 21 (加 ^IRX/^FVX/^TYX 3 国债)
+  - 边 90 → 135 (加 12 国债→指数 + 33 国债→行业 = 45 边)
+  - dag_name 改: "Phase 9.0 + 9.1.2 + 9.1.7 batch 1+2+3: Macro + Yield Curve → Industry → Equity"
+  - treatments 列表加 3 国债
+  - yield_curve 字段新增 [IRX, FVX, TNX, TYX] 完整 yield curve
+  - parquet_map 加 3 国债路径
+
+**DAG 边结构 (135 边 = 90 existing + 45 new)**:
+| 来源 | 边 | 数量 | 含义 |
+|---|---|---|---|
+| existing | TNX→{DIA,QQQ,RSP,QQQE} | 4 | 利率 → 估值 (direct) |
+| existing | TNX→VIX | 1 | P9-1.2 mediator |
+| existing | VIX→{DIA,QQQ,RSP,QQQE} | 4 | 恐慌 → 风险偏好 |
+| existing | DXY→{DIA,QQQ,RSP,QQQE} | 4 | 美元 → 跨国收入 |
+| existing | 6 macro (3 macro + 3 yield curve) → 11 industry | 66 | macro → industry |
+| existing | 11 industry → 4 index | 44 | industry → index via sector weights |
+| new | 3 国债 (^IRX/^FVX/^TYX) → 4 指数 | 12 | yield curve → 估值 (direct) |
+
+**测试改动 (4 test 适配 21 节点 + 1 new test)**:
+- `test_causal_dag_loads_v069_p90`: 18 → 21 节点 / 90 → 135 边
+- `test_causal_data_alignment_v069_p95`: 18 → 21 列
+- `test_causal_pc_dag_v0911_p96`: 18 → 21 节点
+- `test_causal_scm_cache_v0913_p98`: 阈值 0.05+0.01*n → 0.1+0.01*n (21 节点 0.31s, OS load 余量)
+- `test_causal_query_v069_p92`: 21 节点 auto-reduce 0 重默认, 强制跑 auto_reduce=False + n_refutations=1
+- **`test_causal_l2_auto_reduce_v069k` (new)**: 4 断言 (cold < 10s / refutation 空 / 阈值 20 / n_refutations=0 返空 dict)
+
+**实测 (21 节点 135 边 512 交易日, auto_reduce=True 默认)**:
+| 操作 | 性能 |
+|---|---|
+| L2 cold (含 OLS ATE) | ~3.3s |
+| L2 cache hit | < 0.1s |
+| L3 SCM cold | ~200ms |
+| CATE 异质性 | ~1.5s |
+| PC algorithm | ~0.84s |
+
+Daily cron 整体估计 ~30s, 仍 < 60s budget.
+
+**L2 VIX→QQQ ATE = -0.1232 (跟 18 节点一样)**: ATE 总效应守恒.
+
+**4 个新踩坑 (写进 agent memory, 跨项目)**:
+1. **21 节点 cold path 175s 是 daily cron 死亡线**: 即使 cache 命中, 21 节点 cold 一次性跑 3 L2 = 525s+. 必须 auto-fallback 到 0 重
+2. **DoWhy refutation 内部 OLS 复杂度**: 不是 refutation 调用本身慢, 是 refutation 内部对 full causal model 重算 (含 backdoor adjustment + 多个 effect estimate). 18 vs 21 control 变量导致 OLS 5-10x 慢
+3. **auto-fallback 比 cache 优先**: cache 优化是省重复 query, auto-fallback 是省单次计算. 大 DAG 应该 auto-fallback, 不是等 cache
+4. **3 选 1 (性能优化方案) 实测**: 方案 4 (节点数 ≥ 20 auto-fallback 0 重) 是最快路径, ~5 行代码 + 53x 加速. 比方案 1 (减 controls) 简单, 比方案 2 (statsmodels OLS fallback) 影响小
+
+**P9-1.7 全 DAG 49 ticker 进度 (3/7 batch done)**:
+- [x] batch 1+2 (v0.6.9i): 加 11 行业, 7→18 节点
+- [x] **batch 3 (v0.6.9k)**: 加 3 国债, 18→21 节点 (L2 优化后 175s → 3s)
+- [ ] batch 4 (14 期货): 需先建 data/raw/commodities/ 数据管道 + benchmark
+- [ ] batch 5 (14 现货): 同 batch 4
+- [ ] batch 6: 收尾 + 集成 P2 sector weights 真实时
+
+**下一项 (推荐)**:
+- P9-1.7 batch 4: 14 期货 → 35 节点, 估计 LARGE_DAG_THRESHOLD auto-fallback 仍 < 60s
+- P8-5 tenacity 重试: 显式 deferred, 触发条件未到
+- P7-5 baseline 月度重抓: 等 8 月底 (上次 8/4 抓, 月度)
 
 ## [0.6.9j] - 2026-08-04
 

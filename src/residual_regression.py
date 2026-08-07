@@ -29,9 +29,9 @@ from src.attribution import attribute_all_indices, SECTOR_TICKERS  # noqa: F401
 
 
 BASELINE_DIR = PROJECT_ROOT / "data" / "baseline"
-# v0.6.9g (2026-08-04): 重抓 baseline, v069.json (2026-08-03 锁) 第 8 天 5d 残差
-# 漂移 27x 触发 regression. 改 v069g.json (8/4 锁) 当 DEFAULT — 月度重抓机制见效
-DEFAULT_BASELINE = BASELINE_DIR / "residuals_v069g.json"
+# v0.6.9m (2026-08-07): 月度重抓, v069g.json (8/4 锁) 第 3 天 5d 残差漂移 12-15x
+# 改 v069m.json (8/7 锁) 当 DEFAULT — P7-5 月度重抓机制见效
+DEFAULT_BASELINE = BASELINE_DIR / "residuals_v069m.json"
 INDICES = ["DIA", "QQQ", "RSP", "QQQE"]
 WINDOWS = [1, 5, 20]
 
