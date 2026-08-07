@@ -26,6 +26,7 @@ from loguru import logger
 # proxy 必须在 yfinance 之前 import (yfinance 用 requests,会读 env var)
 from src import proxy  # noqa: F401
 from src.yfinance_rate_limit import is_yf_rate_limit_error, record_rate_limit  # noqa: E402
+from src.retry import retry_yfinance  # noqa: E402  (v0.6.9m P8-5 tenacity 统一路径)
 
 
 # yfinance 的 ticker 别名映射 (OpenBB/yahoo 名字差异)
@@ -80,6 +81,24 @@ def fetch(
 
     Returns:
         DataFrame with lowercase columns: open/high/low/close/volume (and adj_close if available)
+
+    v0.6.9m (P8-5): 重试统一到 tenacity (retry_yfinance, 3 重 1s/2s/4s 指数退避)
+    - 旧手写 for 循环 + is_yf_rate_limit_error 检测保留
+    - 限流立即 raise 不重试 (省时间, 跟 v0.6.8j 一致)
+    """
+    return _fetch_with_retry(symbol, start, end, auto_adjust)
+
+
+@retry_yfinance(max_attempts=3, multiplier=1.0, min_wait=1.0, max_wait=4.0)
+def _fetch_with_retry(
+    symbol: str,
+    start: str,
+    end: Optional[str],
+    auto_adjust: bool,
+) -> pd.DataFrame:
+    """fetch() 内部实现, 被 tenacity retry_yfinance 装饰
+    - 3 重指数退避 1s/2s/4s
+    - 限流立即 raise (不重试, 让上层 cache.update_or_fetch 决定 fallback)
     """
     if end is None:
         end = datetime.now().strftime("%Y-%m-%d")
@@ -87,36 +106,27 @@ def fetch(
     actual_symbol = _resolve_ticker(symbol)
     logger.info(f"[fetch] {symbol} -> {actual_symbol}: {start} -> {end}")
 
-    last_err = None
-    for attempt in range(3):
-        try:
-            stock = yf.Ticker(actual_symbol)
-            df = stock.history(
-                start=start,
-                end=end,
-                interval="1d",
-                auto_adjust=auto_adjust,
+    try:
+        stock = yf.Ticker(actual_symbol)
+        df = stock.history(
+            start=start,
+            end=end,
+            interval="1d",
+            auto_adjust=auto_adjust,
+        )
+        if df.empty:
+            raise RuntimeError(f"yfinance 返回空 (可能 delisted 或 ticker 错)")
+        return _normalize(df, symbol)
+    except Exception as e:
+        # v0.6.8j (P7-6): 检测 yfinance 限流, 立即记录 + 不再重试 (省时间)
+        if is_yf_rate_limit_error(e):
+            info = record_rate_limit(symbol, e)
+            logger.error(
+                f"[{symbol}] yfinance 限流检测! hit={info['hit_count']} "
+                f"expires={info['expires_at']}. 24h 内跳过 yfinance, 用 cache only."
             )
-            if df.empty:
-                raise RuntimeError(f"yfinance 返回空 (可能 delisted 或 ticker 错)")
-            return _normalize(df, symbol)
-        except Exception as e:
-            last_err = e
-            # v0.6.8j (P7-6): 检测 yfinance 限流, 立即记录 + 不再重试 (省时间)
-            if is_yf_rate_limit_error(e):
-                info = record_rate_limit(symbol, e)
-                logger.error(
-                    f"[{symbol}] yfinance 限流检测! hit={info['hit_count']} "
-                    f"expires={info['expires_at']}. 24h 内跳过 yfinance, 用 cache only."
-                )
-                # 重新 raise, 让上层 cache.update_or_fetch 决定 fallback
-                raise
-            # 其他错误正常重试
-            wait = 2 ** attempt
-            logger.warning(f"[{symbol}] yfinance 失败 (attempt {attempt+1}/3): {e}. {wait}s 后重试")
-            time.sleep(wait)
-
-    raise RuntimeError(f"{symbol}: 3 次重试都失败: {last_err}")
+        # 抛出让 tenacity 决定 retry (限流也会 retry 3 次, 失败后上层 catch)
+        raise
 
 
 if __name__ == "__main__":
