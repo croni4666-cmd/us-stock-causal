@@ -28,6 +28,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src import proxy  # noqa: F401  (副作用: import 时设 HTTP_PROXY)
 from src import data, cache  # noqa: E402
 
+# 强制 UTF-8 输出 (避免 Windows GBK, fetch_all.py print emoji ♻️ 失败)
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 CONFIG_PATH = PROJECT_ROOT / "config" / "tickers.yaml"
 CACHE_ROOT = PROJECT_ROOT / "data" / "raw"
 

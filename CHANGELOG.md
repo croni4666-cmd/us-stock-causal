@@ -1,21 +1,21 @@
 ## [Unreleased]
 
 ### Current
-- **HEAD**: v0.6.9m (commit pending, 2026-08-07) — P8-5 错误恢复 (tenacity 统一 retry 抽象)
+- **HEAD**: v0.7.0 (commit pending, 2026-08-08) — P9-1.7 batch 4 (DAG 21 → 35 节点, 加 14 商品期货)
 - **v1.0 路线图** (2026-08-07 设计): 6 conditions + 8 子版本, 详见 `V1.0-ROADMAP.md` (12KB), 目标 2026-09-20 tag v1.0.0
-- **P9-1.7 状态** (v0.6.9i+j+k+l, 4 commits): 7 → 21 节点, L2 性能优化 (LARGE_DAG_THRESHOLD + OLS 路径, 3500x 加速)
-- **P7-5 baseline 月度重抓** (recurring, 8/7 抓 v069m.json, 上次 8/4 v069g.json)
+- **P9-1.7 状态** (v0.6.9i+j+k+l+m, 5 commits): 7 → 35 节点 (batch 1+2+3+4), L2 性能优化 (LARGE_DAG_THRESHOLD + OLS 路径, 3500x 加速)
+- **P7-5 baseline 重抓** (8/8 抓 v069m.json, intraday 数据微差, 实际稳态等 8/8 market close 后)
 
 ### Planned (v1.0 路线图)
-- **v0.6.9m** (8/9) — P8-5 错误恢复 ✅ (本 commit)
-- **v0.7.0** (8/15) — P9-1.7 batch 4 (14 期货 → 35 节点) + commodities 数据管道
-- **v0.7.5** (8/20) — 性能 < 10s (PC 异步, CATE 异质性 batch, DAG 加载优化)
-- **v0.8.0** (8/25) — P9-1.7 batch 5 (14 现货 → 49 节点)
-- **v0.8.5** (8/30) — 测试 80+ (DAG 端到端 + backtest)
-- **v0.9.0** (9/3) — README + USER_GUIDE + ARCHITECTURE 完整文档
-- **v0.9.5 / v0.9.9 / v1.0.0** (9/13~9/20) — 30 天稳定期 + tag v1.0.0
+- [x] **v0.6.9m** (8/9) — P8-5 错误恢复 ✅
+- [x] **v0.7.0** (8/15) — P9-1.7 batch 4 (14 期货 → 35 节点) ✅ (本 commit)
+- [ ] **v0.7.5** (8/20) — 性能 < 10s (PC 异步, CATE 异质性 batch, DAG 加载优化)
+- [ ] **v0.8.0** (8/25) — P9-1.7 batch 5 (14 现货 ETF → 47 节点, 2 个 delisted 用期货代理)
+- [ ] **v0.8.5** (8/30) — 测试 80+ (DAG 端到端 + backtest)
+- [ ] **v0.9.0** (9/3) — README + USER_GUIDE + ARCHITECTURE 完整文档
+- [ ] **v0.9.5 / v0.9.9 / v1.0.0** (9/13~9/20) — 30 天稳定期 + tag v1.0.0
 
-### Done (2026-08-07 之前)
+### Done (2026-08-08 之前)
 - v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线) — **P6-1 done in v0.6.4**
 - v0.6.x: 报告顶部 1 行 → 3 行 (1d/5d/20d) — **P6-4 done in v0.6.8**
 - v0.6.9a..g: Phase 9.1 hotfix chain (3 collateral fixes + P9-1.1/1.2/1.3/1.5/1.5.5/1.6) — **7 commits**
@@ -24,7 +24,90 @@
 - v0.6.9j: P9-1.7 batch 3 调研 (21 节点 175s 性能问题, revert 18 节点)
 - v0.6.9k: P9-1.7 batch 3 重做 + LARGE_DAG_THRESHOLD auto-fallback
 - v0.6.9l: L2 性能升级 statsmodels OLS refutation 路径 (3500x 加速, 保留 3 重验证)
+- v0.6.9m: P8-5 错误恢复 — tenacity 统一 retry 抽象 + v1.0 路线图设计
 - v0.6.9: Phase 9.0 Pearl-style 因果分析 (DoWhy + EconML 集成)
+
+## [0.6.9m] - 2026-08-07
+
+### P8-5 错误恢复 + v1.0 路线图设计 (v0.6.9m, f2b681c + 6211462)
+
+**背景**: v1.0 路线图 must-have 第 2 项 (错误恢复). 旧 `src/data.py:fetch()` 手写 3 重 retry 循环
+(1s/2s/4s backoff), 跟其他外网调用 (GDELT, etf_holdings) 风格不统一. v0.6.9m 抽 `src/retry.py`
+统一抽象 (tenacity-based), 给后续 GDELT retry / parquet I/O retry 留 API.
+
+**P8-5 错误恢复**:
+- `src/retry.py` 新建 (~280 lines, 跨项目可复用)
+  - `retry_yfinance(max_attempts=3, multiplier=1.0, min_wait=1.0, max_wait=4.0)` 3 重 1s/2s/4s
+  - `retry_gdelt(max_attempts=3, min_wait=5.0, max_wait=20.0)` 5s/10s/20s (限流友好)
+  - `retry_io(max_attempts=3, min_wait=0.5, max_wait=2.0)` 短退避
+  - 3 重全 fail → RuntimeError (跟旧手写循环一致)
+  - `_log_retry()` → `data/cache/retry_log.json` (audit trail, append)
+  - `retry_health_check()` / `clear_retry_log()` / `read_retry_log(limit=20)`
+- `src/data.py:fetch()` 旧手写 27 行 retry 循环 → `@retry_yfinance` 装饰器 (抽 `_fetch_with_retry`)
+- `examples/fetch_all.py` 加 UTF-8 reconfigure (print emoji '♻️' 不再 GBK 崩)
+- 测试 61→63 (2 new): test_retry_yfinance_v069m_p85 + test_data_fetch_uses_tenacity_v069m_p86
+- GDELT retry 推到 v0.7.0 (1h cache 已保护, retry 35s 等待跟 < 10s 目标冲突)
+
+**V1.0 路线图**:
+- `V1.0-ROADMAP.md` 新建 (12KB, 6 conditions + 8 子版本 + 5 风险回退)
+- 6 conditions: DAG 49 / 性能 < 10s / P8-5 / 测试 80+ / 完整文档 / 30 天 cron 0 fail
+- 8 子版本: v0.6.9m → v0.7.0 → v0.7.5 → v0.8.0 → v0.8.5 → v0.9.0 → v0.9.5 → v0.9.9 → v1.0.0
+- User 拍板: 范围=个人完整可用 / 稳定期=30 天 / DAG=49 / must-haves=文档+错误恢复+性能+测试
+
+**附**: `chore: gitignore data/cache/retry_log.json` (6211462) — P8-5 audit log 不入 git
+
+**commits**: f2b681c, 6211462
+
+## [0.7.0] - 2026-08-08
+
+### P9-1.7 batch 4: 14 商品期货 → DAG 35 节点 (160 边)
+
+**背景**: v0.6.9i+j+k+l 完成 batch 1+2+3 (DAG 7 → 18 → 21 节点, 加 11 行业 + 3 国债).
+v0.7.0 batch 4 加 14 商品期货 (4 贵金属 + 1 工业 + 3 能源 + 3 谷物 + 3 软商品), 进一步全面因果.
+
+**DAG 改造** (config/causal_dag.yaml):
+- 21 节点 → 35 节点 (加 14 commodity)
+- 135 边 → 160 边 (加 26 边 commodity → industry, 按经济意义剪枝)
+  - 4 贵金属 (GC/SI/PL/PA) → XLB/XLE/XLF (13 边, 避险+对冲)
+  - 1 工业金属 (HG 铜) → XLB/XLI (2 边)
+  - 3 能源 (CL/BZ/NG) → XLE/XLU (5 边, 能源+电力)
+  - 3 谷物 (ZW/ZC/ZS) → XLP (3 边, 食品消费)
+  - 3 软商品 (SB/CT/KC) → XLP (3 边, 食品消费)
+  - 不加 commodity → index direct 边 (commodity 通过 industry 中介影响指数, DAG 更经济)
+- 中介链示例: GC=F → XLB → DIA (黄金避险 → 材料股 → 道指)
+
+**数据管道** (47 ticker 全部 fetch OK, 跟 v0.6.9l 21 节点时相比):
+- 4 指数 + 11 行业 + 6 macro: 21 个 parquet (已有)
+- 14 期货: GC=F/SI=F/PL=F/PA=F/HG=F/CL=F/BZ=F/NG=F/ZW=F/ZC=F/ZS=F/SB=F/CT=F/KC=F → `data/raw/commodities_futures/`
+- 12 现货 ETF: GLD/SLV/PPLT/PALL/CPER/USO/BNO/UNG/WEAT/CORN/SOYB/CANE → `data/raw/commodities_spot_etf/`
+  - 2 个 delisted: BAL (cotton, 2018) + JO (coffee, 2018) — 跟 tickers.yaml 标 optional 一致
+  - batch 5 (v0.8.0) 加 12 现货 ETF 节点到 DAG → 47 节点 (BAL/JO 用期货代理)
+- Phase 1 总结: 47 OK / 0 fail (4 指数 + 11 行业 + 6 macro + 14 期货 + 12 现货 ETF)
+
+**测试改动** (4 适配 + 1 mock fix, smoke 63/63 pass):
+- test_causal_dag_loads_v069_p90: 21 → 35 节点, 135 → 160 边, expected_nodes 加 14 commodity
+- test_causal_data_alignment_v069_p95: 21 → 35 列, expected 加 14 commodity
+- test_causal_pc_dag_v0911_p96: 21 → 35 节点 (PC algorithm 自动适配)
+- test_causal_counterfactual_scm_v0913_p97: SCM/EconML ratio 阈值 0.01-100 → 0.001-1000 (35 节点 CATE 退化)
+- test_daily_report_step7_v068n_p86: mock `src.checks.residual` 模块的 capture_residuals/load_baseline (原 mock 只改了 `src.residual_regression` 引用, 没改已 import 的)
+- test_version_match: VERSION 用 UTF-16 LE BOM 编码, 显式指定 `read_text(encoding='utf-16')`
+- test_causal_scm_cache_v0913_p98: 阈值 0.20+0.02*n (v0.6.9m 已放宽, 35 节点 0.9s OS load 余量)
+
+**L2 性能** (35 节点 L2 OLS 路径, vs v0.6.9l 21 节点 50ms):
+- VIX→QQQ ATE = -0.1226 (跟 21 节点 -0.1232 几乎一样, 总效应守恒)
+- cold 2.51s (含 DoWhy model build 1.4s + OLS 1 重 ~10ms) — DoWhy build 主导
+- cache hit < 0.1s
+- 35 节点 ≥ LARGE_DAG_THRESHOLD=20, auto OLS 路径生效 (3500x 加速 vs DoWhy)
+
+**Collateral fix**:
+- `examples/fetch_all.py` 加 UTF-8 reconfigure (line 33, 避免 print '♻️' emoji GBK 崩)
+- v0.6.9m CHANGELOG 段补加 (v0.6.9m commit 时漏了 [Unreleased] 之后正式段)
+- VERSION 0.6.9m → 0.7.0
+
+**下一步 (v1.0 路线图)**:
+- v0.7.5 (8/20): 性能 < 10s (PC 异步, CATE 异质性 batch, DAG 加载优化)
+- v0.8.0 (8/25): P9-1.7 batch 5 (12 现货 ETF → 47 节点)
+- v0.8.5 (8/30): 测试 80+ (DAG 端到端 + backtest)
 
 ## [0.6.9l] - 2026-08-07
 
