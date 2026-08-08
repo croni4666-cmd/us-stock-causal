@@ -1,17 +1,17 @@
 ## [Unreleased]
 
 ### Current
-- **HEAD**: v0.8.5 (commit pending, 2026-08-08) — 测试 66 → 80 (DAG 端到端 + backtest + cache invalidation)
+- **HEAD**: v0.9.0 (commit pending, 2026-08-08) — 完整文档 (README + USER_GUIDE + ARCHITECTURE, 850 lines)
 - **v1.0 路线图** (2026-08-07 设计): 6 conditions + 8 子版本, 详见 `V1.0-ROADMAP.md` (12KB), 目标 2026-09-20 tag v1.0.0
-- **P9-1.7 状态** (v0.6.9i+j+k+l+m + v0.7.0+v0.7.5+v0.8.0+v0.8.5): 7 → 47 节点, L2 + 性能 < 10s + 测试 80+ 全部 done
+- **P9-1.7 状态** (v0.6.9i+j+k+l+m + v0.7.0+v0.7.5+v0.8.0+v0.8.5+v0.9.0): 7 → 47 节点, L2 + 性能 + 测试 + 文档全部 done
 
 ### Planned (v1.0 路线图)
 - [x] **v0.6.9m** (8/9) — P8-5 错误恢复 ✅
 - [x] **v0.7.0** (8/15) — P9-1.7 batch 4 (14 期货 → 35 节点) ✅
 - [x] **v0.7.5** (8/20) — 性能 < 10s (Pydot cache + LRU report cache) ✅
 - [x] **v0.8.0** (8/25) — P9-1.7 batch 5 (12 现货 ETF → 47 节点) ✅
-- [x] **v0.8.5** (8/30) — 测试 80+ (DAG 端到端 + backtest + cache invalidation) ✅ (本 commit)
-- [ ] **v0.9.0** (9/3) — README + USER_GUIDE + ARCHITECTURE 完整文档
+- [x] **v0.8.5** (8/30) — 测试 80+ (DAG 端到端 + backtest + cache invalidation) ✅
+- [x] **v0.9.0** (9/3) — README + USER_GUIDE + ARCHITECTURE 完整文档 (~850 lines) ✅ (本 commit)
 - [ ] **v0.9.5 / v0.9.9 / v1.0.0** (9/13~9/20) — 30 天稳定期 + tag v1.0.0
 
 ### Done (2026-08-08 之前)
@@ -28,7 +28,60 @@
 - v0.7.5: 性能 < 10s (Pydot cache + report LRU cache, daily cron 14s → 8.6s)
 - v0.8.0: P9-1.7 batch 5 (DAG 35 → 47 节点, 加 12 现货 ETF, 12 ETF→期货 配对边, daily cron 11.6s → 9.0s)
 - v0.8.5: 测试 66 → 80 (DAG 端到端 + backtest + cache invalidation, V1.0 "测试 80+" 达成)
+- v0.9.0: 完整文档 (README + USER_GUIDE + ARCHITECTURE, V1.0 "完整文档" 达成)
 - v0.6.9: Phase 9.0 Pearl-style 因果分析 (DoWhy + EconML 集成)
+
+## [0.9.0] - 2026-08-08
+
+### 完整文档 (V1.0 路线图 "完整文档" 达成)
+
+**背景**: V1.0 路线图 must-have 第 5 项 (完整文档). 3 件 ~850 lines, 覆盖 README / USER_GUIDE / ARCHITECTURE.
+
+**3 件文档**:
+
+1. **README.md** (~130 lines, 6.4KB):
+   - 项目简介 + 一手数据 / 因果分析
+   - 当前状态 (v0.8.5, 47 节点, 9.0s, 80 tests)
+   - 5 分钟跑通 (装依赖 / 拉数据 / 跑 daily)
+   - 5 分钟配 cron (Task Scheduler 17:00)
+   - 文档导航 (USER_GUIDE / ARCHITECTURE / V1.0-ROADMAP / CHANGELOG)
+   - 9 阶段核心功能 (Phase 0-9)
+   - 设计原则 vs v1/v2 (跟 us-stock-daily 对比)
+   - hobbyist ceiling 约束
+
+2. **USER_GUIDE.md** (~370 lines, 16KB):
+   - 7 大节: 快速开始 / 数据怎么拉 / 改 DAG / 跑 daily / 解读输出 / FAQ / 排查
+   - 5 分钟跑通 + cron 配 (cmd 命令)
+   - 加新 ticker / 重抓 / 强制重拉
+   - 加新 DAG 节点 + 验证 acyclic
+   - daily_report 8 步内容 + 4 跳标志
+   - 5 段制报告结构 + 因果机制段 (L2/L3/PC/CATE)
+   - 10 个 FAQ (yfinance 5xx / DAG 环 / perf / 残差 / 49 vs 47 / 等)
+   - 7 个常见问题排查 (cron 没跑 / toast 不弹 / smoke fail / stale alert / proxy 换 / rollback)
+
+3. **ARCHITECTURE.md** (~350 lines, 19KB):
+   - 系统总览 ASCII 框图
+   - 模块结构 (6 大类: 数据层 / 分析层 / 呈现层 / 异常层 / 因果层 / 调度层)
+   - 数据流 (fetch / analysis / report 三段)
+   - 缓存层 (6 个 module-level cache + 文件级 cache)
+   - 性能优化路径 (v0.6.9 → v0.8.5 5 个里程碑 + 表格)
+   - Pearl 3 层因果 (L1/L2/L3 + DAG 验证 + CATE 异质性 + 实现)
+   - 扩展点 (加 ticker / 加 query / 加 check / 加 cache / 改 daily_report)
+   - 测试架构 (80 tests 分类 / 跑法 / 阈值自适应)
+   - 性能里程碑表 (v0.6.9 82s → v0.8.5 9.0s)
+
+**测试改动** (1 new, 81/81 pass):
+- `test_v1_0_docs_exist_v090_p106` (~30 lines, 3 断言): README/USER_GUIDE/ARCHITECTURE 存在 + 行数 > 100/200/200 + 关键词覆盖
+
+**Collateral fix**:
+- `test_pc_algorithm_date_cache_v080_p91`: 47 节点 PC cold 阈值 3s → 5s (OS load 实际 3-5s 抖动)
+
+**实测**: smoke test **81/81 pass** (~190s)
+**commits**: 本
+
+**下一步** (V1.0 路线图):
+- v0.9.5 / v0.9.9 (9/13 ~ 9/17): RC1 / RC2, 30 天稳定期验证 + 修 issue
+- v1.0.0 (9/20): tag v1.0.0 🎉
 
 ## [0.8.5] - 2026-08-08
 
