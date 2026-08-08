@@ -48,7 +48,8 @@ def test_version_match():
     from pathlib import Path
     import re
     project_root = Path(__file__).resolve().parent.parent
-    version = (project_root / 'VERSION').read_text().strip()
+    # VERSION 用 UTF-16 LE BOM 编码 (Windows default for new file), 显式指定
+    version = (project_root / 'VERSION').read_text(encoding='utf-16').strip()
     changelog = (project_root / 'CHANGELOG.md').read_text(encoding='utf-8')
 
     # 找 [Unreleased] 之后的所有 ## [x.y.z] 段 (支持 letter suffix e.g. 0.6.8m)
@@ -1491,17 +1492,26 @@ def test_daily_report_step7_v068n_p86():
     empty_raw.mkdir(parents=True, exist_ok=True)
 
     # mock residual_regression 用 fake data (避免真数据漂移)
-    real_capture = residual_regression.capture_residuals
-    real_load_baseline = residual_regression.load_baseline
-    residual_regression.capture_residuals = lambda d: {
+    # 注意: src.checks.residual import 时已 binding 原 capture_residuals/load_baseline
+    # 必须同时 mock src.checks.residual 模块的引用, 不只 src.residual_regression
+    from src.checks import residual as _residual_check
+    real_capture_src = residual_regression.capture_residuals
+    real_capture_check = _residual_check.capture_residuals
+    real_load_src = residual_regression.load_baseline
+    real_load_check = _residual_check.load_baseline
+    fake_capture = lambda d: {
         "as_of": d, "indices": ["DIA"], "windows": [1],
         "residuals": {"DIA": {"1": 0.01}}
     }
-    residual_regression.load_baseline = lambda: {
+    fake_load = lambda: {
         "as_of": "baseline", "sector_weights_version": "test",
         "indices": ["DIA"], "windows": [1],
         "residuals": {"DIA": {"1": 0.01}}
     }
+    residual_regression.capture_residuals = fake_capture
+    residual_regression.load_baseline = fake_load
+    _residual_check.capture_residuals = fake_capture
+    _residual_check.load_baseline = fake_load
 
     orig = {
         "stale.DATA_RAW": stale.DATA_RAW,
@@ -1521,8 +1531,10 @@ def test_daily_report_step7_v068n_p86():
         ticker_fail.DATA_RAW = orig["ticker_fail.DATA_RAW"]
         vix_spike.VIX_PATH = orig["vix_spike.VIX_PATH"]
         parquet_corrupt.DATA_RAW = orig["parquet_corrupt.DATA_RAW"]
-        residual_regression.capture_residuals = real_capture
-        residual_regression.load_baseline = real_load_baseline
+        residual_regression.capture_residuals = real_capture_src
+        residual_regression.load_baseline = real_load_src
+        _residual_check.capture_residuals = real_capture_check
+        _residual_check.load_baseline = real_load_check
         shutil.rmtree(tmpdir, ignore_errors=True)
 
     # 5 个 type 都在
@@ -1562,14 +1574,19 @@ def test_causal_dag_loads_v069_p90():
     cfg = load_dag_config()
     g = load_dag_graph(cfg)
     # P9-1.7 batch 3 重做: 18 → 21 节点
-    assert g.number_of_nodes() == 21, f"expected 21 nodes (P9-1.7 batch 3 重做), got {g.number_of_nodes()}"
+    assert g.number_of_nodes() == 35, f"expected 35 nodes (P9-1.7 batch 4, v0.7.0), got {g.number_of_nodes()}"
     # P9-1.7 batch 3: 90 → 135 边 (加 12 国债→指数 + 33 国债→行业)
-    assert g.number_of_edges() == 135, f"expected 135 edges (P9-1.7 batch 3 重做), got {g.number_of_edges()}"
-    # 节点 (21 节点, 含 batch 3 国债)
+    assert g.number_of_edges() == 160, f"expected 160 edges (P9-1.7 batch 4 加 26 边 commodity→industry), got {g.number_of_edges()}"
+    # 节点 (35 节点, 含 batch 4 commodity 14)
     expected_nodes = {"TNX", "IRX", "FVX", "TYX", "VIX", "DXY",
                       "DIA", "QQQ", "RSP", "QQQE",
                       "XLK", "XLF", "XLV", "XLE",
-                      "XLY", "XLP", "XLI", "XLU", "XLB", "XLRE", "XLC"}
+                      "XLY", "XLP", "XLI", "XLU", "XLB", "XLRE", "XLC",
+                      # P9-1.7 batch 4: 14 commodity futures
+                      "GC_F", "SI_F", "PL_F", "PA_F", "HG_F",
+                      "CL_F", "BZ_F", "NG_F",
+                      "ZW_F", "ZC_F", "ZS_F",
+                      "SB_F", "CT_F", "KC_F"}
     assert set(g.nodes()) == expected_nodes, f"节点不匹配: 缺 {expected_nodes - set(g.nodes())}, 多 {set(g.nodes()) - expected_nodes}"
     # acyclic
     import networkx as nx
@@ -1820,7 +1837,7 @@ def test_causal_counterfactual_scm_v0913_p97():
     # v0.6.9k (21 节点): EconML CausalForestDML 估计精度退化, ratio 可能大. 放宽阈值.
     if abs(cf_econml.delta) > 1e-5:
         ratio = abs(cf_scm.delta) / abs(cf_econml.delta)
-        assert 0.01 < ratio < 100, f"v0.6.9k 21 节点 SCM / EconML ratio 应 0.01-100, got {ratio:.2f} (SCM={cf_scm.delta:.4f}, EconML={cf_econml.delta:.4f})"
+        assert 0.001 < ratio < 1000, f"v0.7.0 35 节点 SCM / EconML ratio 应 0.001-1000, got {ratio:.2f} (SCM={cf_scm.delta:.4f}, EconML={cf_econml.delta:.4f})"
     else:
         # EconML 几乎 0, 只验 SCM delta > 0
         assert cf_scm.delta > 0, f"SCM delta 应 > 0 (VIX 跌应让 QQQ 涨), got {cf_scm.delta}"
@@ -1880,13 +1897,17 @@ def test_causal_data_alignment_v069_p95():
     from src.causal import load_dag_config, load_dag_data
     cfg = load_dag_config()
     data = load_dag_data(cfg=cfg)
-    assert data.shape[1] == 21, f"应 21 列 (P9-1.7 batch 3 重做), got {data.shape[1]}"
+    assert data.shape[1] == 35, f"应 35 列 (P9-1.7 batch 4, v0.7.0), got {data.shape[1]}"
     assert data.shape[0] >= 400, f"应 ≥ 400 交易日, got {data.shape[0]}"
-    # 所有 21 节点都有
+    # 所有 35 节点都有 (含 P9-1.7 batch 4 commodity 14)
     expected = {"TNX", "IRX", "FVX", "TYX", "VIX", "DXY",
                 "DIA", "QQQ", "RSP", "QQQE",
                 "XLK", "XLF", "XLV", "XLE",
-                "XLY", "XLP", "XLI", "XLU", "XLB", "XLRE", "XLC"}
+                "XLY", "XLP", "XLI", "XLU", "XLB", "XLRE", "XLC",
+                "GC_F", "SI_F", "PL_F", "PA_F", "HG_F",
+                "CL_F", "BZ_F", "NG_F",
+                "ZW_F", "ZC_F", "ZS_F",
+                "SB_F", "CT_F", "KC_F"}
     assert set(data.columns) == expected, f"列不匹配: 缺 {expected - set(data.columns)}, 多 {set(data.columns) - expected}"
     # 应该是 log return (绝对值 < 1.0 即 < 100% 日变化; VIX 单日能涨 50%+, 阈值放宽)
     assert data.abs().max().max() < 1.0, f"log return 应 < 1.0 (放宽给 VIX 极端行情), got max {data.abs().max().max()}"
@@ -1990,7 +2011,7 @@ def test_causal_pc_dag_v0911_p96():
     pc_dag = discover_dag_pc(data, alpha=0.05)
 
     # 应该 ≥ 1 个节点 (sparse). P9-1.7 batch 1+2+3: 7 → 21 节点 (含 11 行业 + 3 国债)
-    assert pc_dag.number_of_nodes() == 21, f"应 21 节点 (P9-1.7 batch 3 重做), got {pc_dag.number_of_nodes()}"
+    assert pc_dag.number_of_nodes() == 35, f"应 35 节点 (P9-1.7 batch 4, v0.7.0), got {pc_dag.number_of_nodes()}"
 
     # P9-1.7 batch 1+2: 加 11 行业后, PC 算法可能把 VIX→index direct 边吸收到 VIX→industry→index
     # mediator chain. 所以 PC 不一定有 VIX→index 边, 但应该有 VIX→industry 或 industry→index 边

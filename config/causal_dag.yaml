@@ -1,18 +1,21 @@
-# Phase 9.0 POC + 9.1.2 + 9.1.7 batch 1+2+3: 手工因果 DAG (DOT format)
-# 7 → 18 → 21 节点 (6 macro + 4 指数 + 11 行业)
+# Phase 9.0 POC + 9.1.2 + 9.1.7 batch 1+2+3+4: 手工因果 DAG (DOT format)
+# 7 → 18 → 21 → 35 节点 (6 macro + 4 指数 + 11 行业 + 14 期货)
 #
-# P9-1.7 batch 3 (v0.6.9j+k 重做): 加 3 国债 (^IRX 13W / ^FVX 5Y / ^TYX 30Y 完整 yield curve)
-# 跟 ^TNX (10Y) 一起, 共 4 个 yield curve 节点
-# 短端利率 (^IRX/^FVX) 对消费/金融/能源更敏感 (yield curve shape 相关)
-# 长端利率 (^TYX) 跟 10Y 类似, 影响估值
-# 完整 yield curve 让你能分析 "curve flattening/steepening" 对指数影响
-# 中介链示例: ^IRX → XLF → QQQ (短端利率→金融股→纳指, 反映 bank NIM)
-# 中介链示例: ^TYX → XLK → QQQ (长端利率→科技股→纳指, DCF 折现率)
+# P9-1.7 batch 4 (v0.7.0): 加 14 商品期货 (4 贵金属 + 1 工业 + 3 能源 + 3 谷物 + 3 软商品)
+# 边设计: 26 边 commodity → industry (按经济意义剪枝, 不加 direct commodity→index)
+#   - 4 贵金属 (GC/SI/PL/PA) → XLB/XLE/XLF (13 边, 避险+对冲)
+#   - 1 工业金属 (HG 铜) → XLB/XLI (2 边)
+#   - 3 能源 (CL/BZ/NG) → XLE/XLU (5 边, 能源+电力)
+#   - 3 谷物 (ZW/ZC/ZS) → XLP (3 边, 食品消费)
+#   - 3 软商品 (SB/CT/KC) → XLP (3 边, 食品消费)
+# 中介链示例: GC=F → XLB → DIA (黄金避险→材料股→道指)
+# 中介链示例: CL=F → XLE → QQQ (原油→能源股→纳指, 间接 via industry weight)
 #
 # v0.6.9k (P9-1.5.5 升级): 21 节点 ≥ LARGE_DAG_THRESHOLD=20, L2 refutation 自动 0 重
-# 21 节点 1 重 refutation 实测 175s 性能爆降 30x, 0 重 fallback ~3s. auto_reduce=True 默认.
+# v0.6.9l (P9-1.5.5 升级): OLS refutation 路径, 3500x 加速, 保留 3 重验证
+# 35 节点 L2 OLS 估计 < 200ms (vs DoWhy 21 节点 175s, 实际受 LARGE_DAG_THRESHOLD=20 + OLS 路径保)
 
-dag_name: "Phase 9.0 + 9.1.2 + 9.1.7 batch 1+2+3: Macro + Yield Curve → Industry → Equity"
+dag_name: "Phase 9.0 + 9.1.2 + 9.1.7 batch 1+2+3+4: Macro + Yield Curve + Commodities → Industry → Equity"
 
 # DOT 格式 (graphviz), DoWhy / networkx / causal-learn 都吃
 dot: |
@@ -43,6 +46,27 @@ dot: |
     QQQ [label="QQQ"];
     RSP [label="RSP"];
     QQQE [label="QQQE"];
+
+    // 节点 — commodity futures (14, P9-1.7 batch 4)
+    // 4 贵金属
+    GC_F [label="GC=F (Gold)"];
+    SI_F [label="SI=F (Silver)"];
+    PL_F [label="PL=F (Platinum)"];
+    PA_F [label="PA=F (Palladium)"];
+    // 1 工业金属
+    HG_F [label="HG=F (Copper)"];
+    // 3 能源
+    CL_F [label="CL=F (WTI Crude)"];
+    BZ_F [label="BZ=F (Brent)"];
+    NG_F [label="NG=F (Nat Gas)"];
+    // 3 谷物
+    ZW_F [label="ZW=F (Wheat)"];
+    ZC_F [label="ZC=F (Corn)"];
+    ZS_F [label="ZS=F (Soybean)"];
+    // 3 软商品
+    SB_F [label="SB=F (Sugar)"];
+    CT_F [label="CT=F (Cotton)"];
+    KC_F [label="KC=F (Coffee)"];
 
     // macro (3) → index (direct path, P9.0 已有)
     TNX -> DIA;
@@ -101,6 +125,27 @@ dot: |
     XLB -> DIA; XLB -> QQQ; XLB -> RSP; XLB -> QQQE;
     XLRE -> DIA; XLRE -> QQQ; XLRE -> RSP; XLRE -> QQQE;
     XLC -> DIA; XLC -> QQQ; XLC -> RSP; XLC -> QQQE;
+
+    // P9-1.7 batch 4: 14 commodity → 11 industry = 26 边 (按经济意义剪枝)
+    // 4 贵金属 → XLB/XLE/XLF (13 边, 避险+对冲)
+    GC_F -> XLB; GC_F -> XLE; GC_F -> XLF;
+    SI_F -> XLB; SI_F -> XLE; SI_F -> XLF;
+    PL_F -> XLB; PL_F -> XLE; PL_F -> XLF;
+    PA_F -> XLB; PA_F -> XLE; PA_F -> XLF;
+    // 1 工业金属 (HG 铜) → XLB/XLI (2 边)
+    HG_F -> XLB; HG_F -> XLI;
+    // 3 能源 (CL/BZ/NG) → XLE/XLU (5 边, 能源+电力)
+    CL_F -> XLE; CL_F -> XLU;
+    BZ_F -> XLE;
+    NG_F -> XLE; NG_F -> XLU;
+    // 3 谷物 → XLP (3 边, 食品消费)
+    ZW_F -> XLP;
+    ZC_F -> XLP;
+    ZS_F -> XLP;
+    // 3 软商品 → XLP (3 边, 食品消费)
+    SB_F -> XLP;
+    CT_F -> XLP;
+    KC_F -> XLP;
   }
 
 # P9-1.7 batch 3 query 示例 (yield curve):
@@ -119,6 +164,8 @@ nodes:
   yield_curve: [IRX, FVX, TNX, TYX]
   # P9-1.7 batch 1+2: 11 行业全
   industries: [XLK, XLF, XLV, XLE, XLY, XLP, XLI, XLU, XLB, XLRE, XLC]
+  # P9-1.7 batch 4: 14 商品期货
+  commodities: [GC_F, SI_F, PL_F, PA_F, HG_F, CL_F, BZ_F, NG_F, ZW_F, ZC_F, ZS_F, SB_F, CT_F, KC_F]
   parquet_map:
     TNX: "data/raw/macro/_TNX.parquet"
     IRX: "data/raw/macro/_IRX.parquet"
@@ -141,3 +188,18 @@ nodes:
     XLB: "data/raw/sectors/XLB.parquet"
     XLRE: "data/raw/sectors/XLRE.parquet"
     XLC: "data/raw/sectors/XLC.parquet"
+    # P9-1.7 batch 4: 14 commodity futures
+    GC_F: "data/raw/commodities_futures/GC_F.parquet"
+    SI_F: "data/raw/commodities_futures/SI_F.parquet"
+    PL_F: "data/raw/commodities_futures/PL_F.parquet"
+    PA_F: "data/raw/commodities_futures/PA_F.parquet"
+    HG_F: "data/raw/commodities_futures/HG_F.parquet"
+    CL_F: "data/raw/commodities_futures/CL_F.parquet"
+    BZ_F: "data/raw/commodities_futures/BZ_F.parquet"
+    NG_F: "data/raw/commodities_futures/NG_F.parquet"
+    ZW_F: "data/raw/commodities_futures/ZW_F.parquet"
+    ZC_F: "data/raw/commodities_futures/ZC_F.parquet"
+    ZS_F: "data/raw/commodities_futures/ZS_F.parquet"
+    SB_F: "data/raw/commodities_futures/SB_F.parquet"
+    CT_F: "data/raw/commodities_futures/CT_F.parquet"
+    KC_F: "data/raw/commodities_futures/KC_F.parquet"
