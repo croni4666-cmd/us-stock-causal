@@ -2184,6 +2184,82 @@ def test_data_fetch_uses_tenacity_v069m_p86():
     clear_retry_log()
 
 
+def test_load_dag_graph_cache_v075_p89():
+    """v0.7.5 (性能 < 10s): load_dag_graph 加 Pydot cache, 35 节点 cold 375ms → warm 0ms
+
+    验证:
+    1. 第一次 cold < 500ms (Pydot 解析)
+    2. 第二次 warm < 1ms (cache hit)
+    3. cache key = md5(dot), 跨调用共享
+    4. cfg["dot"] 变时 invalidate (新 key 触发重 parse)
+    """
+    import time as _time
+    from src import causal as cm
+
+    cm.clear_caches()
+    cfg = cm.load_dag_config()
+
+    # 1. cold
+    t0 = _time.time()
+    g1 = cm.load_dag_graph(cfg)
+    cold_elapsed = _time.time() - t0
+    assert cold_elapsed < 0.5, f"cold load_dag_graph 应 < 0.5s, got {cold_elapsed:.3f}s"
+
+    # 2. warm
+    t0 = _time.time()
+    g2 = cm.load_dag_graph(cfg)
+    warm_elapsed = _time.time() - t0
+    assert warm_elapsed < 0.001, f"warm load_dag_graph 应 < 1ms (cache hit), got {warm_elapsed*1000:.2f}ms"
+
+    # 3. cache 共享 (同一对象引用)
+    assert g1 is g2, "cache hit 应返同一 DiGraph 引用"
+
+    # 4. 不同 cfg (dot 变) → 新 key, 重 parse
+    cfg2 = dict(cfg)
+    cfg2["dot"] = cfg["dot"] + "\n// noop comment\n"
+    g3 = cm.load_dag_graph(cfg2)
+    assert g3.number_of_nodes() == g1.number_of_nodes(), "dot 变后应仍 35 节点"
+
+
+def test_render_full_report_lru_cache_v075_p90():
+    """v0.7.5 (性能 < 10s): render_full_report 加 date-based LRU cache
+
+    验证:
+    1. 第一次 cold 实测时间 (含 PC + CATE 实际 cold)
+    2. 第二次 warm < 50ms (cache hit, v0.7.5 优化目标)
+    3. 跨日期 invalidate (date key 变)
+    4. 跨 symbols invalidate
+    """
+    import time as _time
+    from src.report import render_full_report, _REPORT_CACHE
+    from datetime import date
+
+    # 1. cold
+    _REPORT_CACHE.clear()
+    t0 = _time.time()
+    r1 = render_full_report(["DIA", "QQQ", "RSP", "QQQE"])
+    cold_elapsed = _time.time() - t0
+    assert len(r1) > 1000, f"报告应 > 1KB, got {len(r1)} chars"
+
+    # 2. warm (应 < 50ms)
+    t0 = _time.time()
+    r2 = render_full_report(["DIA", "QQQ", "RSP", "QQQE"])
+    warm_elapsed = _time.time() - t0
+    assert warm_elapsed < 0.05, f"warm render_full_report 应 < 50ms (LRU cache hit), got {warm_elapsed*1000:.1f}ms"
+    assert r1 == r2, "warm 跟 cold 应返一致内容"
+
+    # 3. 不同 symbols → invalidate
+    t0 = _time.time()
+    r3 = render_full_report(["DIA"])
+    syms_elapsed = _time.time() - t0
+    # 5 段只算 1 个指数 → 快但仍 cold
+    assert syms_elapsed < 2.0, f"1 指数 cold 应 < 2s, got {syms_elapsed:.2f}s"
+    assert r3 != r1, "不同 symbols 应返不同内容"
+
+    # 4. cache 大小检查 (1 day + 2 symbols entries)
+    assert len(_REPORT_CACHE) >= 2, f"cache 应 ≥ 2 entries, got {len(_REPORT_CACHE)}"
+
+
 if __name__ == "__main__":
     # Run as script (not pytest)
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

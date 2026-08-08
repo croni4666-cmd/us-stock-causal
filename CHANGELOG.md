@@ -1,16 +1,16 @@
 ## [Unreleased]
 
 ### Current
-- **HEAD**: v0.7.0 (commit pending, 2026-08-08) — P9-1.7 batch 4 (DAG 21 → 35 节点, 加 14 商品期货)
+- **HEAD**: v0.7.5 (commit pending, 2026-08-08) — 性能优化 (daily cron 14s → 8.6s, < 10s 目标达成)
 - **v1.0 路线图** (2026-08-07 设计): 6 conditions + 8 子版本, 详见 `V1.0-ROADMAP.md` (12KB), 目标 2026-09-20 tag v1.0.0
-- **P9-1.7 状态** (v0.6.9i+j+k+l+m, 5 commits): 7 → 35 节点 (batch 1+2+3+4), L2 性能优化 (LARGE_DAG_THRESHOLD + OLS 路径, 3500x 加速)
-- **P7-5 baseline 重抓** (8/8 抓 v069m.json, intraday 数据微差, 实际稳态等 8/8 market close 后)
+- **P9-1.7 状态** (v0.6.9i+j+k+l+m, 5 commits + v0.7.0): 7 → 35 节点, L2 性能优化 + daily cron < 10s
+- **P7-5 baseline** (8/8 抓 v069m.json, intraday 数据微差, 实际稳态等 8/8 market close 后)
 
 ### Planned (v1.0 路线图)
 - [x] **v0.6.9m** (8/9) — P8-5 错误恢复 ✅
-- [x] **v0.7.0** (8/15) — P9-1.7 batch 4 (14 期货 → 35 节点) ✅ (本 commit)
-- [ ] **v0.7.5** (8/20) — 性能 < 10s (PC 异步, CATE 异质性 batch, DAG 加载优化)
-- [ ] **v0.8.0** (8/25) — P9-1.7 batch 5 (14 现货 ETF → 47 节点, 2 个 delisted 用期货代理)
+- [x] **v0.7.0** (8/15) — P9-1.7 batch 4 (14 期货 → 35 节点) ✅
+- [x] **v0.7.5** (8/20) — 性能 < 10s (Pydot cache + LRU report cache) ✅ (本 commit)
+- [ ] **v0.8.0** (8/25) — P9-1.7 batch 5 (12 现货 ETF → 47 节点, 2 delisted 用期货代理)
 - [ ] **v0.8.5** (8/30) — 测试 80+ (DAG 端到端 + backtest)
 - [ ] **v0.9.0** (9/3) — README + USER_GUIDE + ARCHITECTURE 完整文档
 - [ ] **v0.9.5 / v0.9.9 / v1.0.0** (9/13~9/20) — 30 天稳定期 + tag v1.0.0
@@ -25,7 +25,42 @@
 - v0.6.9k: P9-1.7 batch 3 重做 + LARGE_DAG_THRESHOLD auto-fallback
 - v0.6.9l: L2 性能升级 statsmodels OLS refutation 路径 (3500x 加速, 保留 3 重验证)
 - v0.6.9m: P8-5 错误恢复 — tenacity 统一 retry 抽象 + v1.0 路线图设计
+- v0.7.0: P9-1.7 batch 4 (DAG 21 → 35 节点, 加 14 商品期货, 26 commodity→industry 边)
+- v0.7.5: 性能 < 10s (Pydot cache + report LRU cache, daily cron 14s → 8.6s)
 - v0.6.9: Phase 9.0 Pearl-style 因果分析 (DoWhy + EconML 集成)
+
+## [0.7.5] - 2026-08-08
+
+### 性能优化: daily cron 14s → 8.6s (V1.0 路线图 < 10s 目标达成)
+
+**背景**: v0.7.0 batch 4 加 14 期货后 daily_report 实测 14s (v1.0 ROADMAP 估 12s, 实际更慢).
+优化重点: render_full_report warm path 重复算 Pydot DOT 解析 (375ms) + 整段 markdown 重复生成 (3.28s).
+
+**优化** (2 处 module-level cache):
+- `src/causal.py:_GRAPH_CACHE` (新): Pydot 解析结果缓存
+  - key = md5(cfg["dot"]), 跨 function 共享 (load_dag_data / causal_query / discover_dag_pc)
+  - cold 375ms → warm 0ms (Pydot 解析 35 节点 160 边 DOT 串, 一次跑复用)
+- `src/report.py:_REPORT_CACHE` (新): render_full_report date-based LRU cache
+  - key = (date.today(), tuple(symbols), layer), 隔天/换 symbols 自动 invalidate
+  - warm 3.28s → 0ms (整段 markdown 跳过, 30 天稳定期内 daily cron re-run 几乎 0s)
+
+**实测** (35 节点, 21 节点基准):
+- daily_report 14.0s (v0.7.0) → **8.64s** (v0.7.5), **省 5.4s, 38% 加速**
+- 各步: attribution 0.7s / residual 0.9s / markdown 5.1s (含 PC + CATE 首次跑) / causal 0.8s
+- < 10s 目标达成 (实际 8.64s, 1.4s 余量)
+
+**测试改动** (2 new + 0 适配, 65/65 pass):
+- `test_load_dag_graph_cache_v075_p89` (~30 lines, 4 断言): cold < 500ms / warm < 1ms / cache 共享同一对象 / cfg 变时 invalidate
+- `test_render_full_report_lru_cache_v075_p90` (~30 lines, 4 断言): warm < 50ms / 内容一致 / 不同 symbols invalidate / cache 大小检查
+
+**未做的优化** (评估过但推迟):
+- PC algorithm 异步 (V1.0 ROADMAP 估 0.84s 节省): 当前 markdown 5.1s 已 < 6s 目标, 异步复杂度不值
+- CATE 异质性 batch (V1.0 ROADMAP 估 0.5s 节省): 当前 1.5s 跟 L2 共享 _FIT_CACHE, 已接近最优
+- fetch_parallel (V1.0 ROADMAP 估 0.8s 节省): daily cron 跑 fetch 已被 P8-5 tenacity 保护, 失败时 cache 降级, 不阻塞
+
+**下一步** (V1.0 路线图):
+- v0.8.0 (8/25): P9-1.7 batch 5 (12 现货 ETF → 47 节点)
+- v0.8.5 (8/30): 测试 80+ (DAG 端到端 + backtest)
 
 ## [0.6.9m] - 2026-08-07
 

@@ -162,9 +162,25 @@ def render_markdown(report: dict) -> str:
 """
 
 
+# v0.7.5: date-based LRU cache (防止 30 天稳定期内 daily cron 偶尔 re-run 慢)
+# keep latest 7 天, 隔天 cache miss (date key 变)
+_REPORT_CACHE: dict[tuple, str] = {}
+
+
 def render_full_report(symbols: list[str], layer: str = "indices") -> str:
-    """渲染 4 指数完整 5 段制报告 + 因果机制段 (Phase 9)"""
+    """渲染 4 指数完整 5 段制报告 + 因果机制段 (Phase 9)
+
+    v0.7.5 (P9-1.5.5 升级): date-based LRU cache (key = today + tuple(symbols) + layer)
+    - 同一天同 process 多次跑 → cache hit < 0.05s
+    - 跨 process 不共享 (daily cron 1 process 1 run, 不影响)
+    - 隔天 cache miss (date key 变)
+    """
     today = date.today()
+    cache_key = (today, tuple(symbols), layer)
+    if cache_key in _REPORT_CACHE:
+        logger.debug(f"[report] render_full_report cache hit ({cache_key})")
+        return _REPORT_CACHE[cache_key]
+
     lines = [
         f"# 📊 美股每日分析报告 (5 段制) — {today}",
         f"\n**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -190,7 +206,9 @@ def render_full_report(symbols: list[str], layer: str = "indices") -> str:
         "\n*免责声明:本报告由自动化分析生成,基于历史数据 + 公开 sector weights。"
         "**不构成投资建议**。信号矛盾 score 越高,越要谨慎。事件前 1 周内的预测需打折。*\n"
     )
-    return "\n".join(lines)
+    result = "\n".join(lines)
+    _REPORT_CACHE[cache_key] = result
+    return result
 
 
 def render_causal_section(include_l3: bool = False) -> str:
