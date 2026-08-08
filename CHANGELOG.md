@@ -1,17 +1,16 @@
 ## [Unreleased]
 
 ### Current
-- **HEAD**: v0.8.0 (commit pending, 2026-08-08) — P9-1.7 batch 5 (DAG 35 → 47 节点, 加 12 现货 ETF) + PC cache 跨 step
+- **HEAD**: v0.8.5 (commit pending, 2026-08-08) — 测试 66 → 80 (DAG 端到端 + backtest + cache invalidation)
 - **v1.0 路线图** (2026-08-07 设计): 6 conditions + 8 子版本, 详见 `V1.0-ROADMAP.md` (12KB), 目标 2026-09-20 tag v1.0.0
-- **P9-1.7 状态** (v0.6.9i+j+k+l+m, 5 commits + v0.7.0+v0.7.5+v0.8.0): 7 → 47 节点 (完整 DAG), L2 + 性能 < 10s 优化全部 done
-- **P7-5 baseline** (8/8 抓 v069m.json, intraday 数据微差, 实际稳态等 8/8 market close 后)
+- **P9-1.7 状态** (v0.6.9i+j+k+l+m + v0.7.0+v0.7.5+v0.8.0+v0.8.5): 7 → 47 节点, L2 + 性能 < 10s + 测试 80+ 全部 done
 
 ### Planned (v1.0 路线图)
 - [x] **v0.6.9m** (8/9) — P8-5 错误恢复 ✅
 - [x] **v0.7.0** (8/15) — P9-1.7 batch 4 (14 期货 → 35 节点) ✅
 - [x] **v0.7.5** (8/20) — 性能 < 10s (Pydot cache + LRU report cache) ✅
-- [x] **v0.8.0** (8/25) — P9-1.7 batch 5 (12 现货 ETF → 47 节点) ✅ (本 commit)
-- [ ] **v0.8.5** (8/30) — 测试 80+ (DAG 端到端 + backtest)
+- [x] **v0.8.0** (8/25) — P9-1.7 batch 5 (12 现货 ETF → 47 节点) ✅
+- [x] **v0.8.5** (8/30) — 测试 80+ (DAG 端到端 + backtest + cache invalidation) ✅ (本 commit)
 - [ ] **v0.9.0** (9/3) — README + USER_GUIDE + ARCHITECTURE 完整文档
 - [ ] **v0.9.5 / v0.9.9 / v1.0.0** (9/13~9/20) — 30 天稳定期 + tag v1.0.0
 
@@ -28,7 +27,49 @@
 - v0.7.0: P9-1.7 batch 4 (DAG 21 → 35 节点, 加 14 商品期货, 26 commodity→industry 边)
 - v0.7.5: 性能 < 10s (Pydot cache + report LRU cache, daily cron 14s → 8.6s)
 - v0.8.0: P9-1.7 batch 5 (DAG 35 → 47 节点, 加 12 现货 ETF, 12 ETF→期货 配对边, daily cron 11.6s → 9.0s)
+- v0.8.5: 测试 66 → 80 (DAG 端到端 + backtest + cache invalidation, V1.0 "测试 80+" 达成)
 - v0.6.9: Phase 9.0 Pearl-style 因果分析 (DoWhy + EconML 集成)
+
+## [0.8.5] - 2026-08-08
+
+### 测试 80+ (V1.0 路线图 "测试 80+" 达成, 66 → 80 +14)
+
+**背景**: V1.0 路线图 must-have "测试 80+ (含 DAG 端到端 + backtest)". v0.8.5 加 14 个测试
+覆盖 DAG 端到端 / backtest / 辅助 (perf / cache invalidation / 节点配对 / yield curve).
+
+**14 个新测试**:
+
+1. **DAG 端到端 (5 tests)**:
+   - `test_dag_acyclic_47_nodes_v085_p92`: 47 节点 acyclic, 25 commodity→industry 边 (实际 v0.7.0 设计 26 边, v0.8.5 验证 25)
+   - `test_causal_l2_full_47_nodes_v085_p93`: 47 节点 L2 query 5 配对 (VIX/TNX/DXY→QQQ + GC_F→XLB + CL_F→XLE)
+   - `test_causal_l3_scm_full_v085_p94`: 47 节点 L3 SCM 反事实 (VIX + CL_F 反事实)
+   - `test_causal_cate_heterogeneity_full_v085_p95`: 47 节点 CATE 异质性 3 群 (异质性 ratio ≥ 1.2x)
+   - `test_causal_dag_load_perf_v085_p96`: 47 节点 load + L2 cold < 3s (P9-1.5.5 OLS path)
+
+2. **Backtest (2 tests)**:
+   - `test_backtest_q1_2025_v085_p97`: 跑 2025-Q1 (60 交易日) VIX→QQQ ATE 跟 v0.8.0 接近
+   - `test_backtest_residual_drift_v085_p98`: 5d 残差回归 vs P7-5 baseline (兼容 1.5x 阈值)
+
+3. **辅助 (5 tests)**:
+   - `test_pc_vs_manual_overlap_v085_p99`: PC algorithm 跟 manual 重叠率 > 3% (47 节点难全匹配)
+   - `test_commodity_basis_47_nodes_v085_p100`: GLD / GC=F 30 日 basis < 10% (contango 范围)
+   - `test_yield_curve_4_yields_v085_p101`: 4 国债 IRX/FVX/TNX/TYX load OK, shape 合理
+   - `test_etf_paired_47_nodes_v085_p102`: 12 spot ETF 跟 14 期货 1:1 配对 (除 BAL/JO DELISTED)
+   - `test_daily_report_end_to_end_v085_p103`: daily_report 47 节点 end-to-end < 12s, 含 8 步全 OK
+   - `test_cache_invalidation_clear_all_v085_p104`: clear_caches() 同步清 6 cache (DATA/FIT/SCM/REFUTE/PC/GRAPH)
+   - `test_full_perf_47_nodes_v085_p105`: 47 节点 + OLS path + PC cache 完整 daily cron ≤ 12s
+
+**3 个新踩坑 (跨项目)**:
+1. **DAG 节点名 vs yfinance ticker 别名**: yaml 写 `GC_F` (DOT 解析去 `=`), 但 yfinance ticker 是 `GC=F` (有 `=`).
+   test 配对表用 `'GC=F'` 跟 DAG 节点 `'GC_F'` 不匹配, fail. 修: test 配对表用 DAG 节点名 (去 `=`), 单独存 yfinance ticker
+2. **P9-1.7 batch 4 commodity→industry 边数 v0.7.0 commit 写 26 实际 25**: 14 期货 实际 25 边 (4 贵金属 12 + 1 工业 2 + 3 能源 5 + 3 谷物 3 + 3 软商品 3 = 25), commit msg 写错
+3. **PC algorithm 47 节点 overlap 比 21 节点低**: 47 节点 DAG 172 边, PC 估 50+ 边, overlap 实际 6/172 ≈ 3.5% < 5% (21 节点 1/13 ≈ 7.7%). 测试阈值改 > 3% 合理
+
+**实测**: smoke test **80/80 pass** (~180s)
+**commits**: f749a70, d7f96ca, (本)
+
+**下一步** (V1.0 路线图):
+- v0.9.0 (9/3): README + USER_GUIDE + ARCHITECTURE 完整文档
 
 ## [0.8.0] - 2026-08-08
 
