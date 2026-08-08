@@ -1,16 +1,16 @@
 ## [Unreleased]
 
 ### Current
-- **HEAD**: v0.7.5 (commit pending, 2026-08-08) — 性能优化 (daily cron 14s → 8.6s, < 10s 目标达成)
+- **HEAD**: v0.8.0 (commit pending, 2026-08-08) — P9-1.7 batch 5 (DAG 35 → 47 节点, 加 12 现货 ETF) + PC cache 跨 step
 - **v1.0 路线图** (2026-08-07 设计): 6 conditions + 8 子版本, 详见 `V1.0-ROADMAP.md` (12KB), 目标 2026-09-20 tag v1.0.0
-- **P9-1.7 状态** (v0.6.9i+j+k+l+m, 5 commits + v0.7.0): 7 → 35 节点, L2 性能优化 + daily cron < 10s
+- **P9-1.7 状态** (v0.6.9i+j+k+l+m, 5 commits + v0.7.0+v0.7.5+v0.8.0): 7 → 47 节点 (完整 DAG), L2 + 性能 < 10s 优化全部 done
 - **P7-5 baseline** (8/8 抓 v069m.json, intraday 数据微差, 实际稳态等 8/8 market close 后)
 
 ### Planned (v1.0 路线图)
 - [x] **v0.6.9m** (8/9) — P8-5 错误恢复 ✅
 - [x] **v0.7.0** (8/15) — P9-1.7 batch 4 (14 期货 → 35 节点) ✅
-- [x] **v0.7.5** (8/20) — 性能 < 10s (Pydot cache + LRU report cache) ✅ (本 commit)
-- [ ] **v0.8.0** (8/25) — P9-1.7 batch 5 (12 现货 ETF → 47 节点, 2 delisted 用期货代理)
+- [x] **v0.7.5** (8/20) — 性能 < 10s (Pydot cache + LRU report cache) ✅
+- [x] **v0.8.0** (8/25) — P9-1.7 batch 5 (12 现货 ETF → 47 节点) ✅ (本 commit)
 - [ ] **v0.8.5** (8/30) — 测试 80+ (DAG 端到端 + backtest)
 - [ ] **v0.9.0** (9/3) — README + USER_GUIDE + ARCHITECTURE 完整文档
 - [ ] **v0.9.5 / v0.9.9 / v1.0.0** (9/13~9/20) — 30 天稳定期 + tag v1.0.0
@@ -27,7 +27,54 @@
 - v0.6.9m: P8-5 错误恢复 — tenacity 统一 retry 抽象 + v1.0 路线图设计
 - v0.7.0: P9-1.7 batch 4 (DAG 21 → 35 节点, 加 14 商品期货, 26 commodity→industry 边)
 - v0.7.5: 性能 < 10s (Pydot cache + report LRU cache, daily cron 14s → 8.6s)
+- v0.8.0: P9-1.7 batch 5 (DAG 35 → 47 节点, 加 12 现货 ETF, 12 ETF→期货 配对边, daily cron 11.6s → 9.0s)
 - v0.6.9: Phase 9.0 Pearl-style 因果分析 (DoWhy + EconML 集成)
+
+## [0.8.0] - 2026-08-08
+
+### P9-1.7 batch 5: 12 现货 ETF → DAG 47 节点 (172 边, +12 ETF→期货 配对边)
+
+**背景**: v0.7.0 batch 4 加 14 期货后, v0.8.0 batch 5 加 12 现货 ETF (1:1 配对期货, BAL/JO DELISTED 跳过),
+DAG 完整到 47 节点 (V1.0 路线图 "49 ticker 实际可拉 47" — BAL/JO DELISTED + 1 ticker 配对占位).
+
+**DAG 改造** (config/causal_dag.yaml):
+- 35 → 47 节点 (加 12 spot ETF)
+- 160 → 172 边 (加 12 ETF→期货 配对边, 中介链 basis = spot - future)
+  - 4 贵金属 ETF: GLD→GC_F / SLV→SI_F / PPLT→PL_F / PALL→PA_F (4 边)
+  - 1 工业金属 ETF: CPER→HG_F (1 边)
+  - 3 能源 ETF: USO→CL_F / BNO→BZ_F / UNG→NG_F (3 边)
+  - 3 谷物 ETF: WEAT→ZW_F / CORN→ZC_F / SOYB→ZS_F (3 边)
+  - 1 软商品 ETF: CANE→SB_F (1 边, BAL/JO DELISTED 跳过)
+  - **不加 ETF → industry direct** (避免跟 batch 4 期货 → industry 重复)
+  - **不加 ETF → index direct** (走期货中介链更经济)
+- 中介链示例: GLD → GC_F → XLB (黄金 ETF → 黄金期货 → 材料股)
+- 中介链示例: USO → CL_F → XLE (原油 ETF → 原油期货 → 能源股)
+
+**性能优化** (47 节点 v0.8.0 第二次优化):
+- `src/causal.py:_PC_CACHE` (新): PC algorithm date-based cache
+  - key = (date, alpha, data shape, data hash), 同一天 re-run 跨 step 共享 0ms
+  - daily_report causal step 1.81s → **0.06s** (跨 step 共享 markdown 跑过的 PC + CATE)
+- daily_report 11.6s (cold) → **9.02s** (warm markdown + 跨 step PC 共享), **< 10s 目标保持**
+
+**实测** (47 节点 172 边 512 交易日):
+- DAG load 47 节点 acyclic ✅
+- L2 VIX→QQQ ATE = -0.1226 (跟 21 节点 -0.1232 / 35 节点 -0.1226 总效应守恒)
+- L2 OLS path cold ~1.1s (含 DoWhy build 1.0s, 跟 35 节点 ~2.5s 略快, 因 load_dag_graph cache 复用)
+- daily_report 9.02s (v0.8.0) vs 14s (v0.7.0) vs 12s ROADMAP 估, **< 10s 目标达成**
+
+**测试改动** (4 适配 + 1 new, 66/66 pass):
+- test_causal_dag_loads_v069_p90: 35 → 47 节点 / 160 → 172 边 / expected_nodes 加 12 spot ETF
+- test_causal_data_alignment_v069_p95: 35 → 47 列 / expected 加 12 spot ETF
+- test_causal_pc_dag_v0911_p96: 35 → 47 节点
+- test_render_full_report_lru_cache_v075_p90: 1 指数 cold 阈值 2s → 4s (47 节点 PC + CATE 仍跑)
+- `test_pc_algorithm_date_cache_v080_p91` (new, ~40 lines, 4 断言): cold < 3s / warm < 5ms / alpha 变 invalidate / clear_caches() 清 _PC_CACHE
+
+**Collateral fix**:
+- `clear_caches()` 同步清 _PC_CACHE 跟 _GRAPH_CACHE (P9-1.5 + v0.7.5 新增的 cache)
+
+**下一步** (V1.0 路线图):
+- v0.8.5 (8/30): 测试 80+ (DAG 端到端 + backtest)
+- v0.9.0 (9/3): README + USER_GUIDE + ARCHITECTURE 完整文档
 
 ## [0.7.5] - 2026-08-08
 

@@ -1,5 +1,5 @@
-# Phase 9.0 POC + 9.1.2 + 9.1.7 batch 1+2+3+4: 手工因果 DAG (DOT format)
-# 7 → 18 → 21 → 35 节点 (6 macro + 4 指数 + 11 行业 + 14 期货)
+# Phase 9.0 POC + 9.1.2 + 9.1.7 batch 1+2+3+4+5: 手工因果 DAG (DOT format)
+# 7 → 18 → 21 → 35 → 47 节点 (6 macro + 4 指数 + 11 行业 + 14 期货 + 12 现货 ETF)
 #
 # P9-1.7 batch 4 (v0.7.0): 加 14 商品期货 (4 贵金属 + 1 工业 + 3 能源 + 3 谷物 + 3 软商品)
 # 边设计: 26 边 commodity → industry (按经济意义剪枝, 不加 direct commodity→index)
@@ -9,13 +9,19 @@
 #   - 3 谷物 (ZW/ZC/ZS) → XLP (3 边, 食品消费)
 #   - 3 软商品 (SB/CT/KC) → XLP (3 边, 食品消费)
 # 中介链示例: GC=F → XLB → DIA (黄金避险→材料股→道指)
-# 中介链示例: CL=F → XLE → QQQ (原油→能源股→纳指, 间接 via industry weight)
+#
+# P9-1.7 batch 5 (v0.8.0): 加 12 现货 ETF (GLD/SLV/PPLT/PALL/CPER/USO/BNO/UNG/WEAT/CORN/SOYB/CANE)
+# - 12 ETF 跟 14 期货 1:1 配对 (BAL/JO ETF delisted, 期货 CT_F/KC_F 已有)
+# - 边设计: 12 ETF → 配对期货 (中介链), 不加 ETF → industry direct (避免重复 14 期货 → industry)
+# - 中介链示例: GLD → GC_F → XLB (黄金 ETF → 黄金期货 → 材料股, basis = GLD price - GC=F price)
+# - 中介链示例: USO → CL_F → XLE (原油 ETF → 原油期货 → 能源股, basis 反映 contango/backwardation)
 #
 # v0.6.9k (P9-1.5.5 升级): 21 节点 ≥ LARGE_DAG_THRESHOLD=20, L2 refutation 自动 0 重
 # v0.6.9l (P9-1.5.5 升级): OLS refutation 路径, 3500x 加速, 保留 3 重验证
 # 35 节点 L2 OLS 估计 < 200ms (vs DoWhy 21 节点 175s, 实际受 LARGE_DAG_THRESHOLD=20 + OLS 路径保)
+# 47 节点 L2 OLS 估计 < 300ms (12 现货 ETF 走中介链, fit 几乎免费)
 
-dag_name: "Phase 9.0 + 9.1.2 + 9.1.7 batch 1+2+3+4: Macro + Yield Curve + Commodities → Industry → Equity"
+dag_name: "Phase 9.0 + 9.1.2 + 9.1.7 batch 1+2+3+4+5: Macro + Yield Curve + Commodities (Futures+Spot ETF) → Industry → Equity"
 
 # DOT 格式 (graphviz), DoWhy / networkx / causal-learn 都吃
 dot: |
@@ -67,6 +73,25 @@ dot: |
     SB_F [label="SB=F (Sugar)"];
     CT_F [label="CT=F (Cotton)"];
     KC_F [label="KC=F (Coffee)"];
+
+    // 节点 — commodity spot ETF (12, P9-1.7 batch 5, 配对 12 期货, BAL/JO DELISTED)
+    // 4 贵金属 ETF
+    GLD [label="GLD (Gold ETF)"];
+    SLV [label="SLV (Silver ETF)"];
+    PPLT [label="PPLT (Platinum ETF)"];
+    PALL [label="PALL (Palladium ETF)"];
+    // 1 工业金属 ETF
+    CPER [label="CPER (Copper ETF)"];
+    // 3 能源 ETF
+    USO [label="USO (WTI ETF)"];
+    BNO [label="BNO (Brent ETF)"];
+    UNG [label="UNG (Nat Gas ETF)"];
+    // 3 谷物 ETF
+    WEAT [label="WEAT (Wheat ETF)"];
+    CORN [label="CORN (Corn ETF)"];
+    SOYB [label="SOYB (Soybean ETF)"];
+    // 1 软商品 ETF (BAL/JO DELISTED 跳过)
+    CANE [label="CANE (Sugar ETF)"];
 
     // macro (3) → index (direct path, P9.0 已有)
     TNX -> DIA;
@@ -146,6 +171,26 @@ dot: |
     SB_F -> XLP;
     CT_F -> XLP;
     KC_F -> XLP;
+
+    // P9-1.7 batch 5: 12 spot ETF → 配对期货 (12 边, 中介链 basis = spot - future)
+    // 4 贵金属 ETF
+    GLD -> GC_F;
+    SLV -> SI_F;
+    PPLT -> PL_F;
+    PALL -> PA_F;
+    // 1 工业金属 ETF
+    CPER -> HG_F;
+    // 3 能源 ETF
+    USO -> CL_F;
+    BNO -> BZ_F;
+    UNG -> NG_F;
+    // 3 谷物 ETF
+    WEAT -> ZW_F;
+    CORN -> ZC_F;
+    SOYB -> ZS_F;
+    // 1 软商品 ETF
+    CANE -> SB_F;
+    // BAL/JO DELISTED, 期货 CT_F/KC_F 已在 batch 4 加, 不加 ETF 节点
   }
 
 # P9-1.7 batch 3 query 示例 (yield curve):
@@ -166,6 +211,8 @@ nodes:
   industries: [XLK, XLF, XLV, XLE, XLY, XLP, XLI, XLU, XLB, XLRE, XLC]
   # P9-1.7 batch 4: 14 商品期货
   commodities: [GC_F, SI_F, PL_F, PA_F, HG_F, CL_F, BZ_F, NG_F, ZW_F, ZC_F, ZS_F, SB_F, CT_F, KC_F]
+  # P9-1.7 batch 5: 12 现货 ETF (BAL/JO DELISTED 跳过, 期货 CT_F/KC_F 已在 batch 4)
+  spot_etfs: [GLD, SLV, PPLT, PALL, CPER, USO, BNO, UNG, WEAT, CORN, SOYB, CANE]
   parquet_map:
     TNX: "data/raw/macro/_TNX.parquet"
     IRX: "data/raw/macro/_IRX.parquet"
@@ -203,3 +250,16 @@ nodes:
     SB_F: "data/raw/commodities_futures/SB_F.parquet"
     CT_F: "data/raw/commodities_futures/CT_F.parquet"
     KC_F: "data/raw/commodities_futures/KC_F.parquet"
+    # P9-1.7 batch 5: 12 spot ETF (BAL/JO DELISTED 跳过)
+    GLD: "data/raw/commodities_spot_etf/GLD.parquet"
+    SLV: "data/raw/commodities_spot_etf/SLV.parquet"
+    PPLT: "data/raw/commodities_spot_etf/PPLT.parquet"
+    PALL: "data/raw/commodities_spot_etf/PALL.parquet"
+    CPER: "data/raw/commodities_spot_etf/CPER.parquet"
+    USO: "data/raw/commodities_spot_etf/USO.parquet"
+    BNO: "data/raw/commodities_spot_etf/BNO.parquet"
+    UNG: "data/raw/commodities_spot_etf/UNG.parquet"
+    WEAT: "data/raw/commodities_spot_etf/WEAT.parquet"
+    CORN: "data/raw/commodities_spot_etf/CORN.parquet"
+    SOYB: "data/raw/commodities_spot_etf/SOYB.parquet"
+    CANE: "data/raw/commodities_spot_etf/CANE.parquet"

@@ -62,11 +62,16 @@ def clear_caches() -> dict:
     n_fit = len(_FIT_CACHE)
     n_scm = len(_SCM_CACHE)
     n_refute = len(_REFUTE_CACHE)
+    n_pc = len(_PC_CACHE)
+    n_graph = len(_GRAPH_CACHE)
     _DATA_CACHE.clear()
     _FIT_CACHE.clear()
     _SCM_CACHE.clear()
     _REFUTE_CACHE.clear()
-    return {"data_cleared": n_data, "fit_cleared": n_fit, "scm_cleared": n_scm, "refute_cleared": n_refute}
+    _PC_CACHE.clear()
+    _GRAPH_CACHE.clear()
+    return {"data_cleared": n_data, "fit_cleared": n_fit, "scm_cleared": n_scm, "refute_cleared": n_refute,
+            "pc_cleared": n_pc, "graph_cleared": n_graph}
 
 
 def get_cache_stats() -> dict:
@@ -140,6 +145,16 @@ def discover_dag_pc(
     from causallearn.search.ConstraintBased.PC import pc
     from causallearn.graph.GeneralGraph import GeneralGraph
 
+    # v0.8.0: date-based cache (P9-1.1 PC algorithm 47 节点 ~1.5s 慢, 同一天 re-run 直接返)
+    # key = (date, alpha, data shape, data mtime hash) — data 改时 invalidate
+    import hashlib
+    from datetime import date as _date
+    data_hash = hashlib.md5(pd.util.hash_pandas_object(data, index=True).values.tobytes()).hexdigest()[:16]
+    cache_key = (_date.today(), alpha, data.shape, data_hash)
+    if cache_key in _PC_CACHE:
+        logger.debug(f"[causal] PC algorithm cache hit (key={cache_key})")
+        return _PC_CACHE[cache_key]
+
     cg = pc(data.values, alpha=alpha, indep_test=indep_test,
             node_names=list(data.columns), show_progress=False)
 
@@ -170,7 +185,13 @@ def discover_dag_pc(
                 else:
                     g.add_edge(node_names[j], node_names[i])
 
+    # v0.8.0: 写 PC cache (date-based, 同一天 re-run 0s)
+    _PC_CACHE[cache_key] = g
     return g
+
+
+# v0.8.0: PC algorithm date-based cache (47 节点 ~1.5s, cache hit 0s)
+_PC_CACHE: dict[tuple, nx.DiGraph] = {}
 
 
 def compare_dags(

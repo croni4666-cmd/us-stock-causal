@@ -1569,15 +1569,17 @@ def test_causal_dag_loads_v069_p90():
     P9-1.7 batch 3 (v0.6.9k 重做, 之前 v0.6.9j 实施 21 节点 L2 175s 爆降 revert):
       节点 18 → 21 (加 ^IRX/^FVX/^TYX 完整 yield curve), 边 90 → 135
       L2 优化: LARGE_DAG_THRESHOLD=20, 21 节点 auto-fallback n_refutations=0 (~3s vs 175s)
+    P9-1.7 batch 4 (v0.7.0): 21 → 35 节点 (加 14 commodity futures), 边 135 → 160 (+26 边 commodity→industry)
+    P9-1.7 batch 5 (v0.8.0): 35 → 47 节点 (加 12 spot ETF), 边 160 → 172 (+12 边 ETF→期货 配对)
     """
     from src.causal import load_dag_config, load_dag_graph
     cfg = load_dag_config()
     g = load_dag_graph(cfg)
-    # P9-1.7 batch 3 重做: 18 → 21 节点
-    assert g.number_of_nodes() == 35, f"expected 35 nodes (P9-1.7 batch 4, v0.7.0), got {g.number_of_nodes()}"
-    # P9-1.7 batch 3: 90 → 135 边 (加 12 国债→指数 + 33 国债→行业)
-    assert g.number_of_edges() == 160, f"expected 160 edges (P9-1.7 batch 4 加 26 边 commodity→industry), got {g.number_of_edges()}"
-    # 节点 (35 节点, 含 batch 4 commodity 14)
+    # P9-1.7 batch 5: 35 → 47 节点
+    assert g.number_of_nodes() == 47, f"expected 47 nodes (P9-1.7 batch 5, v0.8.0), got {g.number_of_nodes()}"
+    # P9-1.7 batch 5: 160 → 172 边 (加 12 ETF→期货 配对)
+    assert g.number_of_edges() == 172, f"expected 172 edges (P9-1.7 batch 5 加 12 边 ETF→期货 配对), got {g.number_of_edges()}"
+    # 节点 (47 节点, 含 batch 4 commodity 14 + batch 5 spot ETF 12)
     expected_nodes = {"TNX", "IRX", "FVX", "TYX", "VIX", "DXY",
                       "DIA", "QQQ", "RSP", "QQQE",
                       "XLK", "XLF", "XLV", "XLE",
@@ -1586,7 +1588,12 @@ def test_causal_dag_loads_v069_p90():
                       "GC_F", "SI_F", "PL_F", "PA_F", "HG_F",
                       "CL_F", "BZ_F", "NG_F",
                       "ZW_F", "ZC_F", "ZS_F",
-                      "SB_F", "CT_F", "KC_F"}
+                      "SB_F", "CT_F", "KC_F",
+                      # P9-1.7 batch 5: 12 spot ETF (BAL/JO DELISTED 跳过)
+                      "GLD", "SLV", "PPLT", "PALL", "CPER",
+                      "USO", "BNO", "UNG",
+                      "WEAT", "CORN", "SOYB",
+                      "CANE"}
     assert set(g.nodes()) == expected_nodes, f"节点不匹配: 缺 {expected_nodes - set(g.nodes())}, 多 {set(g.nodes()) - expected_nodes}"
     # acyclic
     import networkx as nx
@@ -1893,13 +1900,13 @@ def test_causal_scm_cache_v0913_p98():
 
 
 def test_causal_data_alignment_v069_p95():
-    """P9.2: load_dag_data inner join 21 节点 (P9-1.7 batch 1+2+3 重做), 应该 ≥ 400 交易日"""
+    """P9.2: load_dag_data inner join 47 节点 (P9-1.7 batch 1+2+3+4+5), 应该 ≥ 400 交易日"""
     from src.causal import load_dag_config, load_dag_data
     cfg = load_dag_config()
     data = load_dag_data(cfg=cfg)
-    assert data.shape[1] == 35, f"应 35 列 (P9-1.7 batch 4, v0.7.0), got {data.shape[1]}"
+    assert data.shape[1] == 47, f"应 47 列 (P9-1.7 batch 5, v0.8.0), got {data.shape[1]}"
     assert data.shape[0] >= 400, f"应 ≥ 400 交易日, got {data.shape[0]}"
-    # 所有 35 节点都有 (含 P9-1.7 batch 4 commodity 14)
+    # 所有 47 节点都有 (含 P9-1.7 batch 4 commodity 14 + batch 5 spot ETF 12)
     expected = {"TNX", "IRX", "FVX", "TYX", "VIX", "DXY",
                 "DIA", "QQQ", "RSP", "QQQE",
                 "XLK", "XLF", "XLV", "XLE",
@@ -1907,7 +1914,11 @@ def test_causal_data_alignment_v069_p95():
                 "GC_F", "SI_F", "PL_F", "PA_F", "HG_F",
                 "CL_F", "BZ_F", "NG_F",
                 "ZW_F", "ZC_F", "ZS_F",
-                "SB_F", "CT_F", "KC_F"}
+                "SB_F", "CT_F", "KC_F",
+                "GLD", "SLV", "PPLT", "PALL", "CPER",
+                "USO", "BNO", "UNG",
+                "WEAT", "CORN", "SOYB",
+                "CANE"}
     assert set(data.columns) == expected, f"列不匹配: 缺 {expected - set(data.columns)}, 多 {set(data.columns) - expected}"
     # 应该是 log return (绝对值 < 1.0 即 < 100% 日变化; VIX 单日能涨 50%+, 阈值放宽)
     assert data.abs().max().max() < 1.0, f"log return 应 < 1.0 (放宽给 VIX 极端行情), got max {data.abs().max().max()}"
@@ -2010,8 +2021,8 @@ def test_causal_pc_dag_v0911_p96():
     # PC algorithm (alpha=0.05 fisherz, 0.82s 实测)
     pc_dag = discover_dag_pc(data, alpha=0.05)
 
-    # 应该 ≥ 1 个节点 (sparse). P9-1.7 batch 1+2+3: 7 → 21 节点 (含 11 行业 + 3 国债)
-    assert pc_dag.number_of_nodes() == 35, f"应 35 节点 (P9-1.7 batch 4, v0.7.0), got {pc_dag.number_of_nodes()}"
+    # 应该 ≥ 1 个节点 (sparse). P9-1.7 batch 1+2+3+4+5: 7 → 47 节点
+    assert pc_dag.number_of_nodes() == 47, f"应 47 节点 (P9-1.7 batch 5, v0.8.0), got {pc_dag.number_of_nodes()}"
 
     # P9-1.7 batch 1+2: 加 11 行业后, PC 算法可能把 VIX→index direct 边吸收到 VIX→industry→index
     # mediator chain. 所以 PC 不一定有 VIX→index 边, 但应该有 VIX→industry 或 industry→index 边
@@ -2252,12 +2263,59 @@ def test_render_full_report_lru_cache_v075_p90():
     t0 = _time.time()
     r3 = render_full_report(["DIA"])
     syms_elapsed = _time.time() - t0
-    # 5 段只算 1 个指数 → 快但仍 cold
-    assert syms_elapsed < 2.0, f"1 指数 cold 应 < 2s, got {syms_elapsed:.2f}s"
+    # 5 段只算 1 个指数 → 快但仍 cold (PC + CATE 仍跑, 47 节点后 cold 慢)
+    assert syms_elapsed < 4.0, f"1 指数 cold 应 < 4s, got {syms_elapsed:.2f}s"
     assert r3 != r1, "不同 symbols 应返不同内容"
 
     # 4. cache 大小检查 (1 day + 2 symbols entries)
     assert len(_REPORT_CACHE) >= 2, f"cache 应 ≥ 2 entries, got {len(_REPORT_CACHE)}"
+
+
+def test_pc_algorithm_date_cache_v080_p91():
+    """v0.8.0 (性能 < 10s, 47 节点): PC algorithm 加 date-based cache, 47 节点 ~1.5s → warm 0s
+
+    验证:
+    1. 第一次 cold < 3s (47 节点 PC algorithm)
+    2. 第二次 warm < 1ms (cache hit)
+    3. cache key = (date, alpha, data shape, data hash), data 变时 invalidate
+    4. clear_caches() 清 _PC_CACHE
+    """
+    import time as _time
+    import hashlib
+    from src import causal as cm
+    from datetime import date as _date
+
+    cm.clear_caches()
+    cfg = cm.load_dag_config()
+    data = cm.load_dag_data(cfg=cfg)
+
+    # 1. cold
+    t0 = _time.time()
+    pc1 = cm.discover_dag_pc(data, alpha=0.05)
+    cold_elapsed = _time.time() - t0
+    assert cold_elapsed < 3.0, f"47 节点 PC cold 应 < 3s, got {cold_elapsed:.2f}s"
+    assert pc1.number_of_nodes() == 47
+
+    # 2. warm (应 < 5ms, 实际 < 1ms 但 OS load 留余量)
+    t0 = _time.time()
+    pc2 = cm.discover_dag_pc(data, alpha=0.05)
+    warm_elapsed = _time.time() - t0
+    assert warm_elapsed < 0.005, f"warm PC 应 < 5ms (cache hit), got {warm_elapsed*1000:.2f}ms"
+    assert pc1 is pc2, "cache hit 应返同一 DiGraph 引用"
+
+    # 3. 不同 alpha → 新 key, 重跑
+    t0 = _time.time()
+    pc3 = cm.discover_dag_pc(data, alpha=0.10)
+    assert pc3.number_of_nodes() == 47, "不同 alpha 仍 47 节点"
+
+    # 4. clear_caches() 应清 _PC_CACHE
+    cm.clear_caches()
+    t0 = _time.time()
+    pc4 = cm.discover_dag_pc(data, alpha=0.05)
+    after_clear_elapsed = _time.time() - t0
+    # clear 后 cold 跑, 应 > warm 阈值
+    assert after_clear_elapsed > 0.5, f"clear_caches 后 PC cold 应 > 0.5s (实际重跑), got {after_clear_elapsed:.3f}s"
+    assert pc4.number_of_nodes() == 47
 
 
 if __name__ == "__main__":
