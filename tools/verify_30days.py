@@ -95,15 +95,16 @@ def verify_30days(start: str, days: int) -> dict:
     n_fail = 0
     n_skip_weekend = 0
 
+    today = datetime.now().date()
     cur = start_date
     while cur <= end_date:
         date_str = cur.strftime("%Y-%m-%d")
         log_path = LOG_DIR / f"cron_{date_str}.log"
 
-        # 周末 (Sat=5, Sun=6) skip
-        if cur.weekday() in (5, 6):
+        # future date 标 PENDING, 不算 fail (今天还没到, 等第二天再看)
+        # 注意: task 是 CalendarTrigger + ScheduleByDay, 每天都跑 (含周末), 不 skip weekend
+        if cur > today:
             cur += timedelta(days=1)
-            n_skip_weekend += 1
             continue
 
         result = parse_cron_log(log_path)
@@ -135,9 +136,15 @@ def verify_30days(start: str, days: int) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="30 天 daily cron 0 fail 验证 (V1.0 路线图)")
-    parser.add_argument("--start", type=str, default="2026-08-04", help="起始日期 (默认 2026-08-04)")
+    parser.add_argument("--start", type=str, default="2026-08-09", help="起始日期 (默认 2026-08-09, V1.0 新窗口起点)")
     parser.add_argument("--days", type=int, default=30, help="天数 (默认 30)")
     args = parser.parse_args()
+
+    # UTF-8 reconfigure for emoji (Windows PowerShell default GBK 会崩)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
     print(f"🔍 验证 {args.start} 起 {args.days} 天 daily cron 0 fail ...\n")
 
