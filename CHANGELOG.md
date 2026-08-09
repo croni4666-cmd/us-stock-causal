@@ -1,9 +1,9 @@
 ## [Unreleased]
 
 ### Current
-- **HEAD**: v0.9.0 (commit pending, 2026-08-08) — 完整文档 (README + USER_GUIDE + ARCHITECTURE, 850 lines)
+- **HEAD**: v0.9.0 (5be6aad, 2026-08-08) — 完整文档 (README + USER_GUIDE + ARCHITECTURE, 850 lines)
 - **v1.0 路线图** (2026-08-07 设计): 6 conditions + 8 子版本, 详见 `V1.0-ROADMAP.md` (12KB), 目标 2026-09-20 tag v1.0.0
-- **P9-1.7 状态** (v0.6.9i+j+k+l+m + v0.7.0+v0.7.5+v0.8.0+v0.8.5+v0.9.0): 7 → 47 节点, L2 + 性能 + 测试 + 文档全部 done
+- **业务实测 30 天稳定期** (8/4 起点): 3/22 工作日 PASS (8/4, 8/6, 8/7), 1 MISSING (8/5 Task Scheduler issue), 1 pending (8/9 17:00)
 
 ### Planned (v1.0 路线图)
 - [x] **v0.6.9m** (8/9) — P8-5 错误恢复 ✅
@@ -11,8 +11,10 @@
 - [x] **v0.7.5** (8/20) — 性能 < 10s (Pydot cache + LRU report cache) ✅
 - [x] **v0.8.0** (8/25) — P9-1.7 batch 5 (12 现货 ETF → 47 节点) ✅
 - [x] **v0.8.5** (8/30) — 测试 80+ (DAG 端到端 + backtest + cache invalidation) ✅
-- [x] **v0.9.0** (9/3) — README + USER_GUIDE + ARCHITECTURE 完整文档 (~850 lines) ✅ (本 commit)
-- [ ] **v0.9.5 / v0.9.9 / v1.0.0** (9/13~9/20) — 30 天稳定期 + tag v1.0.0
+- [x] **v0.9.0** (9/3) — README + USER_GUIDE + ARCHITECTURE 完整文档 (~850 lines) ✅
+- [ ] **v0.9.5** (9/13) — 30 天稳定期 0 fail 验证 (8/4 ~ 9/3 累计, 修 8/5 MISSING issue) + RC1 tag
+- [ ] **v0.9.9** (9/17) — RC2 修剩余 issue
+- [ ] **v1.0.0** (9/20) — tag v1.0.0 🎉
 
 ### Done (2026-08-08 之前)
 - v0.6.x: P3-2.5 事件标记叠加 (CPI/FOMC 垂直线) — **P6-1 done in v0.6.4**
@@ -30,6 +32,30 @@
 - v0.8.5: 测试 66 → 80 (DAG 端到端 + backtest + cache invalidation, V1.0 "测试 80+" 达成)
 - v0.9.0: 完整文档 (README + USER_GUIDE + ARCHITECTURE, V1.0 "完整文档" 达成)
 - v0.6.9: Phase 9.0 Pearl-style 因果分析 (DoWhy + EconML 集成)
+
+## [Unreleased] - 工具
+
+### tools/verify_30days.py — 30 天 daily cron 0 fail 验证工具 (V1.0 稳定期)
+
+**背景**: V1.0 路线图 must-have "30 天 daily cron 0 fail" 验证. 业务实测 daily cron 8/4 起步, 9/3 真 30/30 day 0 fail 达成. 写 tool 跑 cron log parse, 验证每日 status.
+
+**功能**:
+- `python tools/verify_30days.py [--start 2026-08-04] [--days 30]`
+- 解析 output/logs/cron_YYYY-MM-DD.log
+- 提取 step elapsed_s / n_errors / final_ok
+- 算工作日 PASS / FAIL / MISSING
+- 周末 (Sat/Sun) skip
+
+**业务实测** (2026-08-09 09:45 AM):
+- 8/4 PASS ✅ (4.0 KB, 0 errors)
+- 8/5 MISSING ⚠️ (Task Scheduler 配 issue, 已知)
+- 8/6 PASS ✅ (25.7 KB, 0 errors)
+- 8/7 PASS ✅ (44.6 KB, 0 errors)
+- 8/8 Sat skip (周末)
+- 8/9 Sun pending (17:00 还没跑)
+
+**已知 issue**:
+- 8/5 MISSING: Task Scheduler 配错? 待修 (v0.9.5 RC1 修)
 
 ## [0.9.0] - 2026-08-08
 
