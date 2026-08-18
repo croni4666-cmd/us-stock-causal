@@ -1,0 +1,52 @@
+# Pre-commit hooks config (R5 audit, 跟 paper-agent .pre-commit-config.yaml 模式一致)
+# 安装: `pip install pre-commit && pre-commit install`
+# 跑全部: `pre-commit run --all-files`
+
+repos:
+  # R1 隐私审计: 0 personal info hits in source code
+  - repo: local
+    hooks:
+      - id: r1-privacy-grep
+        name: R1 privacy grep (0 personal info hits)
+        description: R1 audit standard — 0 hits for project-user/USER_LOCATION/东方/C:\Users\project-user
+        entry: bash -c '! grep -rE "project-user|USER_LOCATION|USER_LOCATION东方|USER_LOCATIONUSER_INSTITUTION|USER_INSTITUTION|project-user@gmail|@gmail\.com|C:\\\\Users\\\\project-user" --include="*.py" --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.cmd" --include="*.ps1" src/ examples/ tests/ docs/ .github/ README.md USER_GUIDE.md ARCHITECTURE.md CHANGELOG.md V1.0-ROADMAP.md 2>/dev/null'
+        language: system
+        pass_filenames: false
+        types: [text]
+
+  # Python: 编码检查 (避免 Windows GBK 编码错, paper-agent v3.9.17.0 修)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Python: Black formatter (跟 paper-agent 一致)
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        language_version: python3
+        files: '^(src|examples|tests)/.*\.py$'
+
+  # Python: import 排序 (跟 paper-agent 一致)
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--profile=black, --line-length=100]
+        files: '^(src|examples|tests)/.*\.py$'
+
+  # Python: flake8 lint (跟 paper-agent 一致, max-line-length=100)
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.0
+    hooks:
+      - id: flake8
+        args: [--max-line-length=100, --ignore=E203,W503,E501]
+        files: '^(src|examples|tests)/.*\.py$'
