@@ -142,6 +142,39 @@ hist = get_metric_history("WFC", "revenue", n_quarters=4)
 - 不选选项 4 (改 user 偏好)
 - 不选选项 5 (弱化 V1.0 标准)
 
+**修法现状 (2026-08-18 17:25, 选项 1+2 拍板后)**:
+
+选项 1 **不可行** (powercfg /a 验证):
+- 此机器 sleep states:
+  - ✅ Standby (S0 Low Power Idle) — Modern Standby 当前 only sleep state
+  - ❌ S1 / S2 / S3 — 系统固件不支持
+  - ❌ 混合睡眠
+- 结论: **Win 11 固件 only Modern Standby**, `powercfg /h off` + `bcdedit` 改 S0 → S3 失败
+- WakeToRun 在 S0 上不响应是固件级限制, 注册表修不了
+- 笔记本电池续航不能动 (固件锁定 Modern Standby, 改了无效)
+
+选项 2 ✅ **已实现**:
+- Task Scheduler `us-stock-causal-daily-report-1705-backup` 新建, NextRun 8/19 17:05
+- 17:05 跑同样的 `run_daily_report.cmd` (redirect log 到 cron_<date>.log append)
+- daily_report.py 加 `_is_already_ran_today(date_str)` 守卫:
+  - 检查 `output/report_<date>.md` 在 2h 内生成 → skip
+  - 加 `--force` arg bypass 守卫 (manual 强制重跑)
+  - 跨日 (历史日期) 不算 guard
+- 验证 (8/18 17:25):
+  - `--skip-fetch --skip-md --skip-html --skip-dashboard` 不带 --force → SKIP banner, exit 0 ✅
+  - 带 --force → 全 pipeline 跑 ✅
+
+**未实施项**:
+- 选项 1 不可行 (固件限制)
+- 选项 3 (watchdog) 暂不实施 (选项 2 够用)
+- 选项 4 5 暂不实施 (跟原 user 拍板一致)
+
+**V1.0 路线图影响 (修后预期)**:
+- 30 天稳定期 (8/9~9/7) 8/15 MISSING 已知 issue
+- 8/19 起 17:05 backup 生效, Modern Standby 即使漏跑 17:00 也会 17:05 补
+- 9/3 v0.9.5 RC1 实测 8/19~8/30 (12 天) 0 MISSING 即视为选项 2 修好
+- 9/7 wait 期结束时实际 0 MISSING 算 30/30 day 0 fail 真达成 (8/15 仍标 known, 但 8/19 后 0 new fail)
+
 **V1.0 路线图影响**:
 - 30 天稳定期 wait 期 (8/9~9/7) 已有 1 MISSING (8/15)
 - 9/3 RC1 拍板前还有 16 天 (8/18~9/3) 业务实测
