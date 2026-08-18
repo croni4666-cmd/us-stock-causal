@@ -1,0 +1,16 @@
+{
+  "_doc": "11 行业 ETF top 3 权重股静态 mapping (us-stock-causal Shadow mode v0.9.5)",
+  "_source": "spdr.com holdings 2026 Q3 (近似, 不动态拉)",
+  "_policy": "weight-stable / 季度 rebalance 不会变 top 3 (only 排序可能变)",
+  "XLK": ["AAPL", "MSFT", "NVDA"],
+  "XLF": ["JPM", "BAC", "WFC"],
+  "XLE": ["XOM", "CVX", "COP"],
+  "XLY": ["AMZN", "TSLA", "HD"],
+  "XLP": ["PG", "KO", "PEP"],
+  "XLV": ["UNH", "JNJ", "LLY"],
+  "XLI": ["HON", "UNP", "CAT"],
+  "XLU": ["NEE", "SO", "DUK"],
+  "XLB": ["LIN", "APD", "FCX"],
+  "XLRE": ["AMT", "PLD", "EQIX"],
+  "XLC": ["META", "GOOGL", "NFLX"]
+}
