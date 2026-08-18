@@ -13,6 +13,7 @@ Phase 2.1 计划加 regression-based attribution:
 from __future__ import annotations
 
 import json
+import functools
 from datetime import datetime
 from pathlib import Path
 
@@ -43,7 +44,14 @@ def load_sector_weights(use_live_cache: bool = True) -> dict:
 
 
 def load_prices(symbol: str, layer: str) -> pd.Series:
-    """从 parquet 读 close 列"""
+    """从 parquet 读 close 列
+
+    v0.9.5 RC1 prep (P10-1 性能优化): @lru_cache 避免重复读 parquet
+    - 1st call: ~0.05s (pd.read_parquet + Series slice)
+    - 2nd call: < 1ms (lru_cache 命中)
+    - daily_report 12+12=24 次 attribute_index 调用 → 只第 1 次真读
+    - cache 跟 process 同寿, daily cron 1 process 1 run 收益最大
+    """
     safe = symbol.replace("^", "_").replace("=", "_").replace(".", "_")
     pq = CACHE_ROOT / layer / f"{safe}.parquet"
     if not pq.exists():
@@ -52,8 +60,15 @@ def load_prices(symbol: str, layer: str) -> pd.Series:
     return df["close"]
 
 
+@functools.lru_cache(maxsize=128)
 def get_sector_returns(start: str, end: str) -> pd.DataFrame:
-    """读 11 行业 + 4 指数,返回 log returns DataFrame"""
+    """读 11 行业 + 4 指数,返回 log returns DataFrame
+
+    v0.9.5 RC1 prep (P10-1 性能优化): @lru_cache 跨调用复用
+    - 1st call: ~0.5s (15 parquet read + log return compute)
+    - 2nd call: < 5ms (lru_cache 命中, 避免重复 read 15 个 parquet)
+    - daily_report 12+12=24 次调用, 1 次真算 + 23 次 cache hit
+    """
     rets = {}
     for s in SECTOR_TICKERS:
         prices = load_prices(s, "sectors")
