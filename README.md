@@ -113,7 +113,12 @@ v3 方向: **掌控数据 (47 ticker 一手 yfinance) + 一手模型 (Pearl 因�
 
 ## License
 
-个人项目, 非开源.
+[MIT License](./LICENSE) — 自由使用 / 修改 / 商业, 保留 copyright 即可.
+
+- **个人维护**: 不接受 PR, fork 自用 OK
+- **数据源**: yfinance (Yahoo Finance 免费) + GDELT (公开) + SEC EDGAR (公开) + FRED (公开,需 key)
+- **第三方代码**: `tools/sec_fetch.py` 复制自 mavis `sec-filings-fetch` skill (MIT, 跨 project 复用)
+- **DAG 设计**: 借鉴 Innei/kansoku (AGPL-3.0, 灵感来源, 非代码复用)
 
 ## 版本
 
