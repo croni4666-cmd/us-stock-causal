@@ -29,9 +29,11 @@ from src.attribution import attribute_all_indices, SECTOR_TICKERS  # noqa: F401
 
 
 BASELINE_DIR = PROJECT_ROOT / "data" / "baseline"
-# v0.6.9m (2026-08-07): 月度重抓, v069g.json (8/4 锁) 第 3 天 5d 残差漂移 12-15x
-# 改 v069m.json (8/7 锁) 当 DEFAULT — P7-5 月度重抓机制见效
-DEFAULT_BASELINE = BASELINE_DIR / "residuals_v069m.json"
+# v0.6.9p (2026-08-18): P7-5 月度太慢改手动重抓, v069m.json (8/7 锁) 8/18 已经 11 天
+# → 漂移 6 处 violation (DIA/5d 2.06x, DIA/20d 1.69x, QQQ/1d 2.7x 等)
+# KI-4 修法: 重抓 v069p.json (8/18 锁), 8/25 手动再抓 (v069q), 9/1 第三次 (v069r)
+# 9/3 v0.9.5 RC1 拍板是否改 P7-5 月度 → 周度自动化
+DEFAULT_BASELINE = BASELINE_DIR / "residuals_v069p.json"
 INDICES = ["DIA", "QQQ", "RSP", "QQQE"]
 WINDOWS = [1, 5, 20]
 
