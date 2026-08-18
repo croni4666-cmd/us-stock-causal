@@ -64,3 +64,10 @@ desktop.ini
 
 # Local commit message drafts (�� git commit -F ���ü���)
 commit_msg_*.txt
+
+# Debug scripts / output (scripts starting with _ are throwaway, R1 audit)
+_*.py
+_*.txt
+output\_*.txt
+output\_*.py
+test_*.log
