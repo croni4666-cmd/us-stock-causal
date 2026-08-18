@@ -2,8 +2,8 @@
 # 7 → 18 → 21 → 35 → 47 节点 (6 macro + 4 指数 + 11 行业 + 14 期货 + 12 现货 ETF)
 #
 # P9-1.7 batch 4 (v0.7.0): 加 14 商品期货 (4 贵金属 + 1 工业 + 3 能源 + 3 谷物 + 3 软商品)
-# 边设计: 26 边 commodity → industry (按经济意义剪枝, 不加 direct commodity→index)
-#   - 4 贵金属 (GC/SI/PL/PA) → XLB/XLE/XLF (13 边, 避险+对冲)
+# 边设计: 25 边 commodity → industry (按经济意义剪枝, 不加 direct commodity→index)
+#   - 4 贵金属 (GC/SI/PL/PA) → XLB/XLE/XLF (12 边, 避险+对冲)
 #   - 1 工业金属 (HG 铜) → XLB/XLI (2 边)
 #   - 3 能源 (CL/BZ/NG) → XLE/XLU (5 边, 能源+电力)
 #   - 3 谷物 (ZW/ZC/ZS) → XLP (3 边, 食品消费)
@@ -151,8 +151,8 @@ dot: |
     XLRE -> DIA; XLRE -> QQQ; XLRE -> RSP; XLRE -> QQQE;
     XLC -> DIA; XLC -> QQQ; XLC -> RSP; XLC -> QQQE;
 
-    // P9-1.7 batch 4: 14 commodity → 11 industry = 26 边 (按经济意义剪枝)
-    // 4 贵金属 → XLB/XLE/XLF (13 边, 避险+对冲)
+    // P9-1.7 batch 4: 14 commodity → 11 industry = 25 边 (按经济意义剪枝)
+    // 4 贵金属 → XLB/XLE/XLF (12 边, 避险+对冲)
     GC_F -> XLB; GC_F -> XLE; GC_F -> XLF;
     SI_F -> XLB; SI_F -> XLE; SI_F -> XLF;
     PL_F -> XLB; PL_F -> XLE; PL_F -> XLF;

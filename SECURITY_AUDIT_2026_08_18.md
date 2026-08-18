@@ -9,7 +9,7 @@
 
 ## 概览
 
-10 轮安全审计, 每轮独立 commit, 9 commits (R1-R7 合并 4 commits, R8-R10 合并 1 综合 commit):
+10 轮安全审计, 每轮独立 commit, **6 commits total** (R1-R7 合并 4 commits, R8-R10 合并 1 综合 commit):
 
 | Round | 范围 | Commits | 状态 |
 |---|---|---|---|
@@ -20,11 +20,11 @@
 | **R5** | Pre-commit hooks: black / isort / flake8 / R1 grep | `4cd5498` | ✅ |
 | **R6** | Pre-push hygiene: docs/pre-push-hygiene.md (R1+R4 配合) | `4cd5498` | ✅ |
 | **R7** | API key 安全: docs/api-key-security.md (FRED + paper-agent 跨 project 模式) | `4cd5498` | ✅ |
-| **R8** | Hard safety: docs/hard-safety-sop.md (PowerShell / mavis-trash 替代) | (本 commit) | ✅ |
-| **R9** | 文档审查: R1 strict 0 hits in source code (paper-agent 8/14 同) | (本 commit) | ✅ |
-| **R10** | V1.0 路线图完成度: 5/6 conditions + 6/8 子版本 | (本 commit) | ✅ |
+| **R8** | Hard safety: docs/hard-safety-sop.md (PowerShell / mavis-trash 替代) | `7ac6a0e` | ✅ |
+| **R9** | 文档审查: R1 strict 0 hits in source code (paper-agent 8/14 同) | `7ac6a0e` | ✅ |
+| **R10** | V1.0 路线图完成度: 5/6 conditions + 6/8 子版本 | `7ac6a0e` | ✅ |
 
-总 11 commits (`e586641` + `a4dc73e` + `10d85b2` + `123b533` + `4cd5498` + 本 commit)。
+**总 6 commits** (`e586641` + `a4dc73e` + `10d85b2` + `123b533` + `4cd5498` + `7ac6a0e`)。
 
 ---
 
