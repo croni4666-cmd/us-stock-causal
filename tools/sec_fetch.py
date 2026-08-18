@@ -198,6 +198,7 @@ COMMON_METRICS = {
         "us-gaap:Revenues",
         "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
         "us-gaap:RevenueFromContractWithCustomerIncludingAssessedTax",
+        "us-gaap:RevenuesNetOfInterestExpense",  # 银行/金融专用 (JPM/BAC/WFC/C 等)
         "us-gaap:SalesRevenueNet",
         "us-gaap:SalesRevenueGoodsNet",
     ],
