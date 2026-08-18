@@ -55,6 +55,17 @@ _SCM_CACHE: dict[tuple, "gcm.InvertibleStructuralCausalModel"] = {}  # type: ign
 # key = (T, O, n_obs, n_refutations)
 _REFUTE_CACHE: dict[tuple, dict] = {}
 
+# v0.9.5 RC1 prep (P10-1 性能优化): causal_query 函数级 cache
+# 缓存整次查询结果 (ATE + refutation + estimand), 跨调用复用
+# 1st call ~0.94s (OLS + DoWhy build), 2nd call < 5ms
+# key = (treatment, outcome, n_refutations, refute_method, n_obs)
+_QUERY_CACHE: dict[tuple, "CausalEffect"] = {}  # type: ignore[name-defined]
+
+# v0.9.5 RC1 prep (P10-1 性能优化): cate_heterogeneity 函数级 cache
+# 缓存整次异质性结果, 跨调用复用 (1st ~1.7s, 2nd < 5ms)
+# key = (treatment, outcome, heterogeneity_var, n_quantiles, n_obs)
+_CATE_CACHE: dict[tuple, list[dict]] = {}
+
 
 def clear_caches() -> dict:
     """清空 module-level caches (tests 用)."""
@@ -62,16 +73,20 @@ def clear_caches() -> dict:
     n_fit = len(_FIT_CACHE)
     n_scm = len(_SCM_CACHE)
     n_refute = len(_REFUTE_CACHE)
+    n_query = len(_QUERY_CACHE)
+    n_cate = len(_CATE_CACHE)
     n_pc = len(_PC_CACHE)
     n_graph = len(_GRAPH_CACHE)
     _DATA_CACHE.clear()
     _FIT_CACHE.clear()
     _SCM_CACHE.clear()
     _REFUTE_CACHE.clear()
+    _QUERY_CACHE.clear()
+    _CATE_CACHE.clear()
     _PC_CACHE.clear()
     _GRAPH_CACHE.clear()
     return {"data_cleared": n_data, "fit_cleared": n_fit, "scm_cleared": n_scm, "refute_cleared": n_refute,
-            "pc_cleared": n_pc, "graph_cleared": n_graph}
+            "query_cleared": n_query, "cate_cleared": n_cate, "pc_cleared": n_pc, "graph_cleared": n_graph}
 
 
 def get_cache_stats() -> dict:
@@ -81,6 +96,8 @@ def get_cache_stats() -> dict:
         "fit_cache_size": len(_FIT_CACHE),
         "scm_cache_size": len(_SCM_CACHE),
         "refute_cache_size": len(_REFUTE_CACHE),
+        "query_cache_size": len(_QUERY_CACHE),
+        "cate_cache_size": len(_CATE_CACHE),
         "fit_cache_keys": list(_FIT_CACHE.keys()),
     }
 
@@ -507,6 +524,15 @@ def causal_query(
     if data is None:
         data = load_dag_data(cfg=cfg)
 
+    # v0.9.5 RC1 prep (P10-1 性能优化): function-level _QUERY_CACHE
+    # 缓存整次查询结果 (ATE + refutation + estimand), 跨调用复用
+    # 1st call ~0.94s (OLS + DoWhy build), 2nd call < 5ms
+    # key = (treatment, outcome, n_refutations, refute_method, len(data))
+    _qk = (treatment, outcome, n_refutations, refute_method, len(data))
+    if _qk in _QUERY_CACHE:
+        logger.debug(f"[causal] causal_query cache hit T={treatment} O={outcome} (cache size={len(_QUERY_CACHE)})")
+        return _QUERY_CACHE[_qk]
+
     # Sanity check
     g = load_dag_graph(cfg)
     if not nx.is_directed_acyclic_graph(g):
@@ -574,7 +600,7 @@ def causal_query(
         f"基于 {len(data)} 个交易日, std_err={std_err:.4f}"
     )
 
-    return CausalEffect(
+    result = CausalEffect(
         treatment=treatment,
         outcome=outcome,
         estimate=ate,
@@ -586,6 +612,8 @@ def causal_query(
         std_error=std_err,
         interpretation=interpretation,
     )
+    _QUERY_CACHE[_qk] = result
+    return result
 
 
 # =============================================================================
@@ -880,6 +908,14 @@ def cate_heterogeneity(
     if heterogeneity_var not in data.columns:
         raise ValueError(f"[causal] heterogeneity_var={heterogeneity_var!r} 不在 DAG 节点 {list(data.columns)}")
 
+    # v0.9.5 RC1 prep (P10-1 性能优化): function-level _CATE_CACHE
+    # 缓存整次异质性结果, 跨调用复用 (1st ~1.7s, 2nd < 5ms)
+    # key = (treatment, outcome, heterogeneity_var, n_quantiles, n_obs)
+    _ck = (treatment, outcome, heterogeneity_var, n_quantiles, len(data))
+    if _ck in _CATE_CACHE:
+        logger.debug(f"[causal] cate_heterogeneity cache hit T={treatment} O={outcome} H={heterogeneity_var} (cache size={len(_CATE_CACHE)})")
+        return _CATE_CACHE[_ck]
+
     # 1. 算 quantiles 切群 (基于全 sample, 不是 date-specific)
     quantiles = data[heterogeneity_var].quantile([i / n_quantiles for i in range(n_quantiles + 1)])
     # 处理 duplicate edges (e.g. 0% == 33%): 强制 + 1bp
@@ -931,4 +967,5 @@ def cate_heterogeneity(
             "method": "econml_cfdml",
         })
 
+    _CATE_CACHE[_ck] = results
     return results
