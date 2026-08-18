@@ -1,5 +1,7 @@
 # us-stock-causal dependencies
-# Locked versions for reproducibility; bump after testing
+# requirements.txt — minimum versions (floating)
+# requirements-lock.txt — exact pinned versions (reproducibility)
+# bump after testing, 跟 paper-agent 模式一致
 
 # Core data platform (~300 MB with [ta] extra)
 openbb[ta]>=4.4.0
@@ -16,6 +18,24 @@ pyarrow>=14.0.0
 
 # Technical analysis (kept from v0.2 for reference, OpenBB also provides)
 pandas-ta>=0.4.0
+
+# Causal analysis (Pearl-style, Phase 9)
+causal-learn>=0.1.4.8
+dowhy>=0.14
+
+# Stats / graph
+statsmodels>=0.14.0
+networkx>=3.0
+pydot>=4.0.0
+
+# SEC EDGAR (mavis sec-filings-fetch skill, R2 license)
+edgar-parser>=0.3.1
+rapidfuzz>=3.0
+
+# HTTP / retry
+requests>=2.33.0
+tenacity>=9.0.0
+yfinance>=0.2.40
 
 # Utilities
 pyyaml>=6.0
