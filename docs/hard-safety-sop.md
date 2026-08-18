@@ -25,7 +25,7 @@ trash output\_tz_debug2.txt output\_bench_*.py  # 多文件
 trash "G:\workspace\trade market\us-stock-causal\output\*.log"  # glob
 ```
 `trash`:
-- 移到 `C:\Users\developer\AppData\Local\Temp\trash\` (Recycle Bin 类似)
+- 移到 `$env:LOCALAPPDATA\Temp\trash\` (Recycle Bin 类似)
 - 30 天后自动清
 - trash 找不到 → 降级到 PowerShell `[System.IO.File]::Move()` 失败 → 报错 (不静默删)
 
