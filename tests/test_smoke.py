@@ -2755,6 +2755,84 @@ def test_cache_invalidation_clear_all_v085_p104():
     assert stats["refute_cache_size"] == 0, f"REFUTE_CACHE 应空, got {stats['refute_cache_size']}"
 
 
+def test_residual_check_alert_field_names_v095_p107():
+    """v0.9.5 RC1 prep (R12 audit): residual.check() 字段名修, alert 详情用正确字段
+
+    8/13-8/18 持续 6 天 residual alert 误报, 根因 src/checks/residual.py 字段名错:
+    - 读 `v.get("ratio")` 但 compare_to_baseline 返 `regression_ratio`
+    - 读 `v.get("current")` 但实际是 `current_pct`
+    - 读 `v.get("baseline")` 但实际是 `baseline_pct`
+    字段 fallback 到默认值, alert message "baseline +0.000% → current +0.000% (ratio 1.00x)" 完全无意义
+
+    v0.9.5 修法: 用 .get(field, fallback) 双字段 lookup, 确保 alert message 正确
+
+    验证:
+    1. mock compare_to_baseline 返 violation dict with regression_ratio / current_pct / baseline_pct
+    2. residual.check() 调用, 应生成 1 alert
+    3. alert details 字段名跟 violation dict 一致 (regression_ratio 不是 ratio)
+    4. alert message 含 "ratio" 关键词 (证明不是 fallback 1.0)
+    """
+    from src import residual_regression
+    from src.checks import residual as _residual_check
+
+    # mock capture_residuals + load_baseline
+    fake_capture = lambda d: {
+        "as_of": d, "indices": ["DIA"], "windows": [1],
+        "residuals": {"DIA": {"1": 0.10}}  # 0.10%
+    }
+    fake_load = lambda: {
+        "as_of": "baseline", "sector_weights_version": "test",
+        "indices": ["DIA"], "windows": [1],
+        "residuals": {"DIA": {"1": 0.02}}  # 0.02% baseline
+    }
+    # 0.10% / 0.02% = 5x regression (超 1.5x threshold, abs_floor=0.05% 通过)
+    real_capture_src = residual_regression.capture_residuals
+    real_load_src = residual_regression.load_baseline
+    real_capture_check = _residual_check.capture_residuals
+    real_load_check = _residual_check.load_baseline
+    residual_regression.capture_residuals = fake_capture
+    residual_regression.load_baseline = fake_load
+    _residual_check.capture_residuals = fake_capture
+    _residual_check.load_baseline = fake_load
+
+    try:
+        alerts = _residual_check.check("2099-12-30")
+    finally:
+        # restore
+        residual_regression.capture_residuals = real_capture_src
+        residual_regression.load_baseline = real_load_src
+        _residual_check.capture_residuals = real_capture_check
+        _residual_check.load_baseline = real_load_check
+
+    # 1 个 violation → 1 alert
+    assert len(alerts) == 1, f"应 1 alert, got {len(alerts)}"
+    alert = alerts[0]
+
+    # alert 字段名应正确 (修后: regression_ratio / current_pct / baseline_pct)
+    details = alert.get("details", {})
+    assert "regression_ratio" in details, f"alert details 应有 'regression_ratio' 字段, got keys: {list(details.keys())}"
+    assert "current_pct" in details, f"alert details 应有 'current_pct' 字段"
+    assert "baseline_pct" in details, f"alert details 应有 'baseline_pct' 字段"
+
+    # regression_ratio 应该是 ~5.0 (0.10/0.02), 不是 fallback 1.0
+    ratio = details.get("regression_ratio")
+    assert abs(ratio - 5.0) < 0.01, f"regression_ratio 应 ~5.0, got {ratio}"
+
+    # current_pct 应是 0.10 (不是 fallback 0.0)
+    cur = details.get("current_pct")
+    assert abs(cur - 0.10) < 0.001, f"current_pct 应 ~0.10, got {cur}"
+
+    # baseline_pct 应是 0.02 (不是 fallback 0.0)
+    bsl = details.get("baseline_pct")
+    assert abs(bsl - 0.02) < 0.001, f"baseline_pct 应 ~0.02, got {bsl}"
+
+    # alert message 应含 ratio 关键词 (证明不是 fallback "ratio 1.00x")
+    msg = alert.get("message", "")
+    assert "ratio" in msg.lower(), f"alert message 应含 'ratio' 关键词, got: {msg}"
+    # 不应是 "ratio 1.00x" (fallback 值)
+    assert "1.00" not in msg or "5.00" in msg, f"alert message 不应只显示 fallback '1.00x', got: {msg}"
+
+
 def test_full_perf_47_nodes_v085_p105():
     """v0.8.5 (测试 80+): 47 节点 + OLS path + PC cache 完整 daily cron 性能 ≤ 12s (V1.0 < 10s + 2s 余量)"""
     import os

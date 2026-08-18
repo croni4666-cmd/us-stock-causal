@@ -48,10 +48,15 @@ def check(date_str: str) -> list[dict]:
     for v in violations:
         idx = v.get("index", "?")
         win = v.get("window", "?")
-        cur = v.get("current", 0.0)
-        bsl = v.get("baseline", 0.0)
-        ratio = v.get("ratio", 1.0)
-        msg = f"{idx} {win}d: baseline {bsl:+.3f}% → current {cur:+.3f}% (ratio {ratio:.2f}x, >1.5x threshold)"
+        # v0.9.5 RC1 prep: 字段名错 (R12 audit 修), compare_to_baseline 返
+        # `current_pct` / `baseline_pct` / `regression_ratio`, 不是 `current` / `baseline` / `ratio`
+        # 8/13-8/18 持续 6 天 alert 误报 (fallback 0.0/0.0/1.0 字段值)
+        cur = v.get("current_pct", v.get("current", 0.0))
+        bsl = v.get("baseline_pct", v.get("baseline", 0.0))
+        ratio = v.get("regression_ratio", v.get("ratio", 1.0))
+        # ratio="inf" (baseline=0 时) → 字符串, f-string format 会 crash, 转 "inf"
+        ratio_str = f"{ratio:.2f}" if isinstance(ratio, (int, float)) else str(ratio)
+        msg = f"{idx} {win}d: baseline {bsl:+.3f}% → current {cur:+.3f}% (ratio {ratio_str}x, >1.5x threshold)"
         alerts.append(alert_logger.make_alert(
             alert_type="residual",
             subject=f"{idx}/{win}d",
@@ -62,7 +67,7 @@ def check(date_str: str) -> list[dict]:
                 "window_days": win,
                 "baseline_pct": bsl,
                 "current_pct": cur,
-                "ratio": ratio,
+                "regression_ratio": ratio,
             },
         ))
     return alerts
