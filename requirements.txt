@@ -7,7 +7,7 @@
 openbb[ta]>=4.4.0
 
 # Plotting
-matplotlib>=3.7.0
+matplotlib>=3.11.1
 mplfinance>=0.12.10b0
 plotly>=5.18.0
 
