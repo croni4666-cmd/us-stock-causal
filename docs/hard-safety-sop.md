@@ -25,7 +25,7 @@ mavis-trash output\_tz_debug2.txt output\_bench_*.py  # 多文件
 mavis-trash "G:\Minimax trade market\us-stock-causal\output\*.log"  # glob
 ```
 `mavis-trash`:
-- 移到 `C:\Users\project-user\AppData\Local\Temp\mavis-trash\` (Recycle Bin 类似)
+- 移到 `$env:LOCALAPPDATA\Temp\mavis-trash\` (Recycle Bin 类似)
 - 30 天后自动清
 - mavis-trash 找不到 → 降级到 PowerShell `[System.IO.File]::Move()` 失败 → 报错 (不静默删)
 
