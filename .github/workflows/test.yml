@@ -1,0 +1,52 @@
+# GitHub Actions CI (R4 audit)
+# us-stock-causal push GitHub 时自动跑 smoke test + 81 集成测试
+# 跟 paper-agent CI 模式一致
+
+name: test
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies (lock)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-lock.txt
+
+      - name: Install package
+        run: |
+          pip install -e .
+
+      - name: Run smoke tests (81 tests)
+        run: |
+          pytest tests/test_smoke.py -v --tb=short
+
+      - name: Check pre-push hygiene (R6)
+        run: |
+          # 0 personal info hits in source code
+          if grep -rE 'project-user|USER_LOCATION|USER_LOCATION东方|USER_LOCATIONUSER_INSTITUTION|USER_INSTITUTION|project-user@gmail|@gmail\.com|C:\\Users\\project-user' \
+              --include='*.py' --include='*.md' --include='*.json' --include='*.yaml' --include='*.yml' \
+              --include='*.cmd' --include='*.ps1' \
+              src/ examples/ tests/ docs/ 2>/dev/null; then
+            echo "::error::Personal info found in source code (R6 audit fail)"
+            exit 1
+          fi
+          echo "R6 pre-push hygiene OK (0 personal info hits)"

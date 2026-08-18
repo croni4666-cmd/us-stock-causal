@@ -1,0 +1,36 @@
+# GitHub Dependabot config (R4 audit)
+# us-stock-causal 没 push GitHub 时是 inactive, push 后 Dependabot 自动开
+# 跟 paper-agent 模式一致: weekly 检查 pip + GitHub Actions
+
+version: 2
+updates:
+  # pip dependencies (requirements.txt + requirements-lock.txt)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    # 自动 group patch updates
+    groups:
+      patch:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+
+  # GitHub Actions (workflows/)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
