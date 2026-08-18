@@ -461,15 +461,38 @@ def print_summary(steps: dict, total_elapsed: float, date_str: str):
     print("=" * 72)
 
 
+def _is_already_ran_today(date_str: str, max_age_hours: float = 2.0) -> bool:
+    """KI-3 守卫: 检查今日 report_<date>.md 是否在 max_age_hours 内生成
+
+    17:00 cron 跑通到 step 4 (markdown_report) → 写 output/report_<date>.md
+    17:05 backup trigger 触发 → 检查 report_<date>.md 在 2h 内 → skip
+    """
+    if date_str != datetime.now().strftime("%Y-%m-%d"):
+        return False  # 跨日不算 (历史日期强制跑)
+    report_path = OUTPUT_DIR / f"report_{date_str}.md"
+    if not report_path.exists():
+        return False
+    mtime = datetime.fromtimestamp(report_path.stat().st_mtime)
+    age_h = (datetime.now() - mtime).total_seconds() / 3600
+    return age_h < max_age_hours
+
+
 def run_daily_report(
     date_str: Optional[str] = None,
     skip_fetch: bool = False,
     skip_md: bool = False,
     skip_html: bool = False,
     skip_dashboard: bool = False,
+    force: bool = False,
     verbose: bool = True,
 ) -> dict:
     """主入口: 跑全 pipeline, 返回每步结果 dict
+
+    Args:
+        date_str: 报告日期 (默认今天)
+        skip_fetch/skip_md/skip_html/skip_dashboard: 跳过对应 step
+        force: 强制重跑 (KI-3 守卫 bypass)
+        verbose: 打印 banner + summary
 
     Returns:
         {
@@ -488,6 +511,22 @@ def run_daily_report(
     """
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
+
+    # KI-3 守卫: 17:05 backup trigger 不重跑 17:00 跑通的当日
+    if not force and _is_already_ran_today(date_str):
+        if verbose:
+            print("=" * 72)
+            print(f"us-stock-causal — Daily Report  ({date_str})")
+            print(f"[SKIP] report_{date_str}.md 已生成 (< 2h), 17:00 cron 已跑通")
+            print(f"       17:05 backup 跳过 (KI-3 守卫, 用 --force 强制重跑)")
+            print("=" * 72)
+        return {
+            "date": date_str,
+            "ok": "skip",
+            "reason": "already_ran_today (KI-3 guard)",
+            "elapsed_s": 0,
+            "steps": {},
+        }
 
     if verbose:
         print("=" * 72)
@@ -551,6 +590,8 @@ def main():
     parser.add_argument("--skip-html", action="store_true", help="跳过 HTML 报告")
     parser.add_argument("--skip-dashboard", action="store_true", help="跳过 performance dashboard")
     parser.add_argument("--quiet", action="store_true", help="不打印 banner 和 summary")
+    parser.add_argument("--force", action="store_true",
+                        help="强制重跑, KI-3 守卫 bypass (17:05 backup 默认 skip, --force 重跑)")
     args = parser.parse_args()
 
     result = run_daily_report(
@@ -559,6 +600,7 @@ def main():
         skip_md=args.skip_md,
         skip_html=args.skip_html,
         skip_dashboard=args.skip_dashboard,
+        force=args.force,
         verbose=not args.quiet,
     )
     # exit code: 0 = 全 OK / skip, 1 = 有 fail
