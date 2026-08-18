@@ -96,3 +96,60 @@ hist = get_metric_history("WFC", "revenue", n_quarters=4)
 - v0.9.5 RC1 (9/8) 拍板 WFC 修法选项 1-4
 - 9/15 v0.9.9 RC2 修完
 - 9/20 v1.0.0 tag 时 WFC 必须修好 (否则 daily_report SEC 段 WFC 行 = stale data 污染报告)
+
+---
+
+## KI-3: 2026-08-15 Sat Modern Standby MISSING (新发现, 修法候选 5 个)
+
+**症状**:
+- `output/logs/cron_2026-08-15.log` 不存在
+- `tools/verify_30days.py --start 2026-08-09` 报 1 FAIL (MISSING)
+- 8/15 Sat 17:00 cron 没跑 (8/9 起点后第 6 天 = 1/10 fail, 90%)
+
+**根因分析** (2026-08-18 排查):
+- 8/15 Power events:
+  - 00:35:30 Sleep
+  - 09:21:19 Wake
+  - 14:58:24 Sleep (Application API)
+  - 17:00 cron 触发时机器在 Sleep
+  - (后续 events 缺失, 可能 Sleep 到 8/16)
+- Task Scheduler WakeToRun=True 已设 (8/9 修的)
+- **关键问题**: WakeToRun 在 Win 11 **Modern Standby (S0 Low Power Idle)** 模式下不响应
+- 8/5 是传统 Sleep (S3) → WakeToRun 修后 8/10-8/14 全 PASS
+- 8/15 是 Modern Standby (S0) → WakeToRun 不响应 → 17:00 cron 漏跑
+- 8/16 Sun 27.9KB PASS (8/16 17:00 触发时机器已 wake, cron 跑通)
+- WakeToRun 当前状态: True ✅ 但 S0 模式不响应
+
+**修法候选** (9/3 RC1 拍板):
+- **选项 1: 禁用 Modern Standby 改传统 S3 Sleep** (注册表)
+  - `powercfg /h off` + `bcdedit /set disabledynamictick yes` + `bcdedit /set useplatformtick yes`
+  - 风险: 改全机电源策略, 可能影响笔记本电池续航 (3-5h → 6-8h 差)
+  - 修法最稳, Win 10 时代默认模式, WakeToRun 100% 工作
+- **选项 2: cron 17:00 + 17:05 双 trigger** (保险)
+  - Task Scheduler 加 17:05 backup trigger
+  - 风险: 17:00 跑通的话 17:05 跑第二次会覆盖 report, 需 daily_report 加 "is_already_ran_today" 守卫
+- **选项 3: 加 watchdog 5 分钟检查** (per-task watchdog)
+  - 每 5 分钟检查当日 cron_YYYY-MM-DD.log 是否生成, 没生成就手动 trigger
+  - 风险: 监控本身可能挂, 而且 task 太碎
+- **选项 4: 改 17:00 → 18:00 trigger** (避开 sleep 窗口)
+  - 风险: user 17:00 拍板的时间偏好 (P5-3) 改回 18:00
+- **选项 5: 接受偶尔 MISSING, 改 V1.0 路线图 "30 天内 ≤ 1 MISSING 容忍"**
+  - 风险: 弱化 V1.0 0 fail 验证标准, 不算真 100%
+
+**建议组合** (9/3 RC1 拍板):
+- 选项 1 (主修) + 选项 2 (保险) = 修法 + 兜底
+- 不选选项 3 (太碎)
+- 不选选项 4 (改 user 偏好)
+- 不选选项 5 (弱化 V1.0 标准)
+
+**V1.0 路线图影响**:
+- 30 天稳定期 wait 期 (8/9~9/7) 已有 1 MISSING (8/15)
+- 9/3 RC1 拍板前还有 16 天 (8/18~9/3) 业务实测
+- 如果 16 天里再 MISSING 1 次 = 2/30 = 93.3% < 100% 不达标
+- KI-3 必须 9/3 前修 (否则 V1.0 0 fail 不可能)
+
+**重启验证** (选项 1 修后):
+- `powercfg /a` 看支持的 Sleep 状态
+- 应该从 "Standby (S0 Low Power Idle)" 变 "Standby (S3)"
+- WakeToRun 在 S3 下 100% 唤醒
+- 修后 7 天内无 MISSING 即视为修好
