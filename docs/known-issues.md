@@ -83,19 +83,47 @@ python tools/verify_30days.py --start 2026-08-09
 - 选项 3: 拉 8-K + 10-Q 直接 HTML (47MB 慢, 跟 SKILL.md 限速矛盾, 但只 WFC 一家)
 - 选项 4: 接受 WFC stale, 标 known data quality issue, 不修
 
-**重现验证**:
-```python
-from sec_fetch import get_metric_history
-hist = get_metric_history("WFC", "revenue", n_quarters=4)
-# 返回 2020-09-30 / 2020-06-30 / 2020-03-31 全是 2020 财年
-# 真实 WFC 2026 Q2 营收 $21.5B 不在返回里
-```
+**修法实施 (2026-08-18 17:50, 选项 1 拍板后)**:
 
-**V1.0 路线图影响**:
-- 不破坏 30 天稳定期 wait 期 (Shadow mode 不接 daily_report)
-- v0.9.5 RC1 (9/8) 拍板 WFC 修法选项 1-4
-- 9/15 v0.9.9 RC2 修完
-- 9/20 v1.0.0 tag 时 WFC 必须修好 (否则 daily_report SEC 段 WFC 行 = stale data 污染报告)
+WFC 根因深挖 (跑 _wfc_tags.py 查 companyfacts 全部 revenue tag):
+- WFC 2021+ 用 `us-gaap:RevenuesNetOfInterestExpense` (净利息 + 非利息收入 = 银行总营收)
+- WFC 2021+ 不用 `us-gaap:Revenues` (传统营收)
+- 但 WFC 2020 之前用 `us-gaap:Revenues` 报告,所以旧数据存在
+- _match_metric 按"recent 2 年内 filed"选,WFC Revenues 2020 已 6 年前 → recent=0
+- 但 COMMON_METRICS["revenue"] 列表无 `RevenuesNetOfInterestExpense` → fallback 都找不到
+- → 最后 fallback 选 Revenues 2020 stale
+
+修法 (tools/sec_fetch.py):
+- COMMON_METRICS["revenue"] 加 `us-gaap:RevenuesNetOfInterestExpense` 在 `RevenueFromContractWith...` 之后
+- 移除 `us-gaap:InterestAndDividendIncomeOperating` (避免 _match_metric 选这个中间项,不是真"营收")
+- _match_metric 现在 选 RevenuesNetOfInterestExpense (银行总营收 $44.07B FY26 6M)
+
+WFC 修后验证 (8/18 17:50):
+- `get_metric_history("WFC", "revenue", n_quarters=4)`:
+  - 2026-01-01 ~ 2026-06-30: $44.07B (6M 累计) ✅ 银行总营收
+  - 2026-04-01 ~ 2026-06-30: $22.62B (3M 单季 Q2) ✅
+  - 2026-01-01 ~ 2026-03-31: $21.45B (3M 单季 Q1) ✅
+- 真实 8/14 filed 10-Q 数字
+
+全 33 ticker 验证 (8/18 17:55):
+- 33/33 OK 0 FAIL 66.7s
+- WFC: 44,068M FY26 Q2 ✅ (从 2020 stale 修好)
+- JPM: 182,447M FY25 → 107,183M Q2 2026 (更新到最新季度)
+- BAC: 61,830M FY26 Q2 (不变, 之前已走 RevenuesNetOfInterestExpense 路径)
+- 其他 30 ticker: 不变 (非银行, 走 Revenues / RevenueFromContractWith... 路径)
+
+**V1.0 路线图影响 (修后)**:
+- WFC 修好, daily_report step 6.5 8/19+ 报告显示 WFC 真实数据
+- JPM 跟着更新到 2026 Q2
+- 30 天稳定期 0 fail 验证不受影响 (修法只改 sec_fetch.py tag list)
+- v0.9.5 RC1 (9/8) 拍板 WFC 修法 选项 1 (本次已实施)
+- 9/15 v0.9.9 RC2 跟 8/19~8/30 业务实测数据一起 review
+- 9/20 v1.0.0 tag WFC 修好 + JPM 准确
+
+**缓存注意**:
+- WFC cache 在 `~/.cache/sec_fetch/facts_0000072971.json`, 24h TTL
+- 修法后第一次跑需清 cache (用 `os.utime` 改 mtime 到 25h 前)
+- 8/19 17:30 cron 自动拉新 cache (WFC 24h cache expire 后)
 
 ---
 
