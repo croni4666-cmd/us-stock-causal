@@ -1,0 +1,27 @@
+# us-stock-causal exact pinned versions (reproducibility)
+# Generated 2026-08-18 by `python -m pip freeze` + filter (R3 audit)
+# Install: `pip install --proxy http://127.0.0.1:10808 -r requirements-lock.txt`
+pandas==2.3.3
+numpy==1.26.4
+pyarrow==24.0.0
+scipy==1.15.3
+matplotlib==3.11.0
+plotly==6.8.0
+causal-learn==0.1.4.8
+dowhy==0.14
+statsmodels==0.14.6
+networkx==3.6.1
+pydot==4.0.1
+edgar-parser==0.3.1
+RapidFuzz==3.14.5
+requests==2.33.1
+tenacity==9.1.4
+yfinance==1.5.1
+PyYAML==6.0.3
+loguru==0.7.3
+python-dotenv==1.2.2
+pytest==9.1.1
+openbb==4.7.2
+requests-cache==1.2.1
+requests-toolbelt==1.0.0
+matplotlib-inline==0.2.2
