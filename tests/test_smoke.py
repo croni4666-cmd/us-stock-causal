@@ -137,10 +137,12 @@ def test_data_snapshot():
 
 def test_skill_md_exists_and_accurate():
     """mavis skill 文件存在 + 内容含所有 module"""
-    skill = Path(r'C:\Users\project-user\.minimax\skills\us-stock-causal\SKILL.md')
+    # user home-relative (避免 hardcode user 路径泄漏隐私, R1 修)
+    home = Path.home()
+    skill = home / '.minimax' / 'skills' / 'us-stock-causal' / 'SKILL.md'
     if not skill.exists():
         # Junction path may not be visible — try .mavis
-        skill = Path(r'C:\Users\project-user\.mavis\skills\us-stock-causal\SKILL.md')
+        skill = home / '.mavis' / 'skills' / 'us-stock-causal' / 'SKILL.md'
     assert skill.exists(), f'skill file not found at {skill}'
     text = skill.read_text(encoding='utf-8')
     # 13 modules 都在文件名

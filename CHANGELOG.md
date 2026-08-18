@@ -2308,7 +2308,7 @@ User 反馈 v0.6.0/v0.6.1 K 线图"还是有点糊", 跑 GitHub + 论坛 5 层�
 ## [0.5.1] - 2026-07-13
 
 ### Added
-- **P4-4: mavis skill 装好** — `C:\Users\project-user\.minimax\skills\us-stock-causal\`
+- **P4-4: mavis skill 装好** — `<user-home>/.minimax/skills/us-stock-causal/`
   - SKILL.md (6.9 KB) — 项目概览 + 三档阅读 + 模块快速参考 + 常用命令
   - _meta.json — name / version / platform
   - **junction-safe**: 用真实路径 `.minimax` 装,不走 `.mavis` junction
@@ -2331,7 +2331,7 @@ User 反馈 v0.6.0/v0.6.1 K 线图"还是有点糊", 跑 GitHub + 论坛 5 层�
 
 ### Key Insights
 - **junction 教训实战**: v1 时期因为 junction 走 Remove-Item 损失 5KB SKILL.md,
-  v3 这次主动用 `Get-Item | Select LinkType` 查清楚,直接走 `C:\Users\project-user\.minimax\skills\`
+  v3 这次主动用 `Get-Item | Select LinkType` 查清楚,直接走 `<user-home>/.minimax/skills/`
   真实路径,**绝不从 junction 路径写**
 - **Phase 5 gate 严格**: 4 步 user action 走完才开 cron,不是 1 步
   - 这是 v1 的关键教训 — 拍脑袋 cron 17:00 + webhook 配错 = spam 群 1 周
