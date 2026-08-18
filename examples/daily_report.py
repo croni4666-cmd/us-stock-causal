@@ -52,6 +52,7 @@ WINDOWS = [1, 5, 20]
 # output / cache 目录
 OUTPUT_DIR = PROJECT_ROOT / "output"
 ALERT_DIR = PROJECT_ROOT / "data" / "cache" / "alerts"
+CACHE_DIR = PROJECT_ROOT / "data" / "cache" / "sec_filings"
 
 
 def _step_banner(step: int, name: str):
@@ -216,19 +217,51 @@ h1 {{ font-size: 18px; color: #202124; border-bottom: 2px solid #1a73e8; padding
         return {"ok": False, "error": f"{type(e).__name__}: {e}", "elapsed_s": round(time.time() - t0, 1)}
 
 
-def step_check_alerts(date_str: str) -> dict:
-    """Step 7: 跑 5 类异常检测 (P8-1~5) + 写 alert log (P8-6) + 终端显眼 stdout
+def step_sec_filings(date_str: str) -> dict:
+    """Step 6.5: SEC EDGAR 财报 cache 验证 (Kansoku 借鉴 #1, 选项 A)
 
-    5 类 check 跑法:
-      - stale: data/raw/*/ parquet LastWriteTime > 2 工作日
-      - residual: 当日归因残差 vs P7-5 baseline 偏差 > 1.5x
-      - vix_spike: VIX > 30 或 1 日涨幅 > 15%
-      - ticker_fail: yfinance 限流中 或 parquet < 1KB
-      - parquet_corrupt: pandas 读失败 或 0 行
-
-    任何 alert 写 data/cache/alerts/alerts_<date>.json (累积, dedup by id)
-    + 终端 [ALERT] 显眼输出 (替代飞书 card, 飞书 2026-07-26 archived)
+    17:30 cron 写 data/cache/sec_filings/<date>.json, daily_report 17:00 读 cache verify
+    cache 缺失 → graceful skip (17:30 cron 还没跑, fallback 读前一天)
+    9/3 v0.9.5 RC1 拍板是否接进 markdown 5 段 (当前只 verify, 不接 markdown)
     """
+    _step_banner("6.5", f"SEC EDGAR 财报 cache ({date_str})")
+    t0 = time.time()
+    from datetime import date as _date, timedelta as _td
+
+    cache_path = CACHE_DIR / f"sec_filings_{date_str}.json"
+    if not cache_path.exists():
+        # fallback 读前一天 (17:30 cron 还没跑, 当天 cache 缺失)
+        prev = (_date.fromisoformat(date_str) - _td(days=1)).isoformat()
+        prev_path = CACHE_DIR / f"sec_filings_{prev}.json"
+        if not prev_path.exists():
+            print(f"  [SKIP] SEC EDGAR cache 不存在 ({date_str} + {prev}), 17:30 cron 还没跑过")
+            return {"ok": "skip", "reason": "cache not yet generated", "elapsed_s": 0}
+        cache_path = prev_path
+        print(f"  [WARN] 17:30 cron 当天 cache 缺失, fallback 读 {prev}")
+
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        ok = data.get("ok", 0)
+        fail = data.get("fail", 0)
+        total = data.get("tickers_count", 0)
+        age_h = (time.time() - cache_path.stat().st_mtime) / 3600
+        print(f"  [OK] SEC EDGAR cache: {ok}/{total} OK ({fail} fail), "
+              f"age {age_h:.1f}h, size {cache_path.stat().st_size/1024:.1f}KB")
+        return {
+            "ok": True,
+            "tickers_ok": ok,
+            "tickers_fail": fail,
+            "tickers_total": total,
+            "cache_path": str(cache_path),
+            "cache_age_h": round(age_h, 2),
+            "elapsed_s": round(time.time() - t0, 2),
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}", "elapsed_s": round(time.time() - t0, 2)}
+
+
+def step_check_alerts(date_str: str) -> dict:
     from src import alert_logger
     from src.checks import stale, residual, vix_spike, ticker_fail, parquet_corrupt
     _step_banner(7, f"Alert Check (5 类异常检测 + 写 log, {date_str})")
@@ -483,6 +516,7 @@ def run_daily_report(
     skip_md: bool = False,
     skip_html: bool = False,
     skip_dashboard: bool = False,
+    skip_sec_filings: bool = False,
     force: bool = False,
     verbose: bool = True,
 ) -> dict:
@@ -490,7 +524,7 @@ def run_daily_report(
 
     Args:
         date_str: 报告日期 (默认今天)
-        skip_fetch/skip_md/skip_html/skip_dashboard: 跳过对应 step
+        skip_fetch/skip_md/skip_html/skip_dashboard/skip_sec_filings: 跳过对应 step
         force: 强制重跑 (KI-3 守卫 bypass)
         verbose: 打印 banner + summary
 
@@ -568,6 +602,14 @@ def run_daily_report(
     else:
         steps["performance_dashboard"] = {"ok": "skip", "reason": "--skip-dashboard", "elapsed_s": 0}
 
+    # 6.5. SEC EDGAR 财报 cache 验证 (Kansoku 借鉴 #1, 选项 A)
+    # 17:30 cron 写 data/cache/sec_filings/<date>.json, daily_report 17:00 读 cache verify
+    # cache 缺失 → graceful skip (17:30 cron 还没跑, fallback 读前一天)
+    if not skip_sec_filings:
+        steps["sec_filings"] = step_sec_filings(date_str)
+    else:
+        steps["sec_filings"] = {"ok": "skip", "reason": "--skip-sec", "elapsed_s": 0}
+
     # 7. check alerts (P8-6 写, 本脚本读)
     steps["check_alerts"] = step_check_alerts(date_str)
 
@@ -589,6 +631,7 @@ def main():
     parser.add_argument("--skip-md", action="store_true", help="跳过 markdown 报告")
     parser.add_argument("--skip-html", action="store_true", help="跳过 HTML 报告")
     parser.add_argument("--skip-dashboard", action="store_true", help="跳过 performance dashboard")
+    parser.add_argument("--skip-sec", action="store_true", help="跳过 SEC EDGAR 财报 cache 验证 (step 6.5)")
     parser.add_argument("--quiet", action="store_true", help="不打印 banner 和 summary")
     parser.add_argument("--force", action="store_true",
                         help="强制重跑, KI-3 守卫 bypass (17:05 backup 默认 skip, --force 重跑)")
@@ -600,6 +643,7 @@ def main():
         skip_md=args.skip_md,
         skip_html=args.skip_html,
         skip_dashboard=args.skip_dashboard,
+        skip_sec_filings=args.skip_sec,
         force=args.force,
         verbose=not args.quiet,
     )
