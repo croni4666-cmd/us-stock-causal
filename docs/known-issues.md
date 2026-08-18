@@ -214,3 +214,59 @@ WFC 修后验证 (8/18 17:50):
 - 应该从 "Standby (S0 Low Power Idle)" 变 "Standby (S3)"
 - WakeToRun 在 S3 下 100% 唤醒
 - 修后 7 天内无 MISSING 即视为修好
+
+---
+
+## KI-4: residual_regression "unknown" + P7-5 漂移常态化 (已修 unknown, P7-5 漂移待 user 拍)
+
+**症状**:
+- 8/9 + 8/18 daily_report.py 跑通,但 main exit 1 + summary 印 `[FAIL] residual_regression unknown`
+- verify_30days PASS (只看 error=0), 但 main() 算 fail (ok=False 计入 n_fail)
+- 实际 daily_report.log + 8/18 alert json 显示 6 处 P7-5 regression 越界:
+  - DIA/5d 2.06x (current 0.957% vs baseline 0.465%, abs_floor 0.05 触发)
+  - DIA/20d 1.69x
+  - QQQ/1d 2.7x
+  - QQQ/5d 14.91x (current 0.224% vs baseline 0.011%, ratio 20x)
+  - RSP/1d 4.66x
+  - QQQE/5d 1.85x
+
+**根因分析** (2026-08-18 17:55 排查):
+1. **"unknown" 文字根因**: `print_summary()` 把 `ok=False` 走 `[FAIL]` 分支, 取 `error` 字段 fallback "unknown". step_residual_regression 返回 `{ok: False, violations: [...]}` 但没设 "error" 字段, 所以印 "unknown" — **print logic 缺陷, 不是真 "unknown" 错误**
+2. **6 处 violation 根因**: P7-5 baseline `residuals_v069m.json` 8/7 锁, 到现在 8/18 已经 11 天. baseline avg_abs 1d=0.3865% / 5d=0.377% / 20d=1.0905%, 跟当前市场残差 6 处 > 1.5x 阈值. **真 P7-5 漂移, 不是 bug**
+3. **设计冲突**: P7-5 设计月度重抓 (baseline 一月更新一次), 但月度太慢, baseline 锁后 1-2 周就开始漂移. 8/7 → 8/18 已经 11 天, 9/7 月度重抓才能更新. user 7/4 提过 "P7-5 月度太慢, 改周度", 但实际实施仍是月度
+
+**修法实施 (2026-08-18 17:55, 选项 A 拍板)**:
+
+修法 A: print_summary error 字段 + warning status 分支
+- step_residual_regression() 返回 dict 加 "error" 摘要 (1 行说明几处 violation + top 3 ratio)
+- step_residual_regression() 改 "ok" 字段从 True/False 改 "ok"/"warning" 字符串
+- print_summary() 加 "warning" 分支 → 印 `[WARN]` 不是 `[FAIL]`
+- main() exit code 逻辑不变 (`ok is False` 严格比, "warning" is False = 不算 fail)
+
+修法效果 (8/18 18:00 实测):
+- 修前: `[FAIL] residual_regression unknown` + exit 1
+- 修后: `[WARN] residual_regression 6 处 P7-5 regression 越界 (>1.5x baseline): DIA/5d (2.06x), DIA/20d (1.69x), QQQ/1d (2.7x) ... +3 more` + exit 0
+- daily_report 跑通 (exit 0), 但 [WARN] 显眼显示 P7-5 漂移, user 仍能 catch 异常
+
+**未修问题 (P7-5 漂移常态化)**:
+- 6 处 violation 仍是真 P7-5 baseline 漂移, 不是 false alarm
+- baseline 8/7 锁 → 9/7 月度重抓 (还要 20 天)
+- 持续 20 天 [WARN] 不解决 root cause
+
+**P7-5 周度重抓候选 (user 7/4 提过, 待拍板)**:
+- 选项 1: 改 P7-5 月度 → 周度 (每周 1 重抓)
+  - 8/18 锁 v069p, 8/25 锁 v069q, 9/1 锁 v069r, 9/8 锁 v069s
+  - 跟 V1.0 路线图"9/3 v0.9.5 RC1"对齐, 8/25 锁一次 + 9/1 锁一次
+  - 需要自动化 (cron 周一 16:00 跑 capture + save)
+- 选项 2: 现在手动重抓 (8/18 锁 v069p, 下次 9/7 月度重抓)
+  - 修当前 6 处 violation, 但 3 周后又会出现
+- 选项 3: 接受 P7-5 漂移常态化, [WARN] 显式, 不修
+  - 0 钱, 0 维护, 但 daily_report 持续 [WARN]
+
+**建议**: 选项 1 (周度重抓), 8/25 + 9/1 各锁一次, 30 天稳定期 0 [WARN] 目标
+
+**V1.0 路线图影响**:
+- KI-4 unknown 修好, daily_report 跑通 (exit 0)
+- P7-5 漂移 持续 (P7-5 周度重抓是 9/3 RC1 范围)
+- 30 天稳定期 0 fail 验证不受影响 (KI-4 改 status, 不改 verify_30days 逻辑)
+- 9/3 v0.9.5 RC1 拍板 P7-5 周度重抓
