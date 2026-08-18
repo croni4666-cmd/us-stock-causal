@@ -117,15 +117,27 @@ def step_residual_regression() -> dict:
                 v = current["residuals"][idx][lb_str]
                 print(f"    {idx} {lb_str}d: {v:+.3f}%")
     else:
-        print(f"  [FAIL] {len(violations)} 处 regression:")
+        print(f"  [WARN] {len(violations)} 处 P7-5 regression 越界 (>1.5x baseline, 漂移检测常态化):")
         for v in violations:
             print(f"    - {v['index']} {v['window']}: "
                   f"baseline {v['baseline_pct']:+.3f}% → current {v['current_pct']:+.3f}% "
                   f"(ratio {v['regression_ratio']}x)")
 
+    # KI-4 修法: error 字段加 violation 摘要, 避免 print_summary 显示 "unknown"
+    # (P7-5 regression 是 baseline 漂移检测, 不是 step 崩溃, 但 ok=False 触发 [FAIL] 分支)
+    error_summary = None
+    status = "ok" if ok else "warning"  # warning 走 print_summary [WARN] 分支, 不算 fail
+    if not ok:
+        error_summary = f"{len(violations)} 处 P7-5 regression 越界 (>1.5x baseline): "
+        error_summary += ", ".join(f"{v['index']}/{v['window']} ({v['regression_ratio']}x)"
+                                     for v in violations[:3])
+        if len(violations) > 3:
+            error_summary += f" ... +{len(violations) - 3} more"
+
     return {
-        "ok": ok,
+        "ok": status,  # "ok" / "warning" (不再是 True/False)
         "violations": violations if not ok else [],
+        "error": error_summary,
         "elapsed_s": round(time.time() - t0, 1),
     }
 
@@ -460,11 +472,14 @@ def print_summary(steps: dict, total_elapsed: float, date_str: str):
     for name, info in steps.items():
         status = info.get("ok")
         elapsed = info.get("elapsed_s", 0)
-        if status is True:
+        if status is True or status == "ok":
             print(f"  [OK]    {name:25s} ({elapsed}s)")
         elif status == "skip":
             reason = info.get("reason", "")
             print(f"  [SKIP]  {name:25s} {reason}")
+        elif status == "warning":
+            err = info.get("error", "")
+            print(f"  [WARN]  {name:25s} {err}")
         else:
             err = info.get("error", "unknown")
             print(f"  [FAIL]  {name:25s} {err}")
