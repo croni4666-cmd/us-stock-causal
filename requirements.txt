@@ -7,7 +7,7 @@
 openbb[ta]>=4.4.0
 
 # Plotting
-matplotlib>=3.7.0
+matplotlib>=3.11.1
 mplfinance>=0.12.10b0
 plotly>=5.18.0
 
@@ -40,7 +40,7 @@ yfinance>=0.2.40
 # Utilities
 pyyaml>=6.0
 loguru>=0.7.0
-python-dotenv>=1.0.0
+python-dotenv>=1.2.3
 
 # Dev / test (optional)
 pytest>=7.0.0
