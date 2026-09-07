@@ -13,7 +13,7 @@ plotly>=5.18.0
 
 # Data
 pandas>=2.0.0
-numpy>=1.24.0
+numpy>=2.5.2
 pyarrow>=14.0.0
 
 # Technical analysis (kept from v0.2 for reference, OpenBB also provides)
