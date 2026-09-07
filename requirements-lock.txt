@@ -3,7 +3,7 @@
 # Install: `pip install --proxy http://127.0.0.1:10808 -r requirements-lock.txt`
 pandas==2.3.3
 numpy==1.26.4
-pyarrow==24.0.0
+pyarrow==25.0.1
 scipy==1.15.3
 matplotlib==3.11.0
 plotly==6.8.0
