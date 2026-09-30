@@ -50,6 +50,13 @@ def notify_if_alerts(alerts: list[dict], date: str, timeout: int = DEFAULT_TIMEO
 
     try:
         from plyer import notification
+        from unittest.mock import Mock, MagicMock
+        import os
+        is_mocked = isinstance(getattr(notification, "notify", None), (Mock, MagicMock))
+        if not is_mocked and (os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("US_STOCK_CAUSAL_NO_TOAST") == "1"):
+            logger.info(f"[notify] (测试/静默环境) 跳过桌面 toast: {title}")
+            return True
+
         notification.notify(
             title=title,
             message=message,
@@ -76,6 +83,13 @@ def notify_text(title: str, message: str, timeout: int = DEFAULT_TIMEOUT) -> boo
     """
     try:
         from plyer import notification
+        from unittest.mock import Mock, MagicMock
+        import os
+        is_mocked = isinstance(getattr(notification, "notify", None), (Mock, MagicMock))
+        if not is_mocked and (os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("US_STOCK_CAUSAL_NO_TOAST") == "1"):
+            logger.info(f"[notify] (测试/静默环境) 跳过桌面 toast: {title}")
+            return True
+
         notification.notify(
             title=title,
             message=message,
