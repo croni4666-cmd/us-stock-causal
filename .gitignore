@@ -21,6 +21,8 @@ data/raw/*.parquet
 data/cache/*.parquet
 data/cache/alerts/alerts_*.json
 data/cache/retry_log.json
+data/cache/sec_filings/
+data/cache/sector_weights_live_*.json
 *.parquet
 *.csv
 
@@ -29,6 +31,8 @@ output/*.png
 output/*.jpg
 output/*.html
 output/*.pdf
+output/*.txt
+output/logs/
 # Keep .md reports
 !output/*.md
 
@@ -71,3 +75,9 @@ _*.txt
 output\_*.txt
 output\_*.py
 test_*.log
+
+# Backups and Task Scheduler exports
+*.bak*
+*.task.xml*
+scripts/*.xml*
+scripts/*.bak*
