@@ -33,8 +33,14 @@ output/*.html
 output/*.pdf
 output/*.txt
 output/logs/
-# Keep .md reports
-!output/*.md
+output/*.log
+output/report_*.md
+output/sec_filings_*.md
+output/events_*.md
+output/event_study_*
+output/performance_table_*
+output/track_*.md
+output/_*.md
 
 # Logs
 logs/*.log

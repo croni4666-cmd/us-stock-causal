@@ -81,7 +81,6 @@ log = logging.getLogger('sec_fetch')
 
 # === SEC EDGAR User-Agent (官方要求, 缺这个会被 403) ===
 # SEC 要求: "Sample Company Name AdminContact@samplecompany.com"
-# 我们用 Mavis/MiniMax Code 通用 UA, 跟 paper-agent 风格一致
 DEFAULT_UA = "US-Stock-Causal-Research/1.0 (academic-research@users.noreply.github.com)"
 _HEADERS = {"User-Agent": DEFAULT_UA}
 

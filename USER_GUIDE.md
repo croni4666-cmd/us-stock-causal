@@ -65,7 +65,7 @@ python examples/daily_report.py --skip-fetch --skip-html --skip-dashboard
 
 ```cmd
 :: admin cmd
-cd "G:\workspace\trade market\us-stock-causal"
+cd "<path-to-repo>\us-stock-causal"
 scripts\install_task.cmd
 
 :: 验证

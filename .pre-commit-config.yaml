@@ -3,13 +3,13 @@
 # 跑全部: `pre-commit run --all-files`
 
 repos:
-  # R1 隐私审计: 0 personal info hits in source code
+  # R1 隐私与凭证审计: 0 secret / credential hits in source code
   - repo: local
     hooks:
       - id: r1-privacy-grep
-        name: R1 privacy grep (0 personal info hits)
-        description: R1 audit standard — 0 hits for developer/[REDACTED_LOCATION]/东方/C:\Users\developer
-        entry: bash -c '! grep -rE "developer|[REDACTED_LOCATION]|[REDACTED_INSTITUTION]|[REDACTED_INSTITUTION]|[REDACTED_INSTITUTION]|developer@users.noreply.github.com|@gmail\.com|C:\\\\Users\\\\developer" --include="*.py" --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.cmd" --include="*.ps1" src/ examples/ tests/ docs/ .github/ README.md USER_GUIDE.md ARCHITECTURE.md CHANGELOG.md V1.0-ROADMAP.md 2>/dev/null'
+        name: R1 privacy & credentials grep
+        description: R1 audit standard — check for accidental private key and sensitive credential leaks
+        entry: bash -c '! grep -rE "BEGIN PRIVATE KEY|sk-[a-zA-Z0-9]{20,}" --include="*.py" --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.cmd" --include="*.ps1" src/ examples/ tests/ docs/ .github/ README.md USER_GUIDE.md ARCHITECTURE.md CHANGELOG.md V1.0-ROADMAP.md 2>/dev/null'
         language: system
         pass_filenames: false
         types: [text]

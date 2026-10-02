@@ -22,7 +22,7 @@ us-stock-causal 在 Windows PowerShell 环境跑, Mavis 系统的 hard-safety po
 # 替代 Remove-Item
 trash output\_tz_debug2.txt           # 单文件
 trash output\_tz_debug2.txt output\_bench_*.py  # 多文件
-trash "G:\workspace\trade market\us-stock-causal\output\*.log"  # glob
+trash "output\*.log"  # glob
 ```
 `trash`:
 - 移到 `$env:LOCALAPPDATA\Temp\trash\` (Recycle Bin 类似)

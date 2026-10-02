@@ -3,7 +3,7 @@
 **审计触发**: 8/18 21:38 commit 4666271 + 483b937 + 7a7aa67 (3 new commits after R1 audit at 5b3764c)
 **审计模式**: 10 轮 + 4 agent team 复核 (跟 paper-agent 8/14 + us-stock-causal 8/18 R1 同模式)
 **审计目标**: 验证 v0.9.5 RC1 release 前的最后安全 + 性能 + 正确性门槛
-**审计员**: Mavis root session (session-id-redacted)
+**审计员**: Automated Audit Team
 **commit 范围**: 5b3764c..4666271 (3 commits, +142/-32)
 
 ---
@@ -12,7 +12,7 @@
 
 ### R1 隐私 ✅ 0 hits (实测)
 
-3 new commits 扫 `developer|[REDACTED_LOCATION]|东方|[REDACTED_AUTHOR]|C:\Users\developer|developer@users.noreply.github.com|@gmail\.com`:
+3 new commits 扫隐私敏感词与凭证泄露:
 - `tests/test_smoke.py` (5 fail 修 + 1 regression test): 0 hits
 - `src/attribution.py` (lru_cache + functools): 0 hits
 - `src/causal.py` (_QUERY_CACHE + _CATE_CACHE + clear_caches 集成): 0 hits
@@ -23,7 +23,7 @@
 
 ### R2 License ✅ OK (估过宽 — LICENSE 已就位, 8/18 R1 写)
 
-- `LICENSE`: MIT (c) 2026 Mavis ✅
+- `LICENSE`: MIT (c) 2026 croni4666-cmd ✅
 - `README.md`: 顶部 description + 命令示例 + 5 段制结构 ✅
 - commit_msg 模板: 0 license 头污染 ✅
 

@@ -139,12 +139,11 @@ def test_skill_md_exists_and_accurate():
     """skill 文件存在 + 内容含所有 module"""
     home = Path.home()
     candidates = [
-        Path(__file__).resolve().parents[3] / "workspace" / "saved_assets" / "skills" / "minimax_skills" / "us-stock-causal" / "SKILL.md",
-        Path(__file__).resolve().parents[2] / "workspace" / "saved_assets" / "skills" / "minimax_skills" / "us-stock-causal" / "SKILL.md",
+        Path(__file__).resolve().parent.parent / "SKILL.md",
         home / ".gemini" / "config" / "skills" / "us-stock-causal" / "SKILL.md",
         home / ".gemini" / "skills" / "us-stock-causal" / "SKILL.md",
-        home / ".minimax" / "skills" / "us-stock-causal" / "SKILL.md",
-        home / ".mavis" / "skills" / "us-stock-causal" / "SKILL.md",
+        Path(__file__).resolve().parents[3] / "workspace" / "saved_assets" / "skills" / "us-stock-causal" / "SKILL.md",
+        Path(__file__).resolve().parents[2] / "workspace" / "saved_assets" / "skills" / "us-stock-causal" / "SKILL.md",
     ]
     skill = next((p for p in candidates if p.exists()), None)
     assert skill is not None, f"skill file not found in {[str(c) for c in candidates]}"

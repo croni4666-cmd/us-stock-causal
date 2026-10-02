@@ -65,7 +65,7 @@ SEC EDGAR companyfacts API 不需 key, 但有限速:
 - < 10 req/s 官方限速
 - 我们设 2 req/s (paper-agent 经验)
 - 0.5s/req 间隔 → `tenacity` 装饰器
-- User-Agent 必填 (否则 403), mavis sec-fetch 默认 `US-Stock-Causal-Research/1.0 (academic-research@users.noreply.github.com)`
+- User-Agent 必填 (否则 403), sec-fetch 默认 `US-Stock-Causal-Research/1.0 (academic-research@users.noreply.github.com)`
 
 ## Anti-pattern (禁止)
 

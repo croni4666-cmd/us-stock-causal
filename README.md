@@ -51,7 +51,7 @@ python examples/daily_report.py --date 2026-08-08 --skip-fetch
 
 ```cmd
 :: admin cmd (右键 cmd.exe - 以管理员身份运行)
-cd "G:\workspace\trade market\us-stock-causal"
+cd "<path-to-repo>\us-stock-causal"
 scripts\install_task.cmd          :: 注册 17:00 daily (美股收盘后 1h)
 ```
 

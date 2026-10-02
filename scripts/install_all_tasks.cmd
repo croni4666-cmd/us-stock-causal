@@ -10,7 +10,7 @@ REM   2. us-stock-causal-daily-report-1705-backup 17:05 daily  (KI-3 Modern Stan
 REM   3. us-stock-causal-sec-filings-1730         17:30 daily  (Kansoku 借鉴 #1, A 方案)
 REM
 REM Usage:
-REM   cd "G:\workspace\trade market\us-stock-causal"
+REM   cd /d "<path-to-repo>\us-stock-causal"
 REM   scripts\install_all_tasks.cmd
 REM
 REM Idempotent: /F overwrites existing tasks

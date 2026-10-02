@@ -5,7 +5,7 @@ REM Register Windows Task Scheduler (us-stock-causal P5-4)
 REM Run as admin: right-click cmd.exe - Run as administrator
 REM
 REM Usage:
-REM   cd "G:\workspace\trade market\us-stock-causal"
+REM   cd /d "<path-to-repo>\us-stock-causal"
 REM   scripts\install_task.cmd          [default 17:00]
 REM   scripts\install_task.cmd 16:30    [custom time]
 REM

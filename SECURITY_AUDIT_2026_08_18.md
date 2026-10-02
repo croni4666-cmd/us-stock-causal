@@ -31,9 +31,9 @@
 ## R1 隐私审计 (e586641)
 
 **修前 10 hits**:
-- `output/_tz_debug2.txt` (8 hits, Python traceback 自动含 C:\Users\developer 路径, untracked)
-- `tests/test_smoke.py:140` (2 hits, hardcode C:\Users\developer\.mavis / .minimax skill 路径)
-- `CHANGELOG.md:2311, 2334` (2 hits, 文档历史 hardcode C:\Users\developer\.minimax)
+- `output/_tz_debug2.txt` (8 hits, Python traceback 自动含 `<user-home>` 路径, untracked)
+- `tests/test_smoke.py:140` (2 hits, hardcode `<user-home>/.mavis` / `.minimax` skill 路径)
+- `CHANGELOG.md:2311, 2334` (2 hits, 文档历史 hardcode `<user-home>/.minimax`)
 
 **修**:
 - `tests/test_smoke.py:138-145` test_skill_md_exists_and_accurate() 改 `Path.home()` 模式

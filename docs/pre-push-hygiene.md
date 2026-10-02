@@ -19,8 +19,8 @@ R1 隐私审计标准 + R6 pre-push hygiene 跟 R4 CI 集成。
 ## 1 行 pre-push 脚本
 
 ```powershell
-# 1) R1 grep (PowerShell)
-$hits = Select-String -Path . -Pattern 'developer|[REDACTED_LOCATION]|[REDACTED_INSTITUTION]|[REDACTED_INSTITUTION]|[REDACTED_INSTITUTION]|developer@users.noreply.github.com|@gmail\.com|C:\\Users\\developer' -Recurse -Include '*.py','*.md','*.json','*.yaml','*.cmd' -ErrorAction SilentlyContinue
+# 1) R1 grep (PowerShell 敏感信息与私钥检测)
+$hits = Select-String -Path . -Pattern 'BEGIN PRIVATE KEY|sk-[a-zA-Z0-9]{20,}' -Recurse -Include '*.py','*.md','*.json','*.yaml','*.cmd' -ErrorAction SilentlyContinue
 if ($hits.Count -gt 0) { Write-Host "[FAIL] R1 privacy hits:" $hits.Count; exit 1 } else { Write-Host "[OK] R1 0 hits" }
 
 # 2) Key 不入 git

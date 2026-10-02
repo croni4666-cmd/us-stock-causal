@@ -41,12 +41,12 @@ jobs:
 
       - name: Check pre-push hygiene (R6)
         run: |
-          # 0 personal info hits in source code
-          if grep -rE 'developer|[REDACTED_LOCATION]|[REDACTED_INSTITUTION]|[REDACTED_INSTITUTION]|[REDACTED_INSTITUTION]|developer@users.noreply.github.com|@gmail\.com|C:\\Users\\developer' \
+          # Check for forbidden patterns (unresolved placeholders, private keys, local user profiles)
+          if grep -rE 'C:\\Users\\[a-zA-Z0-9_-]+\\.mavis|BEGIN PRIVATE KEY|sk-[a-zA-Z0-9]{20,}' \
               --include='*.py' --include='*.md' --include='*.json' --include='*.yaml' --include='*.yml' \
               --include='*.cmd' --include='*.ps1' \
               src/ examples/ tests/ docs/ 2>/dev/null; then
-            echo "::error::Personal info found in source code (R6 audit fail)"
+            echo "::error::Sensitive pattern found in source code (R6 audit fail)"
             exit 1
           fi
-          echo "R6 pre-push hygiene OK (0 personal info hits)"
+          echo "R6 pre-push hygiene OK"

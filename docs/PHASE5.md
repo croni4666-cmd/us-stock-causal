@@ -54,7 +54,7 @@
 
 ```bash
 # 在项目根目录
-G:\workspace\trade market\us-stock-causal\.env
+.env
 
 # 内容 (一行,不要引号,不要空格):
 FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
@@ -65,7 +65,7 @@ FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx-xxxx-xx
 ### 步骤 3: 测试 dry-run
 
 ```powershell
-cd "G:\workspace\trade market\us-stock-causal"
+cd "<path-to-repo>\us-stock-causal"
 python examples/feishu_push.py --dry-run
 ```
 
@@ -135,7 +135,7 @@ Report date: 2026-07-13
 
 **注册 (admin cmd)**:
 ```cmd
-cd "G:\workspace\trade market\us-stock-causal"
+cd "<path-to-repo>\us-stock-causal"
 scripts\install_task.cmd          [默认 17:00]
 scripts\install_task.cmd 16:30    [指定时间]
 ```
@@ -159,7 +159,7 @@ schtasks /Run /TN "us-stock-causal-daily-report"
 schtasks /Query /TN "us-stock-causal-daily-report" /V /FO LIST
 ```
 
-**日志**: `G:\workspace\trade market\us-stock-causal\output\logs\cron_YYYY-MM-DD.log`
+**日志**: `output\logs\cron_YYYY-MM-DD.log`
 
 **禁用 (不删)**:
 ```cmd
