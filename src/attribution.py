@@ -37,11 +37,8 @@ def load_sector_weights(use_live_cache: bool = True, as_of: Optional[str] = None
                        过期走 pull (cp config/sector_weights.json). False 直接读 config
         as_of: 历史日期 (YYYY-MM-DD), None = 今天
     """
-    if use_live_cache:
-        from src.sector_weights_live import load_live_or_static
-        return load_live_or_static(date=as_of)
-    with open(WEIGHTS_PATH, encoding="utf-8") as f:
-        return json.load(f)
+    from src.sector_weights_live import load_live_or_static
+    return load_live_or_static(date=as_of, use_cache=use_live_cache)
 
 
 def _get_sector_data_signature() -> tuple:

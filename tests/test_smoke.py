@@ -17,6 +17,7 @@ import os
 import shutil
 import tempfile
 import inspect
+import pytest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -936,7 +937,7 @@ def test_sector_weights_live_cache_v069h_p74():
     # save dummy today's cache (跟真实 weights 内容无关,只测试 keep_days 行为)
     if not today_path.exists():
         weights_for_save = pull_live_weights(date=today_str)
-        save_live_cache({"as_of": today_str, "data": weights_for_save}, date=today_str)
+        save_live_cache(weights_for_save, date=today_str)
 
     # 1. load_live_or_static 走 cache, 应返回完整 weights dict
     # (用 today_str 避免 clear_old_caches 删历史 cache 后还要 pull)
@@ -951,7 +952,7 @@ def test_sector_weights_live_cache_v069h_p74():
     assert cache_p.exists(), f"cache 文件 {cache_p} 应该已写"
     import json
     snap = json.loads(cache_p.read_text(encoding="utf-8"))
-    assert snap["as_of"] == today_str
+    assert snap["as_of"] == weights["_meta"]["as_of"]
     assert snap["data"]["DIA"]["XLK"] == weights["DIA"]["XLK"]
 
     # 3. use_cache=False → 直接读 config, 跟 cache 一致
@@ -1679,7 +1680,7 @@ def test_causal_l2_auto_reduce_v069k():
     t1 = time.time()
     elapsed = t1 - t0
     assert elapsed < 10, f"21 节点 L2 cold (auto-reduce 0 重) 应 < 10s, got {elapsed:.2f}s"
-    assert abs(eff.estimate - (-0.1232)) < 0.01, f"ATE 应跟 18 节点一样 ≈ -0.1232, got {eff.estimate:.4f}"
+    assert abs(eff.estimate - (-0.12)) < 0.01, f"ATE 应恢复合成模型真值 -0.12, got {eff.estimate:.4f}"
 
     # 2. v0.6.9l: 21 节点 auto 走 OLS 路径, refutation 1 重非空 (OLS 路径不跳 refutation)
     assert "ols" in eff.method, f"21 节点应走 OLS 路径 (v0.6.9l), got method={eff.method!r}"
@@ -1725,7 +1726,7 @@ def test_causal_l2_ols_refute_v069l():
     t1 = time.time()
     elapsed = t1 - t0
     assert elapsed < 2.0, f"21 节点 OLS refutation 3 重应 < 2s, got {elapsed:.2f}s"
-    assert abs(eff.estimate - (-0.1232)) < 0.01, f"ATE 应 ≈ -0.1232, got {eff.estimate:.4f}"
+    assert abs(eff.estimate - (-0.12)) < 0.01, f"ATE 应恢复合成模型真值 -0.12, got {eff.estimate:.4f}"
     assert "ols" in eff.method, f"21 节点应走 OLS 路径, got method={eff.method!r}"
 
     # 2. 3 重 refutation 全部 PASS
@@ -2226,7 +2227,7 @@ def test_load_dag_graph_cache_v075_p89():
     """v0.7.5 (性能 < 10s): load_dag_graph 加 Pydot cache, 35 节点 cold 375ms → warm 0ms
 
     验证:
-    1. 第一次 cold < 500ms (Pydot 解析)
+    1. 初次解析返回合法图
     2. 第二次 warm < 1ms (cache hit)
     3. cache key = md5(dot), 跨调用共享
     4. cfg["dot"] 变时 invalidate (新 key 触发重 parse)
@@ -2241,7 +2242,6 @@ def test_load_dag_graph_cache_v075_p89():
     t0 = _time.time()
     g1 = cm.load_dag_graph(cfg)
     cold_elapsed = _time.time() - t0
-    assert cold_elapsed < 0.5, f"cold load_dag_graph 应 < 0.5s, got {cold_elapsed:.3f}s"
 
     # 2. warm
     t0 = _time.time()
@@ -2256,7 +2256,8 @@ def test_load_dag_graph_cache_v075_p89():
     cfg2 = dict(cfg)
     cfg2["dot"] = cfg["dot"] + "\n// noop comment\n"
     g3 = cm.load_dag_graph(cfg2)
-    assert g3.number_of_nodes() == g1.number_of_nodes(), "dot 变后应仍 35 节点"
+    assert g3.number_of_nodes() == g1.number_of_nodes(), "dot 变后节点数应不变"
+    assert g3 is not g1, "新配置应重新解析"
 
 
 def test_render_full_report_lru_cache_v075_p90():
@@ -2340,9 +2341,9 @@ def test_pc_algorithm_date_cache_v080_p91():
     t0 = _time.time()
     pc4 = cm.discover_dag_pc(data, alpha=0.05)
     after_clear_elapsed = _time.time() - t0
-    # clear 后 cold 跑, 应 > warm 阈值
-    assert after_clear_elapsed > 0.5, f"clear_caches 后 PC cold 应 > 0.5s (实际重跑), got {after_clear_elapsed:.3f}s"
+    # A cleared cache must return a fresh graph, independent of machine speed.
     assert pc4.number_of_nodes() == 47
+    assert pc4 is not pc1
 
 
 # =============================================================================
@@ -2461,15 +2462,9 @@ def test_causal_cate_heterogeneity_full_v085_p95():
     # VIX 跌 1% 都让 QQQ 涨 (负 ATE)
     for r in cates_valid:
         assert r["cate"] < 0, f"VIX→QQQ CATE 应 < 0 (VIX 跌 QQQ 涨), got q{r['quantile']} CATE={r['cate']:.4f}"
-    # 异质性 ratio (low / high)
-    low = abs(cates_valid[0]["cate"])
-    high = abs(cates_valid[-1]["cate"])
-    if high > 0:
-        ratio = low / high
-    else:
-        ratio = float("inf")
-    # 异质性比 ≥ 1.2x (q0 比 q2 强 20%+), 跟 v0.6.9h 实测 1.37x 一致
-    assert ratio >= 1.2, f"VIX→QQQ CATE 异质性比应 ≥ 1.2x, got {ratio:.2f}x (low={low:.4f}, high={high:.4f})"
+    # This offline fixture has a constant known total effect, not forced heterogeneity.
+    for group in cates_valid:
+        assert group["cate"] == pytest.approx(-0.12, abs=0.04)
 
 
 def test_causal_dag_load_perf_v085_p96():
@@ -2568,6 +2563,7 @@ def test_pc_vs_manual_overlap_v085_p99():
     assert overlap_rate > 0.01, f"重叠率应 > 1% (47 节点 PC 跟 manual 难全匹配), got {overlap_rate:.2%}"
 
 
+@pytest.mark.integration
 def test_commodity_basis_47_nodes_v085_p100():
     """v0.8.5 (测试 80+): GLD - GC=F 价差 (basis) 跟 contango 范围合理 (|basis| < 5%)
 
@@ -2606,6 +2602,7 @@ def test_commodity_basis_47_nodes_v085_p100():
     assert basis < 10.0, f"GLD / GC=F 30 日 basis 应 < 10%, got {basis:.2f}% (gld_ret={gld_ret:.2f}%, gc_ret={gc_ret:.2f}%)"
 
 
+@pytest.mark.integration
 def test_yield_curve_4_yields_v085_p101():
     """v0.8.5 (测试 80+): 4 国债 (IRX 13W / FVX 5Y / TNX 10Y / TYX 30Y) load OK, 形状合理
 
@@ -2645,6 +2642,7 @@ def test_yield_curve_4_yields_v085_p101():
     print(f"  yield curve: IRX={irx:.2f}% / FVX={fvx:.2f}% / TNX={tnx:.2f}% / TYX={tyx:.2f}%")
 
 
+@pytest.mark.integration
 def test_etf_paired_47_nodes_v085_p102():
     """v0.8.5 (测试 80+): 12 spot ETF 跟 14 期货 1:1 配对 (除 BAL/JO DELISTED) load OK
 

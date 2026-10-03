@@ -28,3 +28,6 @@ openbb==4.7.2
 requests-cache==1.2.1
 requests-toolbelt==1.0.0
 matplotlib-inline==0.2.2
+
+pandas-market-calendars==5.4.0
+tzdata==2026.5

@@ -9,6 +9,12 @@ on:
     branches: [master, main]
   pull_request:
     branches: [master, main]
+  workflow_dispatch:
+    inputs:
+      live_data:
+        description: "Run live provider integration tests"
+        type: boolean
+        default: false
 
 jobs:
   smoke:
@@ -35,14 +41,14 @@ jobs:
         run: |
           pip install -e .
 
-      - name: Run tests (smoke + regression suites)
+      - name: Run offline regression tests
         run: |
           pytest tests -v --tb=short
 
       - name: Check pre-push hygiene (R6)
         run: |
           # Check for forbidden patterns (unresolved placeholders, private keys, local user profiles)
-          if grep -rE 'C:\\Users\\[a-zA-Z0-9_-]+\\.mavis|BEGIN PRIVATE KEY|sk-[a-zA-Z0-9]{20,}' \
+          if grep -rE 'C:\\Users\\[a-zA-Z0-9_-]+\\.mavis|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|sk-[a-zA-Z0-9]{20,}' \
               --include='*.py' --include='*.md' --include='*.json' --include='*.yaml' --include='*.yml' \
               --include='*.cmd' --include='*.ps1' \
               src/ examples/ tests/ docs/ 2>/dev/null; then
@@ -50,3 +56,17 @@ jobs:
             exit 1
           fi
           echo "R6 pre-push hygiene OK"
+
+  integration:
+    if: github.event_name == 'workflow_dispatch' && inputs.live_data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements-lock.txt
+      - run: pip install -e .
+      - name: Run explicitly requested live provider tests
+        run: pytest tests -m integration --integration -v --tb=short

@@ -15,11 +15,11 @@ from datetime import date, datetime, timedelta, time as dtime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
-try:
-    from zoneinfo import ZoneInfo
-    EASTERN_TZ = ZoneInfo("America/New_York")
-except Exception:
-    EASTERN_TZ = timezone(timedelta(hours=-4))  # EDT fallback
+from zoneinfo import ZoneInfo
+from functools import lru_cache
+import pandas_market_calendars as mcal
+
+EASTERN_TZ = ZoneInfo("America/New_York")
 
 import pandas as pd
 from loguru import logger
@@ -41,63 +41,35 @@ def cache_path(symbol: str, layer: str, cache_root: Path) -> Path:
     return layer_dir / f"{safe_name(symbol)}.parquet"
 
 
+@lru_cache(maxsize=128)
+def _nyse_schedule(day: date) -> pd.DataFrame:
+    return mcal.get_calendar("NYSE").schedule(
+        start_date=day - timedelta(days=30), end_date=day,
+    )
+
+
 def get_expected_last_trading_day(ref: Optional[date | datetime | str] = None) -> date:
-    """计算预期的最近已完成美股交易日 (排除周末、休市日及盘中未完成时段).
+    """Last completed NYSE session, allowing 15 minutes after its actual close.
 
-    规则:
-    - 纽交所收盘时间为美东时间 16:00, 结算完成在 16:15 左右.
-    - 若传入时间带有时分秒且在美东时间 16:15 之前, 则当日交易未完成, 最新已完成交易日为上一交易日.
-    - 若在美东 16:15 及之后, 或传入纯日期 (无时间分量), 则当日算作目标交易日 (若为周末/休市则回退).
-    - 周末回退到上周五; 美股法定节假日回退到上一有效交易日.
+    Date-only values target that day's final session. Naive datetimes are NY time;
+    aware datetimes are converted to NY time, including winter DST offsets.
     """
-    has_time = False
     if ref is None:
-        ref_dt = datetime.now(EASTERN_TZ)
-        has_time = True
-    elif isinstance(ref, str):
-        if "T" in ref or " " in ref:
-            ref_dt = datetime.fromisoformat(ref)
-            has_time = True
-        else:
-            d = date.fromisoformat(ref)
-            ref_dt = datetime.combine(d, dtime(17, 0), tzinfo=EASTERN_TZ)
-            has_time = False
-    elif isinstance(ref, datetime):
-        ref_dt = ref
-        has_time = True
+        ref = datetime.now(EASTERN_TZ)
+    if isinstance(ref, str):
+        ref = datetime.fromisoformat(ref) if "T" in ref or " " in ref else date.fromisoformat(ref)
+    if isinstance(ref, datetime):
+        instant = ref.replace(tzinfo=EASTERN_TZ) if ref.tzinfo is None else ref.astimezone(EASTERN_TZ)
+        schedule = _nyse_schedule(instant.date())
+        ready = schedule["market_close"] + pd.Timedelta(minutes=15)
+        schedule = schedule.loc[ready <= pd.Timestamp(instant)]
     elif isinstance(ref, date):
-        ref_dt = datetime.combine(ref, dtime(17, 0), tzinfo=EASTERN_TZ)
-        has_time = False
+        schedule = _nyse_schedule(ref)
     else:
-        ref_dt = datetime.now(EASTERN_TZ)
-        has_time = True
-
-    # 统一转换到美东时间
-    if ref_dt.tzinfo is not None:
-        ny_dt = ref_dt.astimezone(EASTERN_TZ)
-    else:
-        ny_dt = ref_dt.replace(tzinfo=EASTERN_TZ)
-
-    cur_date = ny_dt.date()
-
-    # 如果带有明确的时间分量，且在美东 16:15 之前，则当日盘中或盘前，退回前一工作日
-    if has_time and (ny_dt.hour < 16 or (ny_dt.hour == 16 and ny_dt.minute < 15)):
-        cur_date = cur_date - timedelta(days=1)
-
-    # 循环向前找到最近的有效交易日 (跳过周末与法定假日)
-    try:
-        from pandas.tseries.holiday import USFederalHolidayCalendar
-        holidays = set(USFederalHolidayCalendar().holidays(
-            start=cur_date - timedelta(days=30),
-            end=cur_date + timedelta(days=1)
-        ).date)
-    except Exception:
-        holidays = set()
-
-    while cur_date.weekday() >= 5 or cur_date in holidays:
-        cur_date = cur_date - timedelta(days=1)
-
-    return cur_date
+        raise TypeError("ref must be a date, datetime, or ISO date/time")
+    if schedule.empty:
+        raise ValueError("No completed NYSE session in the requested date range")
+    return schedule.index[-1].date()
 
 
 def is_fresh(

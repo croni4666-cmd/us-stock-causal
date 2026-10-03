@@ -1,13 +1,9 @@
-"""tests/conftest.py - Global pytest configuration and offline test fixtures.
-
-Provides an autouse session fixture that ensures minimal synthetic parquet data
-exists in `data/raw/` so that tests (including `test_smoke.py` and `test_audit_fixes.py`)
-can pass completely offline on a fresh, clean checkout without requiring pre-existing
-market parquet files or network access.
-"""
+"""Isolated, deterministic offline market data; live tests require --integration."""
 from __future__ import annotations
-
-import os
+import importlib
+import json
+import shutil
+import tempfile
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -15,73 +11,102 @@ import pytest
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DAG_CONFIG = PROJECT_ROOT / "config" / "causal_dag.yaml"
 
 
-@pytest.fixture(scope="session", autouse=True)
-def ensure_test_market_parquets():
-    """Ensure minimal offline market parquets exist for CI and clean clones.
-    
-    If data/raw is missing parquet files (as in a clean git checkout where data/raw/*.parquet
-    is ignored), generates synthetic OHLCV data for all 47 DAG symbols (indices, sectors,
-    macro, commodities) spanning 504 business days with realistic returns.
-    """
-    if not DAG_CONFIG.exists():
-        return
+def pytest_addoption(parser):
+    parser.addoption("--integration", action="store_true", help="Run live market/provider tests")
 
-    with open(DAG_CONFIG, encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
 
-    parquet_map = cfg.get("nodes", {}).get("parquet_map", {})
-    if not parquet_map:
-        return
+def pytest_configure(config):
+    config.addinivalue_line("markers", "integration: requires real external providers")
 
-    # Check if any key files are missing
-    missing_paths = []
-    for node, rel_path in parquet_map.items():
-        pq_path = PROJECT_ROOT / rel_path
-        if not pq_path.exists() or pq_path.stat().st_size < 100:
-            missing_paths.append((node, pq_path))
 
-    if not missing_paths:
-        return
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("--integration"):
+        for item in items:
+            if "integration" in item.keywords:
+                item.add_marker(pytest.mark.skip(reason="live providers require --integration"))
 
-    # Generate synthetic 504-day trading calendar
-    dates = pd.bdate_range(end="2026-07-24", periods=504)
+
+@pytest.fixture(scope="session")
+def market_root(tmp_path_factory):
+    root = tmp_path_factory.mktemp("offline-market")
+    shutil.copytree(PROJECT_ROOT / "config", root / "config")
+    shutil.copytree(PROJECT_ROOT / "data" / "baseline", root / "data" / "baseline")
+    config_path = root / "config" / "sector_weights.json"
+    weights = json.loads(config_path.read_text(encoding="utf-8"))
+    # Synthetic weights and prices are one known model, not historical market claims.
+    weights["_meta"]["as_of"] = "2024-01-01"
+    config_path.write_text(json.dumps(weights), encoding="utf-8")
+    cfg = yaml.safe_load((root / "config" / "causal_dag.yaml").read_text(encoding="utf-8"))
+    dates = pd.bdate_range(end="2026-07-24", periods=760)
     rng = np.random.default_rng(42)
+    returns = {node: rng.normal(.0001, .005, len(dates)) for node in cfg["nodes"]["parquet_map"]}
+    returns["VIX"] = rng.normal(0, .04, len(dates))
+    returns["TNX"] = rng.normal(0, .015, len(dates))
+    sectors = ["XLK", "XLF", "XLE", "XLY", "XLP", "XLV", "XLI", "XLU", "XLB", "XLRE", "XLC"]
+    for sector in sectors:
+        returns[sector] = -.12 * returns["VIX"] + .10 * returns["TNX"] + .02 * returns["DXY"] + rng.normal(.0001, .001, len(dates))
+    returns["XLB"] += .05 * returns["GC_F"]
+    returns["XLE"] += .10 * returns["CL_F"]
+    for index in ("DIA", "QQQ", "RSP", "QQQE"):
+        returns[index] = sum(weights[index].get(s, 0) * returns[s] for s in sectors) + rng.normal(0, .0001, len(dates))
+    for node, relative in cfg["nodes"]["parquet_map"].items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        close = 100 * np.exp(np.cumsum(returns[node]))
+        pd.DataFrame({"open": close * 1.001, "close": close, "high": close * 1.005,
+                      "low": close * .995, "volume": 1000000}, index=dates).to_parquet(path)
+    (root / "output").mkdir()
+    return root
 
-    for node, pq_path in missing_paths:
-        pq_path.parent.mkdir(parents=True, exist_ok=True)
-        # Generate random walk with small daily returns (std=0.012)
-        rets = rng.normal(loc=0.0003, scale=0.012, size=len(dates))
-        base_price = 100.0
-        if "VIX" in node:
-            base_price = 18.0
-            rets = rng.normal(loc=0.0, scale=0.04, size=len(dates))
-        elif "TNX" in node:
-            base_price = 4.2
-            rets = rng.normal(loc=0.0, scale=0.015, size=len(dates))
-        elif node in ("DIA", "QQQ", "RSP", "QQQE"):
-            base_price = 350.0
 
-        close = base_price * np.exp(np.cumsum(rets))
-        # Ensure prices remain strictly positive
-        close = np.clip(close, a_min=1.0, a_max=None)
-        
-        noise = rng.normal(0, 0.002, size=len(dates))
-        open_p = close * (1.0 + noise)
-        high_p = np.maximum(open_p, close) * (1.0 + rng.uniform(0.001, 0.008, size=len(dates)))
-        low_p = np.minimum(open_p, close) * (1.0 - rng.uniform(0.001, 0.008, size=len(dates)))
-        vol = rng.integers(500_000, 10_000_000, size=len(dates))
-
-        df = pd.DataFrame(
-            {
-                "open": open_p,
-                "high": high_p,
-                "low": low_p,
-                "close": close,
-                "volume": vol,
-            },
-            index=dates,
-        )
-        df.to_parquet(pq_path)
+@pytest.fixture(autouse=True)
+def isolated_market(monkeypatch, market_root, request):
+    if "integration" in request.node.keywords:
+        yield
+        return
+    monkeypatch.setenv("US_STOCK_PROXY", "off")
+    from src import attribution, causal, report, sector_weights_live
+    for name in ("attribution", "thresholds", "causal", "report", "sector_weights_live",
+                 "alert_logger", "retry", "yfinance_rate_limit", "residual_regression"):
+        module = importlib.import_module("src." + name)
+        monkeypatch.setattr(module, "PROJECT_ROOT", market_root)
+    monkeypatch.setattr(attribution, "CACHE_ROOT", market_root / "data" / "raw")
+    monkeypatch.setattr(importlib.import_module("src.thresholds"), "CACHE_ROOT", market_root / "data" / "raw")
+    for module in (attribution, sector_weights_live):
+        monkeypatch.setattr(module, "WEIGHTS_PATH", market_root / "config" / "sector_weights.json")
+    monkeypatch.setattr(sector_weights_live, "CACHE_DIR", market_root / "data" / "cache")
+    from examples import daily_report
+    monkeypatch.setattr(daily_report, "OUTPUT_DIR", market_root / "output")
+    monkeypatch.setattr(daily_report, "ALERT_DIR", market_root / "data" / "cache" / "alerts")
+    monkeypatch.setattr(daily_report, "CACHE_DIR", market_root / "data" / "cache" / "sec_filings")
+    from src import alert_logger, retry, yfinance_rate_limit, residual_regression
+    monkeypatch.setattr(alert_logger, "ALERT_DIR", market_root / "data" / "cache" / "alerts")
+    monkeypatch.setattr(retry, "RETRY_LOG", market_root / "data" / "cache" / "retry_log.json")
+    monkeypatch.setattr(yfinance_rate_limit, "RATE_LIMIT_CACHE", market_root / "data" / "cache" / "yfinance_rate_limit.json")
+    monkeypatch.setattr(residual_regression, "DEFAULT_BASELINE", market_root / "data" / "baseline" / "residuals_v069p.json")
+    for name in ("stale", "vix_spike", "parquet_corrupt", "ticker_fail"):
+        module = importlib.import_module("src.checks." + name)
+        if hasattr(module, "DATA_RAW"):
+            monkeypatch.setattr(module, "DATA_RAW", market_root / "data" / "raw")
+        if hasattr(module, "RATE_LIMIT_PATH"):
+            monkeypatch.setattr(module, "RATE_LIMIT_PATH", yfinance_rate_limit.RATE_LIMIT_CACHE)
+    scratch = market_root / "scratch"
+    scratch.mkdir(exist_ok=True)
+    monkeypatch.setattr(tempfile, "tempdir", str(scratch))
+    monkeypatch.setenv("US_STOCK_PROXY", "off")
+    monkeypatch.setenv("US_STOCK_NOTIFY", "0")
+    import requests
+    def offline(*args, **kwargs):
+        raise requests.ConnectionError("external requests disabled in offline tests")
+    monkeypatch.setattr(requests.sessions.Session, "request", offline)
+    from curl_cffi.requests import Session
+    monkeypatch.setattr(Session, "request", offline)
+    attribution.clear_attribution_cache()
+    causal.clear_caches()
+    report.clear_report_cache()
+    yield
+    attribution.clear_attribution_cache()
+    causal.clear_caches()
+    report.clear_report_cache()

@@ -63,7 +63,12 @@ def _segment_1_market(symbol: str, layer: str, lookback_days: int, as_of: Option
 
 def _segment_2_attribution(symbol: str, lookback_days: int, as_of: Optional[str] = None, force: bool = False) -> str:
     """② 5 日归因"""
-    r = attribute_index(symbol, date=as_of, lookback_days=lookback_days, force=force)
+    try:
+        r = attribute_index(symbol, date=as_of, lookback_days=lookback_days, force=force)
+    except FileNotFoundError as exc:
+        if "历史行业权重不可用" not in str(exc):
+            raise
+        return "历史权重不可用，无法计算该日的行业归因。"
     # top 3 贡献(按绝对值)
     contribs = sorted(
         r["sector_contributions_pct"].items(),
@@ -183,45 +188,21 @@ def clear_report_cache() -> None:
 
 def _get_data_signature(symbols: list[str], layer: str) -> tuple:
     """获取底层行情数据、行业与宏观数据及配置文件的综合签名 (mtime_ns, size) 避免数据更新后命中旧缓存."""
-    sig = []
-    # 1. 目标标的
-    for s in sorted(symbols):
-        safe = s.replace("^", "_").replace("=", "_").replace(".", "_")
-        pq = PROJECT_ROOT / "data" / "raw" / layer / f"{safe}.parquet"
-        if pq.exists():
-            st = pq.stat()
-            sig.append((f"{layer}:{s}", st.st_mtime_ns, st.st_size))
-        else:
-            sig.append((f"{layer}:{s}", 0, 0))
-
-    # 2. 宏观数据 (VIX/TNX/DXY 等)
-    macro_dir = PROJECT_ROOT / "data" / "raw" / "macro"
-    if macro_dir.exists():
-        for p in sorted(macro_dir.glob("*.parquet")):
-            st = p.stat()
-            sig.append((f"macro:{p.name}", st.st_mtime_ns, st.st_size))
-
-    # 3. 行业数据 (XLK/XLF 等)
-    sectors_dir = PROJECT_ROOT / "data" / "raw" / "sectors"
-    if sectors_dir.exists():
-        for p in sorted(sectors_dir.glob("*.parquet")):
-            st = p.stat()
-            sig.append((f"sectors:{p.name}", st.st_mtime_ns, st.st_size))
-
-    # 4. 关键配置文件 (权重/DAG/事件)
-    for cfg_rel in [
-        "config/sector_weights.json",
-        "config/causal_dag.yaml",
-        "config/events_2026.yaml",
-    ]:
-        cfg_path = PROJECT_ROOT / cfg_rel
-        if cfg_path.exists():
-            st = cfg_path.stat()
-            sig.append((cfg_rel, st.st_mtime_ns, st.st_size))
-        else:
-            sig.append((cfg_rel, 0, 0))
-
-    return tuple(sig)
+    paths = set((PROJECT_ROOT / "data" / "raw").rglob("*.parquet"))
+    paths.update((PROJECT_ROOT / "config").rglob("*.yaml"))
+    paths.update((PROJECT_ROOT / "config").rglob("*.json"))
+    paths.update((PROJECT_ROOT / "data" / "cache").glob("sector_weights_live_*.json"))
+    for symbol in symbols:
+        safe = symbol.replace("^", "_").replace("=", "_").replace(".", "_")
+        paths.add(PROJECT_ROOT / "data" / "raw" / layer / f"{safe}.parquet")
+    signature = []
+    for path in sorted(paths):
+        try:
+            stat = path.stat()
+            signature.append((str(path.relative_to(PROJECT_ROOT)), stat.st_mtime_ns, stat.st_size))
+        except FileNotFoundError:
+            signature.append((str(path.relative_to(PROJECT_ROOT)), 0, 0))
+    return tuple(signature)
 
 
 def render_full_report(
@@ -241,6 +222,12 @@ def render_full_report(
         from src.attribution import clear_attribution_cache
         clear_attribution_cache()
 
+    # Populate the dated weight snapshot before computing the cache signature.
+    from src.attribution import load_sector_weights
+    try:
+        load_sector_weights(as_of=as_of)
+    except FileNotFoundError:
+        pass  # The attribution segment renders historical unavailability.
     report_date = as_of or str(date.today())
     data_sig = _get_data_signature(symbols, layer)
     cache_key = (report_date, tuple(symbols), layer, data_sig)
@@ -274,7 +261,7 @@ def render_full_report(
     sym_reports = {}
     with ThreadPoolExecutor(max_workers=min(len(symbols), 4)) as executor:
         future_to_sym = {
-            executor.submit(five_segment_report, sym, layer, as_of=as_of, force=force): sym
+            executor.submit(five_segment_report, sym, layer, as_of=as_of): sym
             for sym in symbols
         }
         for future in future_to_sym:

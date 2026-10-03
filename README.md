@@ -32,7 +32,8 @@
 
 ```bash
 # 1. 装依赖 (代理 10808, ~3 min)
-pip install -r requirements.txt --proxy http://127.0.0.1:10808
+pip install -r requirements-lock.txt
+pip install -e .
 
 # 2. 拉数据 (47 ticker 全, ~2 min, 含 14 期货 + 12 ETF)
 python examples/fetch_all.py

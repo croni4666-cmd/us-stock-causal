@@ -855,6 +855,18 @@ class CounterfactualResult:
         return asdict(self)
 
 
+def _causal_controls(treatment: str, outcome: str, data: pd.DataFrame, cfg: dict) -> list[str]:
+    adjustment = identify_backdoor_set(load_dag_graph(cfg), treatment, outcome, set(data.columns))
+    if not adjustment.is_identified:
+        raise ValueError(f"Causal effect is unidentifiable: {adjustment.missing_confounders}")
+    return adjustment.adjustment_set
+
+
+def _control_matrix(data: pd.DataFrame, controls: list[str]) -> np.ndarray:
+    # A constant feature permits the unconfounded case without conditioning on descendants.
+    return data[controls].values if controls else np.ones((len(data), 1))
+
+
 def _get_cfdml_cached(
     treatment: str,
     outcome: str,
@@ -882,12 +894,12 @@ def _get_cfdml_cached(
         n_estimators=100,  # P9-1.5: 固定 100, cache 解决重复 fit 问题
         random_state=42,
     )
-    X = data[controls].values
+    X = _control_matrix(data, controls)
     T = data[treatment].values
     Y = data[outcome].values
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        est.fit(Y=Y, T=T, X=X, W=X)  # X=W=controls (POC 简化, 实际应区分)
+        est.fit(Y=Y, T=T, X=X)  # Only pre-treatment adjustment variables enter nuisance fits.
 
     _FIT_CACHE[key] = est
     logger.info(f"[causal] CausalForestDML fit cached T={treatment} O={outcome} n={len(data)} (cache size={len(_FIT_CACHE)})")
@@ -945,13 +957,12 @@ def _counterfactual_query_econml(
     actual_treatment = float(data.loc[date_ts, treatment])
     actual_outcome = float(data.loc[date_ts, outcome])
 
-    treatments = cfg["nodes"]["treatments"]
-    controls = [c for c in treatments if c != treatment]
+    controls = _causal_controls(treatment, outcome, data, cfg)
 
     est = _get_cfdml_cached(treatment, outcome, data, controls)
 
-    x_query = data.loc[[date_ts], controls].values
-    cate = float(est.effect(x_query))
+    x_query = _control_matrix(data.loc[[date_ts]], controls)
+    cate = float(np.asarray(est.effect(x_query)).item())
     delta = cate * (counterfactual_value - actual_treatment)
     counterfactual_outcome = actual_outcome + delta
 
@@ -1131,7 +1142,7 @@ def cate_heterogeneity(
     # v0.9.5 RC1 prep (P10-1 性能优化): function-level _CATE_CACHE
     # 缓存整次异质性结果, 跨调用复用 (1st ~1.7s, 2nd < 5ms)
     # key = (treatment, outcome, heterogeneity_var, n_quantiles, data_hash)
-    _ck = (treatment, outcome, heterogeneity_var, n_quantiles, _compute_data_hash(data))
+    _ck = (treatment, outcome, heterogeneity_var, n_quantiles, _compute_data_hash(data), _compute_graph_hash(load_dag_graph(cfg), cfg))
     if _ck in _CATE_CACHE:
         logger.debug(f"[causal] cate_heterogeneity cache hit T={treatment} O={outcome} H={heterogeneity_var} (cache size={len(_CATE_CACHE)})")
         return _CATE_CACHE[_ck]
@@ -1144,7 +1155,7 @@ def cate_heterogeneity(
             quantiles.iloc[i] = quantiles.iloc[i - 1] + 1e-6
 
     # 2. 共享 CausalForestDML fit (跟 _counterfactual_query_econml 同源, cache 命中)
-    controls = [c for c in data.columns if c not in (treatment, outcome)]
+    controls = _causal_controls(treatment, outcome, data, cfg)
     est = _get_cfdml_cached(treatment, outcome, data, controls)
 
     # 3. 每群算 CATE
@@ -1174,7 +1185,7 @@ def cate_heterogeneity(
             })
             continue
 
-        X_query = in_group[controls].values
+        X_query = _control_matrix(in_group, controls)
         cate_per_row = est.effect(X_query)
         cate_mean = float(cate_per_row.mean())
 

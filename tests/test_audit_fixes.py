@@ -493,7 +493,7 @@ def test_historical_weights_date_integrity(tmp_path, monkeypatch):
     assert not (cache_dir / "sector_weights_live_2026-06-01.json").exists()
 
     # 3. load_live_or_static for past date returns fallback with explicit metadata
-    loaded = weights.load_live_or_static(date="2026-06-01", use_cache=False)
+    loaded = weights.load_live_or_static(date="2026-06-01", use_cache=False, allow_future_fallback=True)
     assert loaded["_meta"]["is_historical_fallback"] is True
     assert loaded["_meta"]["requested_as_of"] == "2026-06-01"
     assert loaded["_meta"]["effective_date"] == "2026-07-23"
