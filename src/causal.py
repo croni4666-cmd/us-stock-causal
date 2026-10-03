@@ -141,6 +141,35 @@ _GRAPH_CACHE: dict[str, nx.DiGraph] = {}
 # P9-1.1 PC algorithm: 数据学 DAG vs 手工 DAG 对比
 # =============================================================================
 
+def _convert_pc_graph(endpoint_matrix, node_names: list[str]) -> nx.DiGraph:
+    """将 causallearn Endpoint 邻接矩阵转换为 networkx DiGraph.
+
+    causallearn 约定 (Endpoint.TAIL=-1, Endpoint.ARROW=1):
+      endpoint_matrix[i, j] 是边在节点 i 处的端点类型
+      matrix[i, j] = -1, matrix[j, i] =  1 → directed i → j (tail at i, arrow at j)
+      matrix[i, j] =  1, matrix[j, i] = -1 → directed j → i (arrow at i, tail at j)
+      matrix[i, j] = -1, matrix[j, i] = -1 → undirected i -- j (CPDAG 未定向骨架)
+    """
+    n = len(node_names)
+    g = nx.DiGraph()
+    g.add_nodes_from(node_names)
+    undirected_edges = []
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            a_ij = endpoint_matrix[i, j]
+            a_ji = endpoint_matrix[j, i]
+            if a_ij == -1 and a_ji == 1:
+                g.add_edge(node_names[i], node_names[j])
+            elif a_ij == 1 and a_ji == -1:
+                g.add_edge(node_names[j], node_names[i])
+            elif a_ij == -1 and a_ji == -1:
+                undirected_edges.append((node_names[i], node_names[j]))
+
+    g.graph["undirected_edges"] = undirected_edges
+    return g
+
+
 def discover_dag_pc(
     data: pd.DataFrame,
     alpha: float = 0.05,
@@ -175,35 +204,8 @@ def discover_dag_pc(
     cg = pc(data.values, alpha=alpha, indep_test=indep_test,
             node_names=list(data.columns), show_progress=False)
 
-    # 解析 causallearn GeneralGraph 到 networkx DiGraph
-    # causallearn convention (Endpoint.TAIL=-1, Endpoint.ARROW=1):
-    #   cg.G.graph[i, j] 是边在节点 i 处的端点类型
-    #   graph[i, j] = -1, graph[j, i] =  1 → directed i → j (tail at i, arrow at j)
-    #   graph[i, j] =  1, graph[j, i] = -1 → directed j → i (arrow at i, tail at j)
-    #   graph[i, j] = -1, graph[j, i] = -1 → undirected i -- j (CPDAG 未定向骨架)
-    #   graph[i, j] =  0, graph[j, i] =  0 → 无边
-    n = cg.G.get_num_nodes()
     node_names = list(data.columns)
-
-    g = nx.DiGraph()
-    g.add_nodes_from(node_names)
-    undirected_edges = []
-
-    for i in range(n):
-        for j in range(i + 1, n):
-            a_ij = cg.G.graph[i, j]
-            a_ji = cg.G.graph[j, i]
-            if a_ij == -1 and a_ji == 1:
-                # directed i → j
-                g.add_edge(node_names[i], node_names[j])
-            elif a_ij == 1 and a_ji == -1:
-                # directed j → i
-                g.add_edge(node_names[j], node_names[i])
-            elif a_ij == -1 and a_ji == -1:
-                # undirected i -- j: CPDAG 未定向边，保留为未定向骨架，不强编造因果方向
-                undirected_edges.append((node_names[i], node_names[j]))
-
-    g.graph["undirected_edges"] = undirected_edges
+    g = _convert_pc_graph(cg.G.graph, node_names)
 
     # v0.8.0: 写 PC cache (date-based, 同一天 re-run 0s)
     _PC_CACHE[cache_key] = g
@@ -351,13 +353,52 @@ class CausalEffect:
         return asdict(self)
 
 
-def _compute_data_hash(df: pd.DataFrame | None) -> int:
-    """计算 DataFrame 的确定性指纹 (包含行数、列名、索引首尾与数值样本哈希)."""
+def _compute_data_hash(df: pd.DataFrame | None) -> str:
+    """计算 DataFrame 的全量确定性指纹 (包含全量数值哈希、完整索引、列名与数据类型)."""
     if df is None or len(df) == 0:
-        return 0
-    meta = (len(df), tuple(df.columns), str(df.index[0]), str(df.index[-1]))
-    vals_sum = float(np.nansum(df.values))
-    return hash((meta, round(vals_sum, 5)))
+        return "empty"
+    import hashlib
+    # 利用 pandas C 级向量哈希，全面覆盖所有单元格数值与完整索引
+    row_bytes = pd.util.hash_pandas_object(df, index=True).values.tobytes()
+    meta = f"{tuple(df.columns)}_{tuple(str(t) for t in df.dtypes)}_{len(df)}".encode("utf-8")
+    return hashlib.sha256(row_bytes + meta).hexdigest()[:16]
+
+
+def _compute_graph_hash(g: nx.DiGraph | None, cfg: dict | None = None) -> str:
+    """计算图结构的确定性指纹 (包含所有有向边与配置)."""
+    if g is None:
+        return "empty_graph"
+    import hashlib
+    edges_str = str(sorted(g.edges()))
+    dot_str = cfg.get("dot", "") if cfg else ""
+    return hashlib.sha256(f"{edges_str}_{dot_str}".encode("utf-8")).hexdigest()[:16]
+
+
+class BackdoorResult(list):
+    """Pearl Backdoor 识别结果 (继承 list 以保持向下兼容性: backdoor_result == ['Z'] 为 True)."""
+    def __init__(
+        self,
+        adjustment_set: list[str],
+        status: str,
+        missing_confounders: list[str] | None = None,
+        reason: str = "",
+    ):
+        super().__init__(adjustment_set)
+        self.adjustment_set = adjustment_set
+        self.status = status  # "identified_unconfounded" | "identified_adjusted" | "unidentifiable"
+        self.missing_confounders = missing_confounders or []
+        self.reason = reason
+        self.is_identified = status != "unidentifiable"
+
+    @property
+    def estimand(self) -> str:
+        if self.status == "identified_adjusted":
+            return f"Pearl L2 Backdoor Adjustment (controlled: {self.adjustment_set})"
+        elif self.status == "identified_unconfounded":
+            return "Pearl L2 (No backdoor confounding in DAG)"
+        else:
+            missing_str = f" (missing confounders: {self.missing_confounders})" if self.missing_confounders else ""
+            return f"Unidentifiable L2 causal effect: unobserved backdoor path in DAG{missing_str}"
 
 
 def identify_backdoor_set(
@@ -365,7 +406,7 @@ def identify_backdoor_set(
     treatment: str,
     outcome: str,
     available_columns: set[str] | None = None,
-) -> list[str]:
+) -> BackdoorResult:
     """根据 Pearl Backdoor 准则从 DAG 识别混杂调整集.
 
     Backdoor 准则 (Pearl 2009, Def 3.3.1):
@@ -373,10 +414,12 @@ def identify_backdoor_set(
     1. Z 中没有任何节点是 Treatment 的后代 (避免控制中介或对撞偏差);
     2. 在去除所有从 Treatment 发出的有向边后的图 G_{\bar{T}} 中, Z 阻断了 Treatment 和 Outcome 之间的所有后门路径 (即在 G_{\bar{T}} 中 d-分离 Treatment 与 Outcome).
 
-    注意: 若在 G_{\bar{T}} 中空集已实现 d-分离 (即无未阻断的后门路径), 则调整集为空集 (避免因控制工具变量/无混杂前置变量引入 Z-bias 或严重共线性).
+    注意:
+    - 若在完整图 G_{\bar{T}} 中空集已实现 d-分离，则调整集为空集 (无未阻断后门路径，避免引入 Z-bias 或严重共线性).
+    - 若存在后门路径但所需混杂变量不在 available_columns 中，显式标记为 unidentifiable，绝不能静默标为无混杂.
     """
     if g is None or treatment not in g or outcome not in g:
-        return []
+        return BackdoorResult([], status="unidentifiable", reason="Nodes not in graph")
 
     try:
         from networkx.algorithms.d_separation import is_d_separator
@@ -386,36 +429,63 @@ def identify_backdoor_set(
     g_bar_t = g.copy()
     g_bar_t.remove_edges_from(list(g.out_edges(treatment)))
 
-    # 若空集已在 G_{\bar{T}} 中 d-分离 T 与 Y, 无需混杂控制
+    # 1. 若在完整图 G_{\bar{T}} 中空集已实现 d-分离，则图本身无未阻断后门路径
     if is_d_separator is not None:
         try:
             if is_d_separator(g_bar_t, {treatment}, {outcome}, set()):
-                return []
+                return BackdoorResult([], status="identified_unconfounded", reason="No unblocked backdoor paths in DAG")
         except Exception:
             pass
 
+    # 2. 存在后门路径，搜寻 Treatment 的非后代父节点作为混杂控制候选
     descendants = nx.descendants(g, treatment) if treatment in g else set()
-    parents = set(g.predecessors(treatment)) - {outcome} - descendants
-    if available_columns is not None:
-        parents = parents.intersection(available_columns)
+    candidate_parents = set(g.predecessors(treatment)) - {outcome} - descendants
 
-    # 仅保留在 G_{\bar{T}} 中与 outcome 连通的真正混杂候选
-    valid_controls = set()
-    for p in parents:
+    # 筛选在 G_{\bar{T}} 中与 outcome 连通的真正混杂节点
+    needed_controls = set()
+    for p in candidate_parents:
         try:
             if nx.has_path(g_bar_t.to_undirected(), p, outcome):
-                valid_controls.add(p)
+                needed_controls.add(p)
         except Exception:
-            valid_controls.add(p)
+            needed_controls.add(p)
 
-    if is_d_separator is not None and valid_controls:
+    # 3. 校验 needed_controls 是否在完整图中阻断所有后门路径
+    can_block = False
+    if is_d_separator is not None and needed_controls:
         try:
-            if is_d_separator(g_bar_t, {treatment}, {outcome}, valid_controls):
-                return sorted(list(valid_controls))
+            can_block = is_d_separator(g_bar_t, {treatment}, {outcome}, needed_controls)
         except Exception:
-            pass
+            can_block = False
+    elif not needed_controls and is_d_separator is None:
+        can_block = True
 
-    return sorted(list(parents))
+    if not can_block:
+        # DAG 上的后门路径无法被观测候选父母节点阻断（例如潜在混杂或中介碰撞结构）
+        return BackdoorResult(
+            [],
+            status="unidentifiable",
+            missing_confounders=sorted(list(candidate_parents or {p for p in g.predecessors(treatment) if p != outcome})),
+            reason="Backdoor paths cannot be blocked by non-descendant parents in DAG",
+        )
+
+    # 4. 检查所需混杂变量在当前数据集中的可用性
+    if available_columns is not None:
+        missing = needed_controls - available_columns
+        if missing:
+            # 关键混杂变量缺失，因果效应不可识别！
+            return BackdoorResult(
+                [],
+                status="unidentifiable",
+                missing_confounders=sorted(list(missing)),
+                reason=f"Required confounders {sorted(list(missing))} in DAG are missing from dataset",
+            )
+
+    return BackdoorResult(
+        sorted(list(needed_controls)),
+        status="identified_adjusted",
+        reason="Valid backdoor adjustment set identified and observed",
+    )
 
 
 # v0.6.9l: P9-1.5.5 升级 — statsmodels OLS 路径 (替代 DoWhy refutation, 5-10x 更快)
@@ -502,7 +572,7 @@ def _get_refutation_cached(
     if n_refutations == 0:
         # v0.6.9k: 大 DAG auto-fallback 0 重, 跳过 refutation
         return {}
-    key = (treatment, outcome, _compute_data_hash(data), n_refutations)
+    key = (treatment, outcome, _compute_data_hash(data), _compute_graph_hash(g), n_refutations)
     if key in _REFUTE_CACHE:
         logger.debug(f"[causal] refutation cache hit T={treatment} O={outcome} (n_refutations={n_refutations}, cache size={len(_REFUTE_CACHE)})")
         return _REFUTE_CACHE[key]
@@ -551,6 +621,41 @@ def _get_refutation_cached(
 # - hobbyist 1-2 次手补 OK, daily cron 不能再 60s+
 # - 严格审稿场景传 causal_query(..., n_refutations=3) 仍跑全 3 重
 LARGE_DAG_THRESHOLD = 20
+
+
+def format_causal_effect(
+    estimate: float,
+    p_value: Optional[float] = None,
+    std_err: Optional[float] = None,
+) -> dict:
+    """统一格式化因果效应输出 (保证百分比符号正确, 避免负效应显示为 +).
+
+    Args:
+        estimate: 因果回归系数 (A -> B 变动斜率)
+        p_value: 统计显著性 p 值 (可选)
+        std_err: 标准误差 (可选)
+
+    Returns:
+        dict 包含 direction, delta_log_y, pct_y, p_value, sig, text
+    """
+    direction = "↑" if estimate > 0 else "↓"
+    delta_log_y = estimate * 0.01
+    pct_y = estimate * 1.0  # percentage points for 1% treatment shock
+    sig = ""
+    if p_value is not None:
+        sig = "显著" if p_value < 0.05 else "不显著"
+    text = f"预期{direction} {abs(delta_log_y):.4f} ({pct_y:+.2f}%)"
+    if p_value is not None:
+        text += f", p={p_value:.3f} {sig}"
+    return {
+        "direction": direction,
+        "delta_log_y": delta_log_y,
+        "pct_y": pct_y,
+        "p_value": p_value,
+        "std_err": std_err,
+        "sig": sig,
+        "text": text,
+    }
 
 
 def causal_query(
@@ -603,15 +708,6 @@ def causal_query(
     if data is None:
         data = load_dag_data(cfg=cfg)
 
-    # v0.9.5 RC1 prep (P10-1 性能优化): function-level _QUERY_CACHE
-    # 缓存整次查询结果 (ATE + refutation + estimand), 跨调用复用
-    # 使用包含数据与维度的确定性指纹作为 cache key，避免同长度数据误命中
-    data_hash = _compute_data_hash(data)
-    _qk = (treatment, outcome, n_refutations, refute_method, data_hash)
-    if _qk in _QUERY_CACHE:
-        logger.debug(f"[causal] causal_query cache hit T={treatment} O={outcome} (cache size={len(_QUERY_CACHE)})")
-        return _QUERY_CACHE[_qk]
-
     # Sanity check
     g = load_dag_graph(cfg)
     if not nx.is_directed_acyclic_graph(g):
@@ -623,26 +719,38 @@ def causal_query(
 
     n_nodes = g.number_of_nodes()
     # v0.6.9l: auto 选型 — 大 DAG 默认用 OLS (3500x 加速), 保留 1 重 / 3 重 refutation 验证
-    if refute_method == "auto":
+    actual_refute_method = refute_method
+    if actual_refute_method == "auto":
         if n_nodes >= LARGE_DAG_THRESHOLD:
-            refute_method = "ols"  # 大 DAG: OLS 路径 (跟 n_refutations=0 一样快)
+            actual_refute_method = "ols"  # 大 DAG: OLS 路径 (跟 n_refutations=0 一样快)
         else:
-            refute_method = "dowhy"  # 小 DAG: DoWhy (默认行为, 标准化)
-    if refute_method not in ("ols", "dowhy"):
+            actual_refute_method = "dowhy"  # 小 DAG: DoWhy (默认行为, 标准化)
+    if actual_refute_method not in ("ols", "dowhy"):
         raise ValueError(f"[causal] refute_method={refute_method!r} 不支持, 用 'auto' / 'ols' / 'dowhy'")
 
     # v0.6.9k: 大 DAG + DoWhy auto-fallback 0 重 (DoWhy 路径 21 节点 175s 不可用)
-    if auto_reduce and refute_method == "dowhy" and n_nodes >= LARGE_DAG_THRESHOLD and n_refutations > 0:
+    actual_n_refutations = n_refutations
+    if auto_reduce and actual_refute_method == "dowhy" and n_nodes >= LARGE_DAG_THRESHOLD and actual_n_refutations > 0:
         logger.warning(
-            f"[causal] DAG {n_nodes} 节点 + DoWhy refutation, auto-fallback n_refutations {n_refutations} → 0. "
+            f"[causal] DAG {n_nodes} 节点 + DoWhy refutation, auto-fallback n_refutations {actual_n_refutations} → 0. "
             f"传 refute_method='ols' 保留 refutation 验证 (推荐) 或 auto_reduce=False 强制跑 (审稿场景)"
         )
-        n_refutations = 0
+        actual_n_refutations = 0
+
+    # v0.9.5 RC1 prep (P10-1 性能优化): function-level _QUERY_CACHE
+    # 缓存整次查询结果 (ATE + refutation + estimand), 跨调用复用
+    # 使用包含数据全量数值指纹与 DAG 图结构的确定性指纹作为 cache key，避免同长度数据误命中或图变更误命中
+    data_hash = _compute_data_hash(data)
+    graph_hash = _compute_graph_hash(g, cfg)
+    _qk = (treatment, outcome, actual_n_refutations, actual_refute_method, auto_reduce, data_hash, graph_hash)
+    if _qk in _QUERY_CACHE:
+        logger.debug(f"[causal] causal_query cache hit T={treatment} O={outcome} (cache size={len(_QUERY_CACHE)})")
+        return _QUERY_CACHE[_qk]
 
     # Step 1+2: 后门混杂调整回归 (Pearl Backdoor Adjustment)
     adjustment_set = identify_backdoor_set(g, treatment, outcome, set(data.columns))
     import statsmodels.api as sm
-    reg_cols = [treatment] + adjustment_set
+    reg_cols = [treatment] + adjustment_set.adjustment_set
     X = sm.add_constant(data[reg_cols])
     y = data[outcome]
     with warnings.catch_warnings():
@@ -652,19 +760,16 @@ def causal_query(
     p_value = float(ols_result.pvalues[treatment])
     std_err = float(ols_result.bse[treatment])
 
-    # Refutation
-    if adjustment_set:
-        estimand_str = f"Pearl L2 Backdoor Adjustment (controlled: {adjustment_set})"
-    else:
-        estimand_str = "Pearl L2 (No backdoor confounders identified in DAG)"
+    # Refutation & Estimand
+    estimand_str = adjustment_set.estimand
     refutation_results = {}
-    if n_refutations > 0:
-        if refute_method == "ols":
+    if actual_n_refutations > 0 and adjustment_set.is_identified:
+        if actual_refute_method == "ols":
             # v0.6.9l: OLS 路径, 保留 controls 调整
             refutation_results = _refute_with_ols(
-                treatment, outcome, data, g, ate, n_refutations, controls=adjustment_set
+                treatment, outcome, data, g, ate, actual_n_refutations, controls=adjustment_set.adjustment_set
             )
-            estimand_str += f"; OLS refutation ({n_refutations} 重)"
+            estimand_str += f"; OLS refutation ({actual_n_refutations} 重)"
         else:
             # DoWhy 路径 (跟 v0.6.9f 一致, cache)
             from dowhy import CausalModel
@@ -674,12 +779,21 @@ def causal_query(
             )
             identified = model.identify_effect(proceed_when_unidentifiable=True)
             estimand_str = str(identified)
-            refutation_results = _get_refutation_cached(treatment, outcome, data, g, n_refutations)
+            refutation_results = _get_refutation_cached(treatment, outcome, data, g, actual_n_refutations)
 
     # 人类可读解读: 严谨区分回归斜率与 1% 扰动响应
     direction = "↑" if ate > 0 else "↓"
     sig = "显著" if p_value < 0.05 else "不显著"
-    ctrl_info = f", 控制后门混杂: {adjustment_set}" if adjustment_set else ""
+    if adjustment_set.status == "unidentifiable":
+        ctrl_info = f", ⚠️ 存在未阻断后门 (缺失混杂: {adjustment_set.missing_confounders})"
+        method_str = "unadjusted_association (unobserved confounders in DAG)"
+    elif adjustment_set.status == "identified_adjusted":
+        ctrl_info = f", 控制后门混杂: {adjustment_set.adjustment_set}"
+        method_str = f"ols_refute_{actual_refute_method}" if actual_n_refutations > 0 else "ols_backdoor_adjusted"
+    else:
+        ctrl_info = ""
+        method_str = f"ols_refute_{actual_refute_method}" if actual_n_refutations > 0 else "ols"
+
     delta_log_y = ate * 0.01
     pct_y = ate * 1.0  # +1% treatment shock 引起的 outcome 百分比变化
     interpretation = (
@@ -694,7 +808,7 @@ def causal_query(
         estimate=ate,
         estimand=estimand_str,
         refutation=refutation_results,
-        method=f"ols_refute_{refute_method}" if n_refutations > 0 else "ols",
+        method=method_str,
         n_obs=len(data),
         p_value=p_value,
         std_error=std_err,

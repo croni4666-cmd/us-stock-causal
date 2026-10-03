@@ -139,19 +139,6 @@ def find_similar_patterns(
             if len(top) >= n_matches:
                 break
 
-    if len(top) < n_matches:
-        for c in candidates:
-            clean_item = {
-                "start_date": c["start_date"],
-                "end_date": c["end_date"],
-                "correlation": c["correlation"],
-                "forward_return": c["forward_return"],
-            }
-            if clean_item not in top:
-                top.append(clean_item)
-            if len(top) >= n_matches:
-                break
-
     if not top:
         raise ValueError(f"{symbol} 找不到任何 pattern (数据可能太短)")
 
@@ -164,6 +151,7 @@ def find_similar_patterns(
         "pattern_length": pattern_length,
         "forecast_horizon": forecast_horizon,
         "n_matches": len(top),
+        "total_candidates": len(candidates),
         "avg_forward_return": round(float(np.mean(forward_returns)), 3),
         "median_forward_return": round(float(np.median(forward_returns)), 3),
         "win_rate": round(n_win / len(forward_returns), 3),

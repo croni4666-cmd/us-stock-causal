@@ -37,6 +37,8 @@ from src.returns import compute_returns, cumulative_return
 from src.signals import aggregate_signals
 from src.macro import topline as macro_topline, macro_snapshot, indices_1line
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 
 def _segment_1_market(symbol: str, layer: str, lookback_days: int, as_of: Optional[str] = None) -> str:
     """① 5 日行情"""
@@ -117,7 +119,7 @@ def _segment_5_risk(symbol: str, as_of: Optional[str] = None) -> str:
         warnings.append(f"信号部分一致 score={agg.contradiction_score:.2f}")
 
     # 事件
-    ne = next_event()
+    ne = next_event(from_date=as_of)
     if ne and ne.days_until is not None:
         if ne.days_until <= 7:
             warnings.append(f"{ne.days_until}d 后 {ne.kind}({ne.description})")
@@ -170,31 +172,47 @@ def render_markdown(report: dict) -> str:
 """
 
 
-# v0.7.5: date-based LRU cache (防止 30 天稳定期内 daily cron 偶尔 re-run 慢)
-# keep latest 7 天, 隔天 cache miss (date key 变)
 _REPORT_CACHE: dict[tuple, str] = {}
+
+
+def clear_report_cache() -> None:
+    """清空 5 段制报告缓存"""
+    _REPORT_CACHE.clear()
+
+
+def _get_data_signature(symbols: list[str], layer: str) -> tuple:
+    """获取底层行情数据文件的签名 (mtime_ns, size) 避免数据更新后命中旧缓存."""
+    sig = []
+    for s in symbols:
+        safe = s.replace("^", "_").replace("=", "_").replace(".", "_")
+        pq = PROJECT_ROOT / "data" / "raw" / layer / f"{safe}.parquet"
+        if pq.exists():
+            st = pq.stat()
+            sig.append((s, st.st_mtime_ns, st.st_size))
+        else:
+            sig.append((s, 0, 0))
+    return tuple(sig)
 
 
 def render_full_report(
     symbols: list[str],
     layer: str = "indices",
     as_of: Optional[str] = None,
+    force: bool = False,
 ) -> str:
     """渲染 4 指数完整 5 段制报告 + 因果机制段 (Phase 9)
 
-    v0.7.5 (P9-1.5.5 升级): date-based LRU cache (key = as_of + tuple(symbols) + layer)
+    v0.7.5 (P9-1.5.5 升级): date-based LRU cache (key = as_of + tuple(symbols) + layer + data_sig)
     - 同一天同 process 多次跑 → cache hit < 0.05s
-    - 跨 process 不共享 (daily cron 1 process 1 run, 不影响)
-    - 隔天 cache miss (date key 变)
-
-    v0.9.5 RC1 prep (P10-1 性能优化): 4x five_segment_report 并发跑
-    - 每指数 ~0.25s (cold), 串行 4x = 1.0s
-    - ThreadPoolExecutor(4) 并发: ~0.3s 总 (节省 0.7s)
-    - 单进程 daily report 实测从 12.9s → 8.4s
+    - 若底层 parquet 更新或传入 force=True, 自动失效缓存
     """
+    if force:
+        clear_report_cache()
+
     report_date = as_of or str(date.today())
-    cache_key = (report_date, tuple(symbols), layer)
-    if cache_key in _REPORT_CACHE:
+    data_sig = _get_data_signature(symbols, layer)
+    cache_key = (report_date, tuple(symbols), layer, data_sig)
+    if not force and cache_key in _REPORT_CACHE:
         logger.debug(f"[report] render_full_report cache hit ({cache_key})")
         return _REPORT_CACHE[cache_key]
 
@@ -306,7 +324,7 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
             refute_str = f"反驳测试 {n_passed}/{n_executed} 通过" if n_executed > 0 else "未运行反驳测试"
             lines.append(
                 f"- **L2 干预**: {label} `do(+1%)` → {outcome} 预期{direction} "
-                f"{abs(delta_log_y):.4f} ({abs(pct_y):+.2f}%, "
+                f"{abs(delta_log_y):.4f} ({pct_y:+.2f}%, "
                 f"p={eff.p_value:.3f} {sig}); "
                 f"{refute_str}"
             )

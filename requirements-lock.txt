@@ -8,7 +8,8 @@ scipy==1.15.3
 matplotlib==3.11.0
 plotly==6.8.0
 causal-learn==0.1.4.8
-dowhy==0.14
+dowhy==0.12
+econml==0.16.0
 statsmodels==0.14.6
 networkx==3.6.1
 pydot==4.0.1
@@ -20,6 +21,8 @@ yfinance==1.5.1
 PyYAML==6.0.3
 loguru==0.7.3
 python-dotenv==1.2.2
+markdown==3.10.2
+plyer==2.1.0
 pytest==9.1.1
 openbb==4.7.2
 requests-cache==1.2.1

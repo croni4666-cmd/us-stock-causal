@@ -81,8 +81,33 @@ def check(date_str: str) -> list[dict]:
             except OSError:
                 continue
             is_stale, days_old, severity = _is_stale(mtime, ref)
-            if is_stale:
-                msg = f"Last update {days_old} days ago ({mtime.strftime('%Y-%m-%d %H:%M')}), threshold {DEFAULT_THRESHOLD_DAYS} days"
+
+            # 同时基于数据内部最新收盘交易日检验 (防止仅修改 mtime 掩盖过期数据)
+            data_stale = False
+            data_lag_days = 0
+            last_dt = None
+            expected = None
+            try:
+                import pandas as _pd
+                df_tail = _pd.read_parquet(pq)
+                if len(df_tail) > 0:
+                    last_dt = _pd.to_datetime(df_tail.index[-1]).date()
+                    from src.cache import get_expected_last_trading_day
+                    expected = get_expected_last_trading_day(ref)
+                    if last_dt < expected:
+                        data_lag_days = len(_pd.bdate_range(last_dt, expected)) - 1
+                        if data_lag_days >= DEFAULT_THRESHOLD_DAYS:
+                            data_stale = True
+                            if data_lag_days >= ERROR_THRESHOLD_DAYS:
+                                severity = "error"
+            except Exception:
+                pass
+
+            if is_stale or data_stale:
+                if data_stale and not is_stale:
+                    msg = f"Data bar date {last_dt} is {data_lag_days} trading days behind expected session {expected}"
+                else:
+                    msg = f"Last update {days_old} days ago ({mtime.strftime('%Y-%m-%d %H:%M')}), threshold {DEFAULT_THRESHOLD_DAYS} days"
                 alerts.append(alert_logger.make_alert(
                     alert_type="stale",
                     subject=f"data/raw/{sub_dir.name}/{pq.name}",
@@ -91,7 +116,7 @@ def check(date_str: str) -> list[dict]:
                     details={
                         "file": f"data/raw/{sub_dir.name}/{pq.name}",
                         "last_write": mtime.isoformat(timespec="seconds"),
-                        "days_old": days_old,
+                        "days_old": max(days_old, data_lag_days),
                         "threshold_days": DEFAULT_THRESHOLD_DAYS,
                     },
                 ))

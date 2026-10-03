@@ -35,8 +35,34 @@ def cache_path(symbol: str, layer: str, cache_root: Path) -> Path:
     return layer_dir / f"{safe_name(symbol)}.parquet"
 
 
-def is_fresh(parquet_path: Path, max_age_days: int = 1) -> bool:
-    """缓存是否新鲜: 同时检查文件 mtime 与 parquet 内最新交易数据日期."""
+def get_expected_last_trading_day(ref: Optional[date | datetime | str] = None) -> date:
+    """计算预期的最近已完成美股交易日 (排除周末及盘中未完成时段)."""
+    if ref is None:
+        ref_dt = datetime.now()
+    elif isinstance(ref, str):
+        ref_dt = datetime.fromisoformat(ref)
+    elif isinstance(ref, date) and not isinstance(ref, datetime):
+        ref_dt = datetime.combine(ref, datetime.min.time())
+    else:
+        ref_dt = ref
+
+    cur_date = ref_dt.date()
+    # 周末回退到周五
+    if cur_date.weekday() == 5:  # Saturday
+        return cur_date - timedelta(days=1)
+    elif cur_date.weekday() == 6:  # Sunday
+        return cur_date - timedelta(days=2)
+    # 工作日: 美股收盘后/次日拉取，最新已收盘交易日至少为前一工作日
+    prev_bday = cur_date - timedelta(days=3 if cur_date.weekday() == 0 else 1)
+    return prev_bday
+
+
+def is_fresh(
+    parquet_path: Path,
+    max_age_days: int = 1,
+    as_of: Optional[date | datetime | str] = None,
+) -> bool:
+    """缓存是否新鲜: 同时检查文件 mtime 与 parquet 内最新交易数据日期与预期交易日差距."""
     if not parquet_path.exists():
         return False
     mtime = datetime.fromtimestamp(parquet_path.stat().st_mtime)
@@ -47,9 +73,12 @@ def is_fresh(parquet_path: Path, max_age_days: int = 1) -> bool:
         df = read_cache(parquet_path)
         if df is None or len(df) == 0:
             return False
-        last_dt = pd.to_datetime(df.index[-1])
-        if (datetime.now() - last_dt) > timedelta(days=5):
-            return False
+        last_dt = pd.to_datetime(df.index[-1]).date()
+        expected = get_expected_last_trading_day(as_of)
+        if last_dt < expected:
+            bus_days_lag = len(pd.bdate_range(last_dt, expected)) - 1
+            if bus_days_lag > 2:
+                return False
     except Exception:
         return False
     return True

@@ -36,13 +36,24 @@ class MacroEvent:
     kind: str           # "FOMC" / "CPI" / "NFP" / "PCE" / "PPI" / etc.
     description: str    # e.g. "12月 CPI 公布"
     impact: str = "high"  # "high" / "medium" / "low"
+    ref_date: Optional[date] = None
 
     @property
     def days_until(self) -> int:
-        return (self.date - date.today()).days
+        base = self.ref_date if self.ref_date is not None else date.today()
+        return (self.date - base).days
 
     def __str__(self) -> str:
         return f"{self.date} ({self.kind}) {self.description}"
+
+
+def _normalize_date(d: Optional[date | str]) -> date:
+    """内部 helper: 将 date | str | None 统一转为 date 对象 (None 默认今天)."""
+    if d is None:
+        return date.today()
+    if isinstance(d, str):
+        return date.fromisoformat(d)
+    return d
 
 
 def load_calendar() -> list[MacroEvent]:
@@ -50,7 +61,7 @@ def load_calendar() -> list[MacroEvent]:
     return _load_yaml_events()
 
 
-def _load_yaml_events() -> list[MacroEvent]:
+def _load_yaml_events(ref_date: Optional[date] = None) -> list[MacroEvent]:
     """读 config/events_2026.yaml (v0.6.8c 内部 helper)"""
     if not CALENDAR_PATH.exists():
         logger.warning(f"{CALENDAR_PATH} 不存在,返回空")
@@ -62,7 +73,7 @@ def _load_yaml_events() -> list[MacroEvent]:
     for entry in data.get("events", []):
         d = entry["date"]
         if isinstance(d, date):
-            d = d  # already date
+            pass
         else:
             d = date.fromisoformat(d)
         events.append(MacroEvent(
@@ -70,20 +81,21 @@ def _load_yaml_events() -> list[MacroEvent]:
             kind=entry["kind"],
             description=entry["description"],
             impact=entry.get("impact", "high"),
+            ref_date=ref_date,
         ))
     return events
 
 
 def upcoming_events(
-    from_date: Optional[date] = None,
+    from_date: Optional[date | str] = None,
     lookahead_days: int = 30,
     providers: Optional[list[str]] = None,
 ) -> list[MacroEvent]:
     """
-    未来 N 天内的事件,按日期排序 (v0.6.8c 加 providers 参数)
+    未来 N 天内的事件,按日期排序 (v0.6.8c 加 providers 参数, 支持 as_of from_date)
 
     Args:
-        from_date: 起始日期 (默认今天)
+        from_date: 起始日期 (默认今天, 可传 str 或 date)
         lookahead_days: 看未来 N 天
         providers: 数据源列表, 默认 ["yaml"]
           - "yaml": config/events_2026.yaml (硬编码 44 宏观事件)
@@ -92,70 +104,83 @@ def upcoming_events(
     Returns:
         MacroEvent list, 合并按 (date, kind) 排序
     """
-    if from_date is None:
-        from_date = date.today()
+    ref = _normalize_date(from_date)
     if providers is None:
         providers = ["yaml"]
 
     events = []
     if "yaml" in providers:
-        events.extend(_load_yaml_events())
+        events.extend(_load_yaml_events(ref_date=ref))
     if "gdelt" in providers:
         try:
             from src.events_gdelt import fetch_gdelt_events
             # GDELT 是 past events, 拉过去 3 天 + 未来 0 天 (不预测)
             # events filter 仍走 from_date <= e.date <= end, 未来命中会从 yaml 来
-            events.extend(fetch_gdelt_events(
-                from_date=from_date - timedelta(days=3),  # 起点: 3 天前
+            g_events = fetch_gdelt_events(
+                from_date=ref - timedelta(days=3),  # 起点: 3 天前
                 lookahead_days=3,  # window 3 天 (昨天-今天-明天), 覆盖 from_date ± 1.5
-            ))
+            )
+            for ge in g_events:
+                events.append(MacroEvent(
+                    date=ge.date,
+                    kind=ge.kind,
+                    description=ge.description,
+                    impact=ge.impact,
+                    ref_date=ref,
+                ))
         except Exception as e:
             logger.warning(f"[events] gdelt 拉取失败: {e}")
 
-    end = from_date + timedelta(days=lookahead_days)
+    end = ref + timedelta(days=lookahead_days)
     return sorted(
-        [e for e in events if from_date <= e.date <= end],
+        [e for e in events if ref <= e.date <= end],
         key=lambda e: (e.date, e.kind),  # 稳定排序
     )
 
 
 def past_events(
-    from_date: Optional[date] = None,
+    from_date: Optional[date | str] = None,
     lookback_days: int = 30,
     providers: Optional[list[str]] = None,
 ) -> list[MacroEvent]:
     """过去 N 天内的事件"""
-    if from_date is None:
-        from_date = date.today()
+    ref = _normalize_date(from_date)
     if providers is None:
         providers = ["yaml"]
-    start = from_date - timedelta(days=lookback_days)
+    start = ref - timedelta(days=lookback_days)
 
     events = []
     if "yaml" in providers:
-        events.extend(_load_yaml_events())
+        events.extend(_load_yaml_events(ref_date=ref))
     if "gdelt" in providers:
         try:
             from src.events_gdelt import fetch_gdelt_events
-            events.extend(fetch_gdelt_events(
+            g_events = fetch_gdelt_events(
                 from_date=start,
                 lookahead_days=lookback_days,
-            ))
+            )
+            for ge in g_events:
+                events.append(MacroEvent(
+                    date=ge.date,
+                    kind=ge.kind,
+                    description=ge.description,
+                    impact=ge.impact,
+                    ref_date=ref,
+                ))
         except Exception as e:
             logger.warning(f"[events] gdelt 拉取失败: {e}")
 
     return sorted(
-        [e for e in events if start <= e.date <= from_date],
+        [e for e in events if start <= e.date <= ref],
         key=lambda e: (e.date, e.kind),
     )
 
 
-def next_event(from_date: Optional[date] = None) -> Optional[MacroEvent]:
-    """下一个高影响事件 (yaml only, 跟 v0.3.2 行为一致)"""
-    if from_date is None:
-        from_date = date.today()
-    cal = _load_yaml_events()
-    future = sorted([e for e in cal if e.date >= from_date], key=lambda e: e.date)
+def next_event(from_date: Optional[date | str] = None) -> Optional[MacroEvent]:
+    """下一个高影响事件 (yaml only, 支持 from_date / as_of 参数)"""
+    ref = _normalize_date(from_date)
+    cal = _load_yaml_events(ref_date=ref)
+    future = sorted([e for e in cal if e.date >= ref], key=lambda e: e.date)
     return future[0] if future else None
 
 

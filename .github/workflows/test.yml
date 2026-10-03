@@ -35,9 +35,9 @@ jobs:
         run: |
           pip install -e .
 
-      - name: Run smoke tests (81 tests)
+      - name: Run tests (smoke + regression suites)
         run: |
-          pytest tests/test_smoke.py -v --tb=short
+          pytest tests -v --tb=short
 
       - name: Check pre-push hygiene (R6)
         run: |

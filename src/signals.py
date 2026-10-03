@@ -97,9 +97,9 @@ def _classify_threshold(snap: dict) -> SignalSnapshot:
     )
 
 
-def _classify_event() -> Optional[SignalSnapshot]:
+def _classify_event(as_of: Optional[date | str] = None) -> Optional[SignalSnapshot]:
     """从 event 日历生成信号 (1 周内事件 = 风险预警,不是方向)"""
-    ne = next_event()
+    ne = next_event(from_date=as_of)
     if ne is None:
         return None
     days = ne.days_until
@@ -131,7 +131,7 @@ def aggregate_signals(symbol: str, as_of: Optional[str] = None) -> SignalAggrega
         _classify_pattern(patterns),
         _classify_threshold(thresholds),
     ]
-    event_sig = _classify_event()
+    event_sig = _classify_event(as_of=as_of)
     if event_sig:
         sigs.append(event_sig)
 

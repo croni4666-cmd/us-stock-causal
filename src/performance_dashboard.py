@@ -95,8 +95,8 @@ DEFAULT_SYMBOLS: list[tuple[str, str]] = [
 ]
 
 
-def compute_1d_change(symbol: str, layer: str) -> Optional[dict]:
-    """算 1d 涨跌幅 + 52w 高低 + 现价
+def compute_1d_change(symbol: str, layer: str, as_of: Optional[str] = None) -> Optional[dict]:
+    """算 1d 涨跌幅 + 52w 高低 + 现价 (支持 as_of 历史时点截断)
 
     Returns:
         dict {symbol, layer, last_close, prev_close, change_pct, high_52w, low_52w}
@@ -109,6 +109,10 @@ def compute_1d_change(symbol: str, layer: str) -> Optional[dict]:
         return None
     if df is None or len(df) < 2:
         return None
+    if as_of is not None:
+        df = df.loc[:as_of]
+        if len(df) < 2:
+            return None
     last_close = float(df["close"].iloc[-1])
     prev_close = float(df["close"].iloc[-2])
     change_pct = (last_close - prev_close) / prev_close * 100
@@ -129,13 +133,16 @@ def compute_1d_change(symbol: str, layer: str) -> Optional[dict]:
     }
 
 
-def collect_performance(symbols: Optional[list[tuple[str, str]]] = None) -> list[dict]:
+def collect_performance(
+    symbols: Optional[list[tuple[str, str]]] = None,
+    as_of: Optional[str] = None,
+) -> list[dict]:
     """收集所有标的的 1d 涨跌幅 + 52w 数据"""
     if symbols is None:
         symbols = DEFAULT_SYMBOLS
     results = []
     for layer, sym in symbols:
-        r = compute_1d_change(sym, layer)
+        r = compute_1d_change(sym, layer, as_of=as_of)
         if r is not None:
             results.append(r)
     return results
@@ -145,6 +152,7 @@ def plot_performance_dashboard(
     ax: plt.Axes,
     symbols: Optional[list[tuple[str, str]]] = None,
     top_n: Optional[int] = None,
+    as_of: Optional[str] = None,
 ) -> plt.Axes:
     """画 1 张 1d 涨跌幅 horizontal bar chart
 
@@ -152,7 +160,7 @@ def plot_performance_dashboard(
     v0.6.8h hotfix 2: y-tick 只放 symbol (1 行), 中文名做 annotation 放 bar 末端
     解决 20 标的时 y-tick 2 行 label 垂直重叠问题
     """
-    results = collect_performance(symbols)
+    results = collect_performance(symbols, as_of=as_of)
     if not results:
         ax.text(0.5, 0.5, "无数据", ha="center", va="center", transform=ax.transAxes)
         return ax
@@ -227,7 +235,10 @@ def plot_performance_dashboard(
     return ax
 
 
-def render_performance_table(symbols: Optional[list[tuple[str, str]]] = None) -> str:
+def render_performance_table(
+    symbols: Optional[list[tuple[str, str]]] = None,
+    as_of: Optional[str] = None,
+) -> str:
     """渲染中文 Google-Finance 风格表格 (markdown)
 
     | 中文名 | 标的 | 现价 USD | 1d 涨跌幅 | 52w 高 | 52w 低 | 当日位置 |
@@ -235,7 +246,7 @@ def render_performance_table(symbols: Optional[list[tuple[str, str]]] = None) ->
     | 信息技术 | XLK | $234.56 | +1.23% | $240.00 | $180.00 | 73% |
     ...
     """
-    results = collect_performance(symbols)
+    results = collect_performance(symbols, as_of=as_of)
     if not results:
         return "无数据"
 
@@ -265,9 +276,12 @@ def render_performance_table(symbols: Optional[list[tuple[str, str]]] = None) ->
     return "\n".join(lines)
 
 
-def render_performance_table_html(symbols: Optional[list[tuple[str, str]]] = None) -> str:
+def render_performance_table_html(
+    symbols: Optional[list[tuple[str, str]]] = None,
+    as_of: Optional[str] = None,
+) -> str:
     """HTML 风格 (Google Finance 风, 涨绿跌红 inline color)"""
-    results = collect_performance(symbols)
+    results = collect_performance(symbols, as_of=as_of)
     if not results:
         return "<p>无数据</p>"
 

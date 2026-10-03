@@ -29,18 +29,24 @@ WEIGHTS_PATH = PROJECT_ROOT / "config" / "sector_weights.json"
 SECTOR_TICKERS = ["XLK", "XLF", "XLE", "XLY", "XLP", "XLV", "XLI", "XLU", "XLB", "XLRE", "XLC"]
 
 
-def load_sector_weights(use_live_cache: bool = True) -> dict:
-    """读 sector weights — P7-4 加 1d cache 选项
+def load_sector_weights(use_live_cache: bool = True, as_of: Optional[str] = None) -> dict:
+    """读 sector weights — 支持 as_of 历史快照与 1d cache (P7-4)
 
     Args:
         use_live_cache: True (默认) 优先读 data/cache/sector_weights_live_<date>.json,
                        过期走 pull (cp config/sector_weights.json). False 直接读 config
+        as_of: 历史日期 (YYYY-MM-DD), None = 今天
     """
     if use_live_cache:
         from src.sector_weights_live import load_live_or_static
-        return load_live_or_static()
+        return load_live_or_static(date=as_of)
     with open(WEIGHTS_PATH, encoding="utf-8") as f:
         return json.load(f)
+
+
+def clear_attribution_cache() -> None:
+    """清空归因模块缓存 (get_sector_returns lru_cache 等)."""
+    get_sector_returns.cache_clear()
 
 
 def load_prices(symbol: str, layer: str) -> pd.Series:
@@ -84,6 +90,7 @@ def attribute_index(
     date: str | None = None,
     lookback_days: int = 1,
     method: str = "log",
+    force: bool = False,
 ) -> dict:
     """
     归因 1 个指数的当日 / 近期表现
@@ -93,6 +100,7 @@ def attribute_index(
         date: YYYY-MM-DD, None = 最新可用日
         lookback_days: 1 = 当日, 5 = 5 日累计
         method: 'log' / 'simple'
+        force: True 强制刷新缓存
 
     Returns:
         {
@@ -106,7 +114,9 @@ def attribute_index(
             'top_drivers': ['XLK', 'XLC', ...]
         }
     """
-    weights_data = load_sector_weights()
+    if force:
+        clear_attribution_cache()
+    weights_data = load_sector_weights(as_of=date)
     if index_symbol not in weights_data:
         raise ValueError(f"{index_symbol} 没有 sector weights 配置")
     weights = weights_data[index_symbol]
@@ -168,12 +178,13 @@ def attribute_all_indices(
     date: str | None = None,
     lookback_days: int = 1,
     symbols: list[str] | None = None,
+    force: bool = False,
 ) -> list[dict]:
     """多指数归因 (v0.6.7 P6-3: symbols 参数支持自定义列表)"""
     if symbols is None:
         symbols = ["DIA", "QQQ", "RSP", "QQQE"]
     return [
-        attribute_index(idx, date=date, lookback_days=lookback_days)
+        attribute_index(idx, date=date, lookback_days=lookback_days, force=force)
         for idx in symbols
     ]
 

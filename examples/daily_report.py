@@ -166,22 +166,15 @@ def step_html_report(date_str: str) -> dict:
         from src.kline import savefig_multi_format
         OUTPUT_DIR.mkdir(exist_ok=True)
 
-        # 找最新的 indices SVG (1y) + gold SVG
+        # 找匹配当前 date_str 的 indices SVG (1y/2y) + gold SVG
         svgs = []
-        for pattern in ["indices_2y_*.svg", "gold_1y_*.svg"]:
-            matches = sorted(OUTPUT_DIR.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
-            if matches:
-                svgs.append(matches[0])
-        # 兼容旧名字
-        if not svgs:
-            for pattern in ["indices_*.svg", "gold_*.svg"]:
-                matches = sorted(OUTPUT_DIR.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
-                if matches:
-                    svgs.append(matches[0])
+        for prefix in ["indices_2y_", "gold_1y_", "indices_", "gold_"]:
+            candidate = OUTPUT_DIR / f"{prefix}{date_str}.svg"
+            if candidate.exists() and candidate not in svgs:
+                svgs.append(candidate)
 
         if not svgs:
-            print(f"  [WARN] 没找到 K 线 SVG, 跳过 (先跑 `python examples/indices_chart.py` 和 `plot_gold.py`)")
-            return {"ok": "skip", "reason": "no K-line SVG", "elapsed_s": round(time.time() - t0, 1)}
+            print(f"  [INFO] 报告日期 {date_str} 无匹配的 K 线 SVG, 将生成无图表 HTML 报告")
 
         # 读 markdown
         md_path = OUTPUT_DIR / f"report_{date_str}.md"
@@ -218,7 +211,7 @@ h1 {{ font-size: 18px; color: #202124; border-bottom: 2px solid #1a73e8; padding
 </head><body>
 <h1>us-stock-causal — Performance Dashboard ({date_str})</h1>
 <p class="note">数据来源: cache parquet + yfinance, 报告时点: {date_str}</p>
-{render_performance_table_html()}
+{render_performance_table_html(as_of=date_str)}
 </body></html>"""
         out_path = OUTPUT_DIR / f"performance_table_{date_str}.html"
         out_path.write_text(html_doc, encoding="utf-8")
@@ -411,7 +404,7 @@ def step_causal(date_str: str) -> dict:
                 if abs(new_eff - vix_qqq.estimate) <= max(0.35 * abs(vix_qqq.estimate), 0.05):
                     n_passed += 1
         print(f"  [L2 do-calculus] VIX do(+1%) → QQQ: {direction}{abs(delta_log_y):.4f} "
-              f"({abs(pct_y):+.2f}%, p={vix_qqq.p_value:.3f}, n={vix_qqq.n_obs})")
+              f"({pct_y:+.2f}%, p={vix_qqq.p_value:.3f}, n={vix_qqq.n_obs})")
         print(f"    反驳测试 PASS 数: {n_passed}/{n_executed}")
 
         # L3 反事实: 用最近一天, 假设 VIX 比实际低 (恐慌小, 应该利好)
