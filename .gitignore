@@ -23,6 +23,9 @@ data/cache/alerts/alerts_*.json
 data/cache/retry_log.json
 data/cache/sec_filings/
 data/cache/sector_weights_live_*.json
+data/asset_sources/
+output/asset_report.md
+output/asset_report.json
 *.parquet
 *.csv
 

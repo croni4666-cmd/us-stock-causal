@@ -129,3 +129,9 @@ v3 方向: **掌控数据 (47 ticker 一手 yfinance) + 一手模型 (Pearl 因�
 - v0.7.0 (2026-08-08): P9-1.7 batch 4 (DAG 21 → 35 节点, 加 14 商品期货, 26 commodity→industry 边)
 - v0.6.9m (2026-08-07): P8-5 错误恢复 (tenacity 统一 retry 抽象)
 - 详见 `CHANGELOG.md` (按 (date, base, -suffix_rank) 排序的 44 段)
+# 资产专用归因入口
+
+新增官方 QQQ / IEF / TLT 持仓、GLD 历史档案和离线资产分析。
+使用方法及模型边界见 [资产专用分析](docs/asset-specific-attribution.md)，
+详细路线见 [设计文档](docs/superpowers/specs/2026-10-03-asset-specific-attribution-design.md)。
+
