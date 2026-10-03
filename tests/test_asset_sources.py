@@ -145,3 +145,20 @@ def test_availability_requires_timezone_and_asof_cannot_be_future(tmp_path):
 def test_capture_rejects_unsupported_symbol_before_request(tmp_path):
     with pytest.raises(ValueError, match='unsupported'):
         capture_source('../../OTHER', tmp_path)
+
+
+def test_cash_without_cusip_has_explicit_cash_identity():
+    raw = bond_bytes().replace(b'USD,Cash and/or Derivatives,Cash,10,0.50,USD',
+                               b'USD CASH,Cash and/or Derivatives,Cash,10,0.50,-')
+    doc = parse_ishares(raw, 'TLT')
+    assert doc['rows'][1]['id'] == 'Cash:USD CASH'
+
+
+def test_gold_awaited_field_is_missing_not_zero_or_dropped_date():
+    raw = gold_xlsx([['Date', 'Closing Price', 'Ounces of Gold per Share', 'NAV/Share at 10:30am NYT',
+                      'Indicative Price per Share at 4:15pm NYT', 'Mid point of bid/ask spread at 4:15pm NYT',
+                      'Premium/Discount of GLD Mid Point vs Indicative Value of GLD at 4:15pm NYT'],
+                     ['01-Oct-2026', 100, .09, 'AWAITED', 100, 100.1, .1]])
+    doc = parse_spdr(raw)
+    assert doc['rows'][0]['nav_1030'] is None
+    assert doc['rows'][0]['close'] == 100

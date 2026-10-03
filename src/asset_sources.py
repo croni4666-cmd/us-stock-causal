@@ -32,7 +32,7 @@ _EQUITY_TYPES = {"Common Stock", "American Depository Receipt", "American Deposi
 
 
 def _number(value, *, optional=False, nonnegative=False):
-    if value is None or str(value).strip() in ("", "-", "N/A"):
+    if value is None or str(value).strip() in ("", "-", "N/A", "AWAITED"):
         if optional:
             return None
         raise ValueError("missing numeric field")
@@ -125,7 +125,10 @@ def parse_ishares(raw: bytes, symbol: str) -> dict:
         item = dict(zip(header, record))
         identity = item["CUSIP"]
         if identity in ("", "-"):
-            raise ValueError("missing security identifier")
+            if item["Asset Class"] == "Cash" and item["Name"]:
+                identity = "Cash:" + item["Name"]
+            else:
+                raise ValueError("missing security identifier")
         weight = _number(item["Weight (%)"], optional=True)
         rows.append({"id": identity, "ticker": None, "name": item["Name"],
                      "asset_class": item["Asset Class"], "security_type": item["Asset Class"],
