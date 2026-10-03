@@ -11,9 +11,15 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, time as dtime, timezone
 from pathlib import Path
 from typing import Callable, Optional
+
+try:
+    from zoneinfo import ZoneInfo
+    EASTERN_TZ = ZoneInfo("America/New_York")
+except Exception:
+    EASTERN_TZ = timezone(timedelta(hours=-4))  # EDT fallback
 
 import pandas as pd
 from loguru import logger
@@ -36,25 +42,62 @@ def cache_path(symbol: str, layer: str, cache_root: Path) -> Path:
 
 
 def get_expected_last_trading_day(ref: Optional[date | datetime | str] = None) -> date:
-    """计算预期的最近已完成美股交易日 (排除周末及盘中未完成时段)."""
-    if ref is None:
-        ref_dt = datetime.now()
-    elif isinstance(ref, str):
-        ref_dt = datetime.fromisoformat(ref)
-    elif isinstance(ref, date) and not isinstance(ref, datetime):
-        ref_dt = datetime.combine(ref, datetime.min.time())
-    else:
-        ref_dt = ref
+    """计算预期的最近已完成美股交易日 (排除周末、休市日及盘中未完成时段).
 
-    cur_date = ref_dt.date()
-    # 周末回退到周五
-    if cur_date.weekday() == 5:  # Saturday
-        return cur_date - timedelta(days=1)
-    elif cur_date.weekday() == 6:  # Sunday
-        return cur_date - timedelta(days=2)
-    # 工作日: 美股收盘后/次日拉取，最新已收盘交易日至少为前一工作日
-    prev_bday = cur_date - timedelta(days=3 if cur_date.weekday() == 0 else 1)
-    return prev_bday
+    规则:
+    - 纽交所收盘时间为美东时间 16:00, 结算完成在 16:15 左右.
+    - 若传入时间带有时分秒且在美东时间 16:15 之前, 则当日交易未完成, 最新已完成交易日为上一交易日.
+    - 若在美东 16:15 及之后, 或传入纯日期 (无时间分量), 则当日算作目标交易日 (若为周末/休市则回退).
+    - 周末回退到上周五; 美股法定节假日回退到上一有效交易日.
+    """
+    has_time = False
+    if ref is None:
+        ref_dt = datetime.now(EASTERN_TZ)
+        has_time = True
+    elif isinstance(ref, str):
+        if "T" in ref or " " in ref:
+            ref_dt = datetime.fromisoformat(ref)
+            has_time = True
+        else:
+            d = date.fromisoformat(ref)
+            ref_dt = datetime.combine(d, dtime(17, 0), tzinfo=EASTERN_TZ)
+            has_time = False
+    elif isinstance(ref, datetime):
+        ref_dt = ref
+        has_time = True
+    elif isinstance(ref, date):
+        ref_dt = datetime.combine(ref, dtime(17, 0), tzinfo=EASTERN_TZ)
+        has_time = False
+    else:
+        ref_dt = datetime.now(EASTERN_TZ)
+        has_time = True
+
+    # 统一转换到美东时间
+    if ref_dt.tzinfo is not None:
+        ny_dt = ref_dt.astimezone(EASTERN_TZ)
+    else:
+        ny_dt = ref_dt.replace(tzinfo=EASTERN_TZ)
+
+    cur_date = ny_dt.date()
+
+    # 如果带有明确的时间分量，且在美东 16:15 之前，则当日盘中或盘前，退回前一工作日
+    if has_time and (ny_dt.hour < 16 or (ny_dt.hour == 16 and ny_dt.minute < 15)):
+        cur_date = cur_date - timedelta(days=1)
+
+    # 循环向前找到最近的有效交易日 (跳过周末与法定假日)
+    try:
+        from pandas.tseries.holiday import USFederalHolidayCalendar
+        holidays = set(USFederalHolidayCalendar().holidays(
+            start=cur_date - timedelta(days=30),
+            end=cur_date + timedelta(days=1)
+        ).date)
+    except Exception:
+        holidays = set()
+
+    while cur_date.weekday() >= 5 or cur_date in holidays:
+        cur_date = cur_date - timedelta(days=1)
+
+    return cur_date
 
 
 def is_fresh(
@@ -75,10 +118,9 @@ def is_fresh(
             return False
         last_dt = pd.to_datetime(df.index[-1]).date()
         expected = get_expected_last_trading_day(as_of)
+        # 如果最新数据早于预期的已完成交易日，说明缺少必要交易日数据，需要更新
         if last_dt < expected:
-            bus_days_lag = len(pd.bdate_range(last_dt, expected)) - 1
-            if bus_days_lag > 2:
-                return False
+            return False
     except Exception:
         return False
     return True

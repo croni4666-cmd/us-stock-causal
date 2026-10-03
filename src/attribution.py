@@ -44,9 +44,31 @@ def load_sector_weights(use_live_cache: bool = True, as_of: Optional[str] = None
         return json.load(f)
 
 
+def _get_sector_data_signature() -> tuple:
+    """收集 11 行业 + 4 指数 parquet 的修改时间与大小，保证数据更新后缓存自动失效."""
+    sig = []
+    for s in SECTOR_TICKERS:
+        safe = s.replace("^", "_").replace("=", "_").replace(".", "_")
+        pq = CACHE_ROOT / "sectors" / f"{safe}.parquet"
+        if pq.exists():
+            st = pq.stat()
+            sig.append((s, st.st_mtime_ns, st.st_size))
+        else:
+            sig.append((s, 0, 0))
+    for idx in ["DIA", "QQQ", "RSP", "QQQE"]:
+        safe = idx.replace("^", "_").replace("=", "_").replace(".", "_")
+        pq = CACHE_ROOT / "indices" / f"{safe}.parquet"
+        if pq.exists():
+            st = pq.stat()
+            sig.append((idx, st.st_mtime_ns, st.st_size))
+        else:
+            sig.append((idx, 0, 0))
+    return tuple(sig)
+
+
 def clear_attribution_cache() -> None:
     """清空归因模块缓存 (get_sector_returns lru_cache 等)."""
-    get_sector_returns.cache_clear()
+    _get_sector_returns_cached.cache_clear()
 
 
 def load_prices(symbol: str, layer: str) -> pd.Series:
@@ -67,14 +89,7 @@ def load_prices(symbol: str, layer: str) -> pd.Series:
 
 
 @functools.lru_cache(maxsize=128)
-def get_sector_returns(start: str, end: str) -> pd.DataFrame:
-    """读 11 行业 + 4 指数,返回 log returns DataFrame
-
-    v0.9.5 RC1 prep (P10-1 性能优化): @lru_cache 跨调用复用
-    - 1st call: ~0.5s (15 parquet read + log return compute)
-    - 2nd call: < 5ms (lru_cache 命中, 避免重复 read 15 个 parquet)
-    - daily_report 12+12=24 次调用, 1 次真算 + 23 次 cache hit
-    """
+def _get_sector_returns_cached(start: str, end: str, data_sig: tuple) -> pd.DataFrame:
     rets = {}
     for s in SECTOR_TICKERS:
         prices = load_prices(s, "sectors")
@@ -83,6 +98,20 @@ def get_sector_returns(start: str, end: str) -> pd.DataFrame:
         prices = load_prices(idx, "indices")
         rets[idx] = compute_returns(prices.loc[start:end], method="log")
     return pd.DataFrame(rets).dropna(how="all")
+
+
+def get_sector_returns(start: str, end: str, force: bool = False) -> pd.DataFrame:
+    """读 11 行业 + 4 指数,返回 log returns DataFrame
+
+    带有数据版本签名的 LRU cache: 若底层 parquet 更新或 force=True 自动重算.
+    """
+    if force:
+        clear_attribution_cache()
+    sig = _get_sector_data_signature()
+    return _get_sector_returns_cached(start, end, sig).copy()
+
+
+get_sector_returns.cache_clear = clear_attribution_cache
 
 
 def attribute_index(
@@ -116,7 +145,7 @@ def attribute_index(
     """
     if force:
         clear_attribution_cache()
-    weights_data = load_sector_weights(as_of=date)
+    weights_data = load_sector_weights(as_of=date, use_live_cache=not force)
     if index_symbol not in weights_data:
         raise ValueError(f"{index_symbol} 没有 sector weights 配置")
     weights = weights_data[index_symbol]
@@ -127,7 +156,7 @@ def attribute_index(
     # 拉 2y 数据,后续按 date 切片
     start_pull = "2024-01-01"
     end_pull = date or datetime.now().strftime("%Y-%m-%d")
-    rets = get_sector_returns(start_pull, end_pull)
+    rets = get_sector_returns(start_pull, end_pull, force=force)
 
     if date is None:
         end_date = rets.index[-1]

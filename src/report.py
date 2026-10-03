@@ -61,9 +61,9 @@ def _segment_1_market(symbol: str, layer: str, lookback_days: int, as_of: Option
     )
 
 
-def _segment_2_attribution(symbol: str, lookback_days: int, as_of: Optional[str] = None) -> str:
+def _segment_2_attribution(symbol: str, lookback_days: int, as_of: Optional[str] = None, force: bool = False) -> str:
     """② 5 日归因"""
-    r = attribute_index(symbol, date=as_of, lookback_days=lookback_days)
+    r = attribute_index(symbol, date=as_of, lookback_days=lookback_days, force=force)
     # top 3 贡献(按绝对值)
     contribs = sorted(
         r["sector_contributions_pct"].items(),
@@ -140,6 +140,7 @@ def five_segment_report(
     layer: str = "indices",
     lookback_days: int = 5,
     as_of: Optional[str] = None,
+    force: bool = False,
 ) -> dict:
     """生成 5 段制报告"""
     report_date = as_of or str(date.today())
@@ -148,7 +149,7 @@ def five_segment_report(
         "as_of": report_date,
         "lookback_days": lookback_days,
         "segment_1_market": _segment_1_market(symbol, layer, lookback_days, as_of=as_of),
-        "segment_2_attribution": _segment_2_attribution(symbol, lookback_days, as_of=as_of),
+        "segment_2_attribution": _segment_2_attribution(symbol, lookback_days, as_of=as_of, force=force),
         "segment_3_thresholds": _segment_3_thresholds(symbol, layer, as_of=as_of),
         "segment_4_patterns": _segment_4_patterns(symbol, layer, as_of=as_of),
         "segment_5_risk": _segment_5_risk(symbol, as_of=as_of),
@@ -181,16 +182,45 @@ def clear_report_cache() -> None:
 
 
 def _get_data_signature(symbols: list[str], layer: str) -> tuple:
-    """获取底层行情数据文件的签名 (mtime_ns, size) 避免数据更新后命中旧缓存."""
+    """获取底层行情数据、行业与宏观数据及配置文件的综合签名 (mtime_ns, size) 避免数据更新后命中旧缓存."""
     sig = []
-    for s in symbols:
+    # 1. 目标标的
+    for s in sorted(symbols):
         safe = s.replace("^", "_").replace("=", "_").replace(".", "_")
         pq = PROJECT_ROOT / "data" / "raw" / layer / f"{safe}.parquet"
         if pq.exists():
             st = pq.stat()
-            sig.append((s, st.st_mtime_ns, st.st_size))
+            sig.append((f"{layer}:{s}", st.st_mtime_ns, st.st_size))
         else:
-            sig.append((s, 0, 0))
+            sig.append((f"{layer}:{s}", 0, 0))
+
+    # 2. 宏观数据 (VIX/TNX/DXY 等)
+    macro_dir = PROJECT_ROOT / "data" / "raw" / "macro"
+    if macro_dir.exists():
+        for p in sorted(macro_dir.glob("*.parquet")):
+            st = p.stat()
+            sig.append((f"macro:{p.name}", st.st_mtime_ns, st.st_size))
+
+    # 3. 行业数据 (XLK/XLF 等)
+    sectors_dir = PROJECT_ROOT / "data" / "raw" / "sectors"
+    if sectors_dir.exists():
+        for p in sorted(sectors_dir.glob("*.parquet")):
+            st = p.stat()
+            sig.append((f"sectors:{p.name}", st.st_mtime_ns, st.st_size))
+
+    # 4. 关键配置文件 (权重/DAG/事件)
+    for cfg_rel in [
+        "config/sector_weights.json",
+        "config/causal_dag.yaml",
+        "config/events_2026.yaml",
+    ]:
+        cfg_path = PROJECT_ROOT / cfg_rel
+        if cfg_path.exists():
+            st = cfg_path.stat()
+            sig.append((cfg_rel, st.st_mtime_ns, st.st_size))
+        else:
+            sig.append((cfg_rel, 0, 0))
+
     return tuple(sig)
 
 
@@ -208,6 +238,8 @@ def render_full_report(
     """
     if force:
         clear_report_cache()
+        from src.attribution import clear_attribution_cache
+        clear_attribution_cache()
 
     report_date = as_of or str(date.today())
     data_sig = _get_data_signature(symbols, layer)
@@ -242,7 +274,7 @@ def render_full_report(
     sym_reports = {}
     with ThreadPoolExecutor(max_workers=min(len(symbols), 4)) as executor:
         future_to_sym = {
-            executor.submit(five_segment_report, sym, layer, as_of=as_of): sym
+            executor.submit(five_segment_report, sym, layer, as_of=as_of, force=force): sym
             for sym in symbols
         }
         for future in future_to_sym:
@@ -305,29 +337,37 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
             eff = causal_mod.causal_query(
                 treatment=treatment, outcome=outcome, data=data, cfg=cfg
             )
-            direction = "↑" if eff.estimate > 0 else "↓"
             sig = "显著" if eff.p_value < 0.05 else "不显著"
-            delta_log_y = eff.estimate * 0.01
             pct_y = eff.estimate * 1.0  # percentage points change for +1% treatment shock
-            n_executed = len(eff.refutation)
-            n_passed = 0
-            for rname, rres in eff.refutation.items():
-                if not isinstance(rres, dict) or "new_effect" not in rres:
-                    continue
-                new_eff = rres.get("new_effect", 0.0)
-                if "placebo" in rname.lower():
-                    if abs(new_eff) <= max(0.3 * abs(eff.estimate), 0.02):
-                        n_passed += 1
-                else:
-                    if abs(new_eff - eff.estimate) <= max(0.35 * abs(eff.estimate), 0.05):
-                        n_passed += 1
-            refute_str = f"反驳测试 {n_passed}/{n_executed} 通过" if n_executed > 0 else "未运行反驳测试"
-            lines.append(
-                f"- **L2 干预**: {label} `do(+1%)` → {outcome} 预期{direction} "
-                f"{abs(delta_log_y):.4f} ({pct_y:+.2f}%, "
-                f"p={eff.p_value:.3f} {sig}); "
-                f"{refute_str}"
-            )
+            if getattr(eff, "identification_status", "identified") == "unidentifiable":
+                missing = getattr(eff, "missing_confounders", [])
+                lines.append(
+                    f"- **观察关联 (因果不可识别)**: {label} 与 {outcome} 存在统计关联 "
+                    f"(回归斜率 {eff.estimate:+.4f}, {pct_y:+.2f}%, p={eff.p_value:.3f} {sig}); "
+                    f"⚠️ DAG 存在未观测混杂变量 {missing}，无法估计因果干预效应"
+                )
+            else:
+                direction = "↑" if eff.estimate > 0 else "↓"
+                delta_log_y = eff.estimate * 0.01
+                n_executed = len(eff.refutation)
+                n_passed = 0
+                for rname, rres in eff.refutation.items():
+                    if not isinstance(rres, dict) or "new_effect" not in rres:
+                        continue
+                    new_eff = rres.get("new_effect", 0.0)
+                    if "placebo" in rname.lower():
+                        if abs(new_eff) <= max(0.3 * abs(eff.estimate), 0.02):
+                            n_passed += 1
+                    else:
+                        if abs(new_eff - eff.estimate) <= max(0.35 * abs(eff.estimate), 0.05):
+                            n_passed += 1
+                refute_str = f"反驳测试 {n_passed}/{n_executed} 通过" if n_executed > 0 else "未运行反驳测试"
+                lines.append(
+                    f"- **L2 干预**: {label} `do(+1%)` → {outcome} 预期{direction} "
+                    f"{abs(delta_log_y):.4f} ({pct_y:+.2f}%, "
+                    f"p={eff.p_value:.3f} {sig}); "
+                    f"{refute_str}"
+                )
     except Exception as e:
         logger.warning(f"[causal section] L2 query 失败: {e}")
         lines.append(f"- L2 干预: 查询失败 ({type(e).__name__}: {e})")

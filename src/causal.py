@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import warnings
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Literal
 
@@ -340,14 +340,18 @@ class CausalEffect:
     """因果估计结果 (DoWhy 4 步)"""
     treatment: str
     outcome: str
-    estimate: float           # 平均处理效应 ATE (回归系数, treatment 1 单位变化 → outcome 变化)
+    estimate: float           # 平均处理效应 ATE (或未调整关联斜率, treatment 1 单位变化 → outcome 变化)
     estimand: str             # 识别出的 estimand 公式 (DoWhy identify_effect 输出)
     refutation: dict          # 反驳测试结果 (3 重)
-    method: str               # 'ols' (Phase 9.0 POC)
+    method: str               # 'ols' / 'ols_backdoor_adjusted' / 'unadjusted_association'
     n_obs: int
     p_value: float            # 系数显著性 (P>|t|)
     std_error: float          # 系数标准误
     interpretation: str       # 人类可读解读
+    identification_status: str = "identified"  # 'identified', 'identified_adjusted', 'unidentifiable'
+    adjustment_set: list[str] = field(default_factory=list)
+    missing_confounders: list[str] = field(default_factory=list)
+    reason: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -784,23 +788,33 @@ def causal_query(
     # 人类可读解读: 严谨区分回归斜率与 1% 扰动响应
     direction = "↑" if ate > 0 else "↓"
     sig = "显著" if p_value < 0.05 else "不显著"
+    delta_log_y = ate * 0.01
+    pct_y = ate * 1.0  # +1% treatment shock 引起的 outcome 百分比变化
+
     if adjustment_set.status == "unidentifiable":
-        ctrl_info = f", ⚠️ 存在未阻断后门 (缺失混杂: {adjustment_set.missing_confounders})"
         method_str = "unadjusted_association (unobserved confounders in DAG)"
+        interpretation = (
+            f"观察关联 (因果不可识别): {treatment} 与 {outcome} 存在统计关联 "
+            f"(回归斜率 {ate:+.4f}, {pct_y:+.2f}%, p={p_value:.3f} {sig}); "
+            f"⚠️ DAG 中存在未观测混杂变量 {adjustment_set.missing_confounders}，无法通过后门调整估计因果干预效应; "
+            f"基于 {len(data)} 个交易日, std_err={std_err:.4f}"
+        )
     elif adjustment_set.status == "identified_adjusted":
         ctrl_info = f", 控制后门混杂: {adjustment_set.adjustment_set}"
         method_str = f"ols_refute_{actual_refute_method}" if actual_n_refutations > 0 else "ols_backdoor_adjusted"
+        interpretation = (
+            f"{treatment} 变动 +1% (log return +0.01), {outcome} 预期{direction} {abs(delta_log_y):.4f} "
+            f"({pct_y:+.2f}%, p={p_value:.3f} {sig}{ctrl_info}); "
+            f"基于 {len(data)} 个交易日, std_err={std_err:.4f}"
+        )
     else:
         ctrl_info = ""
         method_str = f"ols_refute_{actual_refute_method}" if actual_n_refutations > 0 else "ols"
-
-    delta_log_y = ate * 0.01
-    pct_y = ate * 1.0  # +1% treatment shock 引起的 outcome 百分比变化
-    interpretation = (
-        f"{treatment} 变动 +1% (log return +0.01), {outcome} 预期{direction} {abs(delta_log_y):.4f} "
-        f"({pct_y:+.2f}%, p={p_value:.3f} {sig}{ctrl_info}); "
-        f"基于 {len(data)} 个交易日, std_err={std_err:.4f}"
-    )
+        interpretation = (
+            f"{treatment} 变动 +1% (log return +0.01), {outcome} 预期{direction} {abs(delta_log_y):.4f} "
+            f"({pct_y:+.2f}%, p={p_value:.3f} {sig}{ctrl_info}); "
+            f"基于 {len(data)} 个交易日, std_err={std_err:.4f}"
+        )
 
     result = CausalEffect(
         treatment=treatment,
@@ -813,6 +827,10 @@ def causal_query(
         p_value=p_value,
         std_error=std_err,
         interpretation=interpretation,
+        identification_status=adjustment_set.status,
+        adjustment_set=list(adjustment_set.adjustment_set),
+        missing_confounders=list(adjustment_set.missing_confounders),
+        reason=adjustment_set.reason,
     )
     _QUERY_CACHE[_qk] = result
     return result

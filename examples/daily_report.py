@@ -81,14 +81,14 @@ def step_fetch(skip: bool = False) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}", "elapsed_s": round(time.time() - t0, 1)}
 
 
-def step_attribution(date_str: Optional[str] = None) -> dict:
+def step_attribution(date_str: Optional[str] = None, force: bool = False) -> dict:
     """Step 2: 归因 (4 指数 × 3 窗口)"""
     _step_banner(2, f"归因 (4 指数 × 3 窗口, {date_str or 'latest'})")
     from src.attribution import attribute_all_indices
     t0 = time.time()
     results_by_window = {}
     for lb in WINDOWS:
-        results = attribute_all_indices(date=date_str, lookback_days=lb, symbols=INDICES)
+        results = attribute_all_indices(date=date_str, lookback_days=lb, symbols=INDICES, force=force)
         results_by_window[lb] = results
         for r in results:
             res = r["residual_pct"]
@@ -142,13 +142,13 @@ def step_residual_regression(date_str: Optional[str] = None) -> dict:
     }
 
 
-def step_markdown_report(date_str: str) -> dict:
+def step_markdown_report(date_str: str, force: bool = False) -> dict:
     """Step 4: Markdown 报告 (5 段制)"""
     _step_banner(4, "Markdown 报告 (5 段制)")
     t0 = time.time()
     try:
         OUTPUT_DIR.mkdir(exist_ok=True)
-        md = render_full_report(INDICES, as_of=date_str)
+        md = render_full_report(INDICES, as_of=date_str, force=force)
         md_path = OUTPUT_DIR / f"report_{date_str}.md"
         md_path.write_text(md, encoding="utf-8")
         kb = md_path.stat().st_size / 1024
@@ -380,32 +380,43 @@ def step_causal(date_str: str) -> dict:
 
         # L2 干预 query: VIX → QQQ (经济理论: 应强负)
         vix_qqq = causal.causal_query(treatment="VIX", outcome="QQQ", data=data, cfg=cfg)
+        direction = "↑" if vix_qqq.estimate > 0 else "↓"
+        delta_log_y = vix_qqq.estimate * 0.01
+        pct_y = vix_qqq.estimate * 1.0
+
+        if getattr(vix_qqq, "identification_status", "identified") == "unidentifiable":
+            q_type = "unadjusted_association"
+            print(f"  [因果不可识别] VIX 与 QQQ 观察关联: {vix_qqq.estimate:+.4f} "
+                  f"({pct_y:+.2f}%, p={vix_qqq.p_value:.3f}, n={vix_qqq.n_obs}); "
+                  f"⚠️ 缺失混杂: {getattr(vix_qqq, 'missing_confounders', [])}, 无法估计因果干预")
+        else:
+            q_type = "L2_intervention"
+            n_executed = len(vix_qqq.refutation)
+            n_passed = 0
+            for rname, rres in vix_qqq.refutation.items():
+                if not isinstance(rres, dict) or "new_effect" not in rres:
+                    continue
+                new_eff = rres.get("new_effect", 0.0)
+                if "placebo" in rname.lower():
+                    if abs(new_eff) <= max(0.3 * abs(vix_qqq.estimate), 0.02):
+                        n_passed += 1
+                else:
+                    if abs(new_eff - vix_qqq.estimate) <= max(0.35 * abs(vix_qqq.estimate), 0.05):
+                        n_passed += 1
+            print(f"  [L2 do-calculus] VIX do(+1%) → QQQ: {direction}{abs(delta_log_y):.4f} "
+                  f"({pct_y:+.2f}%, p={vix_qqq.p_value:.3f}, n={vix_qqq.n_obs})")
+            print(f"    反驳测试 PASS 数: {n_passed}/{n_executed}")
+
         results["queries"].append({
-            "type": "L2_intervention",
+            "type": q_type,
             "treatment": vix_qqq.treatment,
             "outcome": vix_qqq.outcome,
             "estimate": vix_qqq.estimate,
             "p_value": vix_qqq.p_value,
             "interpretation": vix_qqq.interpretation,
+            "identification_status": getattr(vix_qqq, "identification_status", "identified"),
+            "missing_confounders": getattr(vix_qqq, "missing_confounders", []),
         })
-        direction = "↑" if vix_qqq.estimate > 0 else "↓"
-        delta_log_y = vix_qqq.estimate * 0.01
-        pct_y = vix_qqq.estimate * 1.0
-        n_executed = len(vix_qqq.refutation)
-        n_passed = 0
-        for rname, rres in vix_qqq.refutation.items():
-            if not isinstance(rres, dict) or "new_effect" not in rres:
-                continue
-            new_eff = rres.get("new_effect", 0.0)
-            if "placebo" in rname.lower():
-                if abs(new_eff) <= max(0.3 * abs(vix_qqq.estimate), 0.02):
-                    n_passed += 1
-            else:
-                if abs(new_eff - vix_qqq.estimate) <= max(0.35 * abs(vix_qqq.estimate), 0.05):
-                    n_passed += 1
-        print(f"  [L2 do-calculus] VIX do(+1%) → QQQ: {direction}{abs(delta_log_y):.4f} "
-              f"({pct_y:+.2f}%, p={vix_qqq.p_value:.3f}, n={vix_qqq.n_obs})")
-        print(f"    反驳测试 PASS 数: {n_passed}/{n_executed}")
 
         # L3 反事实: 用最近一天, 假设 VIX 比实际低 (恐慌小, 应该利好)
         # P9-1.5 跑 2 个 L3 query 演示 cache 价值 (第一 fit, 第二 hit)
@@ -594,6 +605,14 @@ def run_daily_report(
     t_total = time.time()
     steps = {}
 
+    if force:
+        from src.attribution import clear_attribution_cache
+        from src.report import clear_report_cache
+        from src.causal import clear_caches as clear_causal_caches
+        clear_report_cache()
+        clear_attribution_cache()
+        clear_causal_caches()
+
     # 1. fetch (默认跑, --skip-fetch 跳过)
     steps["fetch"] = step_fetch(skip=skip_fetch)
     if steps["fetch"]["ok"] is False and not skip_fetch:
@@ -601,14 +620,14 @@ def run_daily_report(
             print(f"  [WARN] fetch 失败, 后续步骤可能受影响 (用 cache)")
 
     # 2. attribution (关键, 失败则中断)
-    steps["attribution"] = step_attribution(date_str)
+    steps["attribution"] = step_attribution(date_str, force=force)
 
     # 3. residual regression (P7-5)
     steps["residual_regression"] = step_residual_regression(date_str)
 
     # 4. markdown report
     if not skip_md:
-        steps["markdown_report"] = step_markdown_report(date_str)
+        steps["markdown_report"] = step_markdown_report(date_str, force=force)
     else:
         steps["markdown_report"] = {"ok": "skip", "reason": "--skip-md", "elapsed_s": 0}
 

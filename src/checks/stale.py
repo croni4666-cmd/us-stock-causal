@@ -90,7 +90,7 @@ def check(date_str: str) -> list[dict]:
             try:
                 import pandas as _pd
                 df_tail = _pd.read_parquet(pq)
-                if len(df_tail) > 0:
+                if len(df_tail) > 0 and isinstance(df_tail.index, _pd.DatetimeIndex):
                     last_dt = _pd.to_datetime(df_tail.index[-1]).date()
                     from src.cache import get_expected_last_trading_day
                     expected = get_expected_last_trading_day(ref)

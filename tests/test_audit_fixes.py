@@ -399,3 +399,197 @@ def test_offline_five_segment_report_and_future_data_invariance(tmp_path, monkey
     assert rep_past["segment_1_market"] == rep_full["segment_1_market"]
     assert rep_past["segment_3_thresholds"] == rep_full["segment_3_thresholds"]
     assert rep_past["segment_4_patterns"] == rep_full["segment_4_patterns"]
+
+
+# =============================================================================
+# Round 3 Audit Regression Tests (6 Reproducible Issues)
+# =============================================================================
+
+def test_unidentifiable_causal_rendering_no_l2_or_do():
+    """Point 1: Unidentifiable causal effect must display observation association without L2/do labels."""
+    from unittest.mock import patch
+    from src import causal, report
+
+    clear_caches()
+    rng = np.random.default_rng(42)
+    n = 1000
+    z = rng.normal(size=n)
+    t = 1.5 * z + rng.normal(0, 0.5, n)
+    y = 2.0 * t + 3.0 * z + rng.normal(0, 0.5, n)
+    df = pd.DataFrame(
+        {"VIX": t, "QQQ": y, "TNX": rng.normal(size=n)},
+        index=pd.date_range("2020-01-01", periods=n, freq="B"),
+    )
+    # Z is in DAG, but missing from df
+    cfg = {
+        "dot": "digraph { Z -> VIX; Z -> QQQ; VIX -> QQQ; TNX -> QQQ; }",
+        "nodes": {"parquet_map": {}},
+    }
+
+    orig_query = causal.causal_query
+    def query_no_refute(*args, **kwargs):
+        kwargs["n_refutations"] = 0
+        return orig_query(*args, **kwargs)
+
+    with patch.object(causal, "load_dag_config", return_value=cfg), \
+         patch.object(causal, "load_dag_data", return_value=df), \
+         patch.object(causal, "causal_query", side_effect=query_no_refute):
+        rendered = report.render_causal_section(include_l3=False, as_of="2023-10-31")
+
+    # Find the VIX query line
+    vix_lines = [l for l in rendered.splitlines() if "恐慌指数 (VIX)" in l and "QQQ" in l]
+    assert len(vix_lines) == 1
+    vl = vix_lines[0]
+
+    # Must be marked as observation association
+    assert "观察关联 (因果不可识别)" in vl
+    # Must NOT contain L2 or do labels
+    assert "**L2 干预**" not in vl
+    assert "`do(+1%)`" not in vl
+    assert "无法估计因果干预效应" in vl
+    assert "['Z']" in vl
+
+    # When Z is added to data, identifiability is restored!
+    df_with_z = df.copy()
+    df_with_z["Z"] = z
+    with patch.object(causal, "load_dag_config", return_value=cfg), \
+         patch.object(causal, "load_dag_data", return_value=df_with_z), \
+         patch.object(causal, "causal_query", side_effect=query_no_refute):
+        rendered_restored = report.render_causal_section(include_l3=False, as_of="2023-10-31")
+
+    vix_lines_restored = [l for l in rendered_restored.splitlines() if "恐慌指数 (VIX)" in l and "QQQ" in l]
+    assert len(vix_lines_restored) == 1
+    assert "**L2 干预**" in vix_lines_restored[0]
+    assert "`do(+1%)`" in vix_lines_restored[0]
+
+
+def test_historical_weights_date_integrity(tmp_path, monkeypatch):
+    """Point 3: Historical weights fallback must not spoof past date or write fake snapshots."""
+    from src import sector_weights_live as weights
+
+    wroot = tmp_path / "weights"
+    (wroot / "config").mkdir(parents=True)
+    cfg_file = wroot / "config" / "sector_weights.json"
+    cache_dir = wroot / "data" / "cache"
+
+    test_config = {
+        "_meta": {"as_of": "2026-07-23", "note": "future config"},
+        "QQQ": {"XLK": 0.5, "XLC": 0.5},
+    }
+    import json
+    cfg_file.write_text(json.dumps(test_config), encoding="utf-8")
+
+    monkeypatch.setattr(weights, "PROJECT_ROOT", wroot)
+    monkeypatch.setattr(weights, "WEIGHTS_PATH", cfg_file)
+    monkeypatch.setattr(weights, "CACHE_DIR", cache_dir)
+
+    # 1. pull_live_weights must return true effective date, not requested past date
+    snap = weights.pull_live_weights(date="2026-06-01")
+    assert snap["as_of"] == "2026-07-23"
+
+    # 2. save_live_cache must reject saving past date with future snapshot
+    saved = weights.save_live_cache(snap, date="2026-06-01")
+    assert saved is None
+    assert not (cache_dir / "sector_weights_live_2026-06-01.json").exists()
+
+    # 3. load_live_or_static for past date returns fallback with explicit metadata
+    loaded = weights.load_live_or_static(date="2026-06-01", use_cache=False)
+    assert loaded["_meta"]["is_historical_fallback"] is True
+    assert loaded["_meta"]["requested_as_of"] == "2026-06-01"
+    assert loaded["_meta"]["effective_date"] == "2026-07-23"
+    assert loaded != test_config  # Does not silently return current config unchanged!
+
+
+def test_report_cache_invalidates_on_macro_or_sector_update(tmp_path, monkeypatch):
+    """Point 4: Report cache signature must cover macro, sectors, and configs."""
+    from unittest.mock import patch
+    from src import report
+
+    report_root = tmp_path / "report"
+    raw_dir = report_root / "data" / "raw"
+    for lyr in ("indices", "macro", "sectors"):
+        (raw_dir / lyr).mkdir(parents=True)
+
+    idx_file = raw_dir / "indices" / "QQQ.parquet"
+    vix_file = raw_dir / "macro" / "_VIX.parquet"
+    pd.DataFrame({"close": [100.0, 101.0]}, index=pd.date_range("2026-06-01", periods=2)).to_parquet(idx_file)
+    pd.DataFrame({"close": [20.0, 21.0]}, index=pd.date_range("2026-06-01", periods=2)).to_parquet(vix_file)
+
+    def mock_macro_topline(**kwargs):
+        return "VIX=" + str(pd.read_parquet(vix_file)["close"].iloc[-1])
+
+    report.clear_report_cache()
+    monkeypatch.setattr(report, "PROJECT_ROOT", report_root)
+    monkeypatch.setattr(report, "macro_topline", mock_macro_topline)
+    monkeypatch.setattr(report, "render_causal_section", lambda **k: "")
+    monkeypatch.setattr(report, "five_segment_report", lambda *a, **k: {})
+    monkeypatch.setattr(report, "render_markdown", lambda r: "probe")
+
+    before = report.render_full_report(["QQQ"], as_of="2026-06-02")
+    assert "VIX=21.0" in before
+
+    # Update _VIX.parquet price: 21.0 -> 99.0
+    pd.DataFrame({"close": [20.0, 99.0]}, index=pd.date_range("2026-06-01", periods=2)).to_parquet(vix_file)
+
+    # Next standard call without force must automatically detect the updated macro file!
+    after = report.render_full_report(["QQQ"], as_of="2026-06-02")
+    assert "VIX=99.0" in after
+
+
+def test_attribution_cache_data_version_invalidation(tmp_path, monkeypatch):
+    """Point 5: Attribution cache must auto-invalidate when sector parquets change."""
+    from src import attribution
+
+    att_root = tmp_path / "attribution" / "data" / "raw"
+    for lyr in ("indices", "sectors"):
+        (att_root / lyr).mkdir(parents=True)
+
+    idx_dates = pd.date_range("2026-06-01", periods=3, freq="B")
+    for s in attribution.SECTOR_TICKERS:
+        pd.DataFrame({"close": [100.0, 101.0, 102.0]}, index=idx_dates).to_parquet(att_root / "sectors" / f"{s}.parquet")
+    for idx in ("DIA", "QQQ", "RSP", "QQQE"):
+        pd.DataFrame({"close": [100.0, 101.0, 102.0]}, index=idx_dates).to_parquet(att_root / "indices" / f"{idx}.parquet")
+
+    attribution.clear_attribution_cache()
+    monkeypatch.setattr(attribution, "CACHE_ROOT", att_root)
+    monkeypatch.setattr(attribution, "load_sector_weights", lambda as_of=None, use_live_cache=True: {"QQQ": {"XLK": 1.0}})
+
+    r1 = attribution.attribute_index("QQQ", date="2026-06-03")
+    assert abs(r1["predicted_return_pct"] - 0.985) < 0.01
+
+    # Modify XLK.parquet last price 102 -> 150
+    pd.DataFrame({"close": [100.0, 101.0, 150.0]}, index=idx_dates).to_parquet(att_root / "sectors" / "XLK.parquet")
+
+    # Regular call must automatically reflect new price without needing manual cache clear!
+    r2 = attribution.attribute_index("QQQ", date="2026-06-03")
+    assert abs(r2["predicted_return_pct"] - 39.551) < 0.01
+
+
+def test_market_freshness_session_timing_and_types(tmp_path):
+    """Point 6: get_expected_last_trading_day timezone/types and is_fresh strict checking."""
+    from src import cache
+
+    # 1. date and datetime inputs must not raise NameError
+    d_res = cache.get_expected_last_trading_day(date(2026, 10, 2))
+    assert isinstance(d_res, date)
+    assert d_res == date(2026, 10, 2)
+
+    # 2. Midday (before 16:15 ET) on Friday Oct 2 -> expected last completed is Thursday Oct 1
+    midday = cache.get_expected_last_trading_day("2026-10-02T12:00:00")
+    assert midday == date(2026, 10, 1)
+
+    # 3. After close (17:00 ET) on Friday Oct 2 -> expected last completed is Friday Oct 2
+    after_close = cache.get_expected_last_trading_day("2026-10-02T17:00:00-04:00")
+    assert after_close == date(2026, 10, 2)
+
+    # 4. Weekend (Saturday Oct 3) -> expected is Friday Oct 2
+    sat_res = cache.get_expected_last_trading_day(date(2026, 10, 3))
+    assert sat_res == date(2026, 10, 2)
+
+    # 5. is_fresh returns False when latest bar lags expected session (no 2-day slack skipping)
+    pq_path = tmp_path / "test_freshness.parquet"
+    pd.DataFrame({"close": [100.0]}, index=pd.to_datetime(["2026-09-30"])).to_parquet(pq_path)
+    # Expected is 2026-10-01 at 12:00 on Oct 2; file has 2026-09-30 (missing 1 session)
+    fresh = cache.is_fresh(pq_path, as_of="2026-10-02T12:00:00")
+    assert fresh is False
+
