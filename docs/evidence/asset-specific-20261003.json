@@ -1058,10 +1058,12 @@
     }
   },
   "verification": {
-    "python_3_11": "192 passed, 3 skipped, 11 warnings",
-    "python_3_12": "192 passed, 3 skipped, 11 warnings",
-    "new_regressions": 62,
+    "python_3_11": "193 passed, 3 skipped, 11 warnings",
+    "python_3_12": "193 passed, 3 skipped, 11 warnings",
+    "new_regressions": 63,
     "review_important_findings_fixed": 4,
-    "live_official_sources": 4
+    "live_official_sources": 4,
+    "isolated_installed_cli": "passed after packaging fix",
+    "wheel_contents": "documented CLI and asset modules included"
   }
 }

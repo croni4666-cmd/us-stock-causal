@@ -41,8 +41,8 @@ Consumes Task1/2; produces `src/asset_report.py` and `examples/asset_report.py`;
 - [x] Build report from genuine previously downloaded Yahoo data; verify shapes, hash, dates, weights, and readiness. Do not claim current weights explain past periods.
 - [x] Commit summary evidence and report, excluding complete restricted issuer archives.
 - [x] Conduct whole-branch review; fix material issues with failing regression tests first.
-- [ ] Publish a stacked draft PR based on fix/audit-follow-through, attach it; dispatch existing CI workflow on this branch because PR trigger filters master/main.
-- [ ] Report implemented scope and actual tests, plus concrete next causal-study input requirements.
+- [x] Publish a stacked draft PR based on fix/audit-follow-through, attach it; dispatch existing CI workflow on this branch because PR trigger filters master/main.
+- [x] Report implemented scope and actual tests, plus concrete next causal-study input requirements.
 
 ## Review focus
 
@@ -55,6 +55,8 @@ Plan self-review: producer/consumer signatures align; tests run in writable fres
 - Task1 complete: e869a02/6403d61, source tests19 GREEN; actual four issuer payloads parsed after cash/AWAITED edge tests RED→GREEN.
 - Task2 complete: 3f3be79, model tests22 GREEN; combined41 GREEN.
 - Task3 complete: d882ee8, report/CLI tests9 GREEN after explicit market-file selector RED→GREEN; complete suites180 GREEN in both runtimes before review.
-- Final independent review:4 Important,0 Critical,0 Minor; all reproduced with12 red regression cases and fixed in one pass. Focused62 GREEN; complete suites192 passed/3 skipped/11 warnings on Python3.11 and3.12.
+- Final independent review:4 Important,0 Critical,0 Minor; all reproduced with12 red regression cases and fixed in one pass. Focused62 GREEN; complete suites193 passed/3 skipped/11 warnings on Python3.11 and3.12.
 - Task4 real verification:4 live official captures succeeded; six actual source/date/coverage guards all true; full raw issuer archives excluded from commits. Sourcechecks use SHA256 and independent CSV duration recomputation.
 - Final: Ruling: reviewer left live endpoint stability, full-archive accuracy and later research inputs unjudged. Live sources were verified twice this session, CSV durations independently recalculated, historical cutoffs tested; this does not guarantee future website schemas or historical publication. Licensed benchmark, full curve and external shocks remain explicit later phases. Cost if this boundary is ignored: biased historical or causal claims; outputs retain not_identified and backtest_ready=false.
+
+- Publishing: draft PR #8 created and attached, based on PR #7; initial CI exposed missing installed examples namespace. Isolated external-CWD CLI regression RED→GREEN, examples added to packaging; wheel contents verified; full console pytest193 GREEN in both runtimes. Current-head CI is tracked on the PR and in the canonical project progress file.
