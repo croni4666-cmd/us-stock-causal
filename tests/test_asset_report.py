@@ -120,3 +120,38 @@ def test_cli_supports_explicit_market_file_selection(tmp_path):
                  '--market-root', str(market), '--source-root', str(sources), '--output', str(out),
                  '--market-file', 'IEF=' + str(market / 'IEF.parquet')]) == 0
     assert '价格/报价变动' in out.read_text(encoding='utf-8')
+
+
+def test_broken_source_object_does_not_abort_other_assets(tmp_path):
+    market, sources = prepare(tmp_path)
+    (sources / 'QQQ').mkdir()
+    (sources / 'QQQ' / 'broken.json').write_text('[]', encoding='utf-8')
+    result = build_asset_report(['QQQ', 'IEF'], '2026-10-01', '2026-10-02', market, sources,
+                               mode='retrospective')
+    assert result['assets'][0]['attribution']['status'] == 'unavailable'
+    assert result['assets'][0]['errors']
+    assert result['assets'][1]['attribution']['status'] == 'approximation'
+
+
+def test_qqq_attribution_keeps_constituent_and_beginning_snapshot_evidence(tmp_path):
+    from src.asset_sources import parse_invesco
+    market, sources = prepare(tmp_path)
+    stock = market / 'AAA.parquet'
+    pd.DataFrame({'close': [100, 102]}, index=pd.to_datetime(['2026-10-01','2026-10-02'])).to_parquet(stock)
+    documents = []
+    for day, weight in [('2026-10-01', 80), ('2026-10-02', 90)]:
+        raw = json.dumps({'cusip': '46090E103', 'effectiveDate': day, 'effectiveBusinessDate': day,
+                          'totalNumberOfHoldings': 2, 'holdings': [
+                              {'ticker':'AAA','cusip':'111','issuerName':'Alpha','securityTypeName':'Common Stock',
+                               'percentageOfTotalNetAssets':weight},
+                              {'ticker':'USD','cusip':'USD','issuerName':'Cash','securityTypeName':'Currency',
+                               'percentageOfTotalNetAssets':100-weight}]}).encode()
+        path = store_source('QQQ', raw, parse_invesco(raw), sources, retrieved_at='2026-10-03T14:00:00+00:00')
+        documents.append(json.loads(path.read_text(encoding='utf-8')))
+    result = build_asset_report(['QQQ'], '2026-10-01', '2026-10-02', market, sources, mode='retrospective')
+    attr = result['assets'][0]['attribution']
+    assert attr['market_sources']['AAA']['sha256']
+    assert attr['market_sources']['AAA']['path'] == str(stock)
+    text = render_asset_report(result)
+    assert documents[0]['sha256'] in text  # the actual attribution input, not just current profile
+    assert documents[1]['sha256'] in text

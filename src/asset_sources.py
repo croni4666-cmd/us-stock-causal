@@ -50,10 +50,27 @@ def _iso_day(value):
 
 
 def _timestamp(value):
+    if not isinstance(value, str):
+        raise ValueError("capture timestamp must be a timezone-aware string")
     stamp = datetime.fromisoformat(value)
     if stamp.tzinfo is None or stamp.utcoffset() is None:
         raise ValueError("capture timestamp requires timezone")
     return stamp.astimezone(timezone.utc)
+
+
+def portfolio_weight_complete(rows: list[dict]) -> bool:
+    """Allow per-record issuer rounding, without rescaling or inventing cash.
+
+    iShares publishes weights at 0.01 percentage-point precision. The bound
+    allows half a rounding unit per row plus a small floating-point margin.
+    This checksum detects material truncation; it cannot prove every tiny
+    holding is present without an independent published row count.
+    """
+    if not rows or any(row.get("weight") is None for row in rows):
+        return False
+    total = sum(_number(row["weight"]) for row in rows)
+    tolerance = max(.0002, len(rows) * .00005 + .0001)
+    return abs(total - 1) <= tolerance
 
 
 def _validate_rows(rows):
@@ -62,12 +79,17 @@ def _validate_rows(rows):
     ids = [row["id"] for row in rows]
     if len(set(ids)) != len(ids):
         raise ValueError("duplicate security identifier")
+    equity_tickers = [r['ticker'] for r in rows if r['asset_class'] == 'Equity' and r.get('ticker')]
+    if len(equity_tickers) != len(set(equity_tickers)):
+        raise ValueError("duplicate equity ticker with conflicting security identity")
     for row in rows:
         weight = row["weight"]
         if weight is not None and abs(weight) > 1.5:
             raise ValueError("weight outside supported portfolio range")
         if row["asset_class"] == "Equity" and weight is not None and weight < 0:
             raise ValueError("negative equity weight not supported")
+    if all(row["weight"] is not None for row in rows) and not portfolio_weight_complete(rows):
+        raise ValueError("portfolio weight coverage incomplete or inconsistent")
     return [f"unknown weight: {row['id']}" for row in rows if row["weight"] is None]
 
 
@@ -84,12 +106,23 @@ def parse_invesco(raw: bytes) -> dict:
         raise ValueError("incomplete Invesco holdings")
     rows = []
     for item in holdings:
+        if not isinstance(item, dict):
+            raise ValueError("invalid holding object")
         security_type = item.get("securityTypeName") or "Unknown"
         identity = item.get("cusip") or item.get("ticker") or item.get("issuerName")
-        if not identity:
+        if not isinstance(identity, str) or not identity.strip():
             raise ValueError("holding without identifier")
+        identity = identity.strip().upper()
+        ticker = item.get('ticker')
+        if ticker is not None:
+            if not isinstance(ticker, str):
+                raise ValueError("invalid holding ticker")
+            ticker = ticker.strip().upper() or None
         weight = _number(item.get("percentageOfTotalNetAssets"), optional=True)
-        rows.append({"id": f"{identity}:{security_type}", "ticker": item.get("ticker"),
+        # Type labels must not let a single equity CUSIP evade duplication.
+        # Cash/derivative identities retain their explicit instrument type.
+        security_id = str(identity) if security_type in _EQUITY_TYPES else f"{identity}:{security_type}"
+        rows.append({"id": security_id, "ticker": ticker,
                      "name": item.get("issuerName") or str(identity),
                      "asset_class": "Equity" if security_type in _EQUITY_TYPES else security_type,
                      "security_type": security_type, "weight": None if weight is None else weight / 100,
@@ -262,6 +295,8 @@ def load_sources(symbol: str, root: Path) -> list[dict]:
     documents = []
     for path in sorted((Path(root) / symbol).glob("*.json")):
         doc = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(doc, dict):
+            raise ValueError("source metadata must be an object")
         if doc.get("schema_version") != 1 or doc.get("symbol") != symbol:
             raise ValueError("unsupported source schema or symbol")
         provider, url = SOURCE_SPECS[symbol]

@@ -131,3 +131,11 @@ def test_gold_missing_date_and_late_point_in_time_data_are_unavailable():
     assert result['status'] == 'unavailable'
     result = gold_archive_metrics(source, '2026-10-01', '2026-10-01', 'point_in_time')
     assert result['status'] == 'unavailable'
+
+
+def test_known_duration_for_only_twenty_percent_is_not_complete_portfolio():
+    source = doc(symbol='TLT', rows=[
+        {'id': 'A', 'asset_class': 'Fixed Income', 'weight': .2, 'duration_years': 14}])
+    result = treasury_profile(source)
+    assert result['weighted_duration_years'] == pytest.approx(2.8)
+    assert result['complete'] is False

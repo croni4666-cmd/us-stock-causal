@@ -79,6 +79,8 @@ premium_pct_1615、ounces_per_share。各字段的时点不能抹平。
 标为供应商调整序列的总回报代理，不能保证完全重现官方基金回报。
 不得把缺失adj close退回close后仍称总回报。
 全序列必须索引唯一且递增；拒绝端点缺失、非正数或无限值；不补齐缺失交易日。
+当前行情缓存没有历史发布时间与修订版本，官方输入满足point_in_time约束也
+不等于整个报告已经可以认证为可交易回测；输出backtest_ready始终为false。
 日收益不默认forward-fill。期间计算需匹配同一日期，显示price_return和
 adjusted_return_proxy及两者差（不是严格现金分红收益）。
 

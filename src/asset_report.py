@@ -115,16 +115,19 @@ def build_asset_report(symbols: list[str], start: str, end: str, market_root: Pa
                 item["attribution"] = _unavailable("asset return endpoints unavailable")
                 continue
             if symbol == "QQQ":
-                stocks = {}
+                stocks, stock_sources = {}, {}
                 for row in beginning["rows"]:
                     if row["asset_class"] != "Equity" or not row.get("ticker"):
                         continue
                     try:
-                        stocks[row["ticker"]] = period_return(_read_market(row["ticker"], market_root, market_files)["close"], start, end)
+                        stock_data = _read_market(row["ticker"], market_root, market_files)
+                        stocks[row["ticker"]] = period_return(stock_data["close"], start, end)
+                        stock_sources[row["ticker"]] = stock_data.attrs['market_source']
                     except (ValueError, OSError, KeyError):
                         continue  # explicitly reported as missing coverage by the model
                 item["attribution"] = equity_contributions(beginning, stocks,
                     item["returns"]["price_return"], start, mode)
+                item["attribution"]["market_sources"] = stock_sources
             else:
                 profile = treasury_profile(beginning)
                 if not profile["complete"]:
@@ -191,15 +194,22 @@ def render_asset_report(result: dict) -> str:
         if attr["status"] == "unavailable":
             lines.append(f"专用期间分析未就绪：{attr['reason']}。")
         elif symbol in ("IEF", "TLT"):
+            beginning_source = attr['beginning_source']
+            lines.append(f"归因期初证据：日期 {beginning_source['as_of']}；取得/可用时间 {beginning_source['available_at']}；SHA256 `{beginning_source['sha256']}`。")
             lines.append(f"期初持仓 {attr['beginning_as_of']}；单期限代理 {attr['yield_proxy']} 变化 {attr['yield_delta_bp']:+.2f}bp，线性久期近似 {_pct(attr['estimated_price_effect'])}，价格残差 {_pct(attr['residual'])}。")
             lines.append("此近似未覆盖全曲线、凸性、票息、费用与非平行变化。")
         elif symbol == "QQQ":
+            beginning_source = attr['beginning_source']
+            lines.append(f"归因期初证据：日期 {beginning_source['as_of']}；取得/可用时间 {beginning_source['available_at']}；SHA256 `{beginning_source['sha256']}`。")
             lines.append(f"固定期初权重覆盖 {attr['covered_weight']:.4%}；股票价格贡献 {_pct(attr['contribution'])}；残差 {_pct(attr['residual'])}。")
             if attr["missing_tickers"]:
                 lines.append("缺失股票回报：" + ", ".join(attr["missing_tickers"]))
             lines.extend(["", "| 股票 | 原始权重 | 价格回报 | 贡献 |", "|---|---:|---:|---:|"])
             for row in attr["contributions"][:10]:
                 lines.append(f"| {row['ticker']} | {row['weight']:.4%} | {_pct(row['price_return'])} | {_pct(row['contribution'])} |")
+            lines.extend(["", "成分股行情证据（本地输入，不代表历史发布时间）：", ""])
+            for ticker, evidence in attr['market_sources'].items():
+                lines.append(f"- {ticker}：`{evidence['path']}`；SHA256 `{evidence['sha256']}`。")
             lines.append("固定期初权重的期间近似；现金、衍生品、分红、费用和交易留在残差，未重归一化。")
         elif symbol == "GLD":
             lines.append(f"官方档案价格回报 {_pct(attr['price_return'])}；纽约10:30 NAV回报 {_pct(attr['nav_return_1030'])}；每股黄金储备变化 {_pct(attr['backing_change'])}。")

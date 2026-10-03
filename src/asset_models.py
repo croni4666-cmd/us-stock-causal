@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from src.asset_sources import eligible_snapshot
+from src.asset_sources import eligible_snapshot, portfolio_weight_complete
 
 
 ASSET_KINDS = {"QQQ": "equity_etf", "IEF": "treasury_etf", "TLT": "treasury_etf",
@@ -133,7 +133,7 @@ def treasury_profile(doc: dict) -> dict:
             "weighted_duration_years": weighted, "missing_duration_ids": missing,
             "unknown_weight_count": sum(r.get("weight") is None for r in doc["rows"]),
             "known_weight": sum(r["weight"] for r in doc["rows"] if r.get("weight") is not None),
-            "complete": bool(bonds) and not missing and all(r.get("weight") is not None and
+            "complete": bool(bonds) and not missing and portfolio_weight_complete(doc["rows"]) and all(r.get("weight") is not None and
                            r.get("duration_years") is not None for r in doc["rows"]),
             "method": "portfolio-weighted issuer effective durations; linear parallel-shift approximation",
             "causal_status": "not_identified"}

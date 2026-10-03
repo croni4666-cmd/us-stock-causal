@@ -162,3 +162,55 @@ def test_gold_awaited_field_is_missing_not_zero_or_dropped_date():
     doc = parse_spdr(raw)
     assert doc['rows'][0]['nav_1030'] is None
     assert doc['rows'][0]['close'] == 100
+
+
+def test_truncated_portfolio_at_complete_csv_row_is_rejected():
+    raw = bond_bytes(weight='20').split(b'USD,Cash')[0]
+    with pytest.raises(ValueError, match='weight coverage'):
+        parse_ishares(raw, 'TLT')
+
+
+def test_same_equity_identifier_with_different_type_is_duplicate():
+    data = json.loads(qqq_bytes())
+    first = dict(data['holdings'][0], percentageOfTotalNetAssets=50)
+    second = dict(first, securityTypeName='American Depository Receipt')
+    data.update(holdings=[first, second], totalNumberOfHoldings=2)
+    with pytest.raises(ValueError, match='duplicate'):
+        parse_invesco(json.dumps(data).encode())
+
+
+def test_equity_identity_is_normalized_before_duplicate_check():
+    data = json.loads(qqq_bytes())
+    first = dict(data['holdings'][0], cusip='abc', percentageOfTotalNetAssets=50)
+    second = dict(first, cusip=' ABC ', ticker='OTHER')
+    data.update(holdings=[first, second], totalNumberOfHoldings=2)
+    with pytest.raises(ValueError, match='duplicate'):
+        parse_invesco(json.dumps(data).encode())
+
+
+def test_equity_ticker_cannot_silently_price_two_conflicting_securities():
+    data = json.loads(qqq_bytes())
+    first = dict(data['holdings'][0], percentageOfTotalNetAssets=50)
+    second = dict(first, cusip='222')
+    data.update(holdings=[first, second], totalNumberOfHoldings=2)
+    with pytest.raises(ValueError, match='duplicate'):
+        parse_invesco(json.dumps(data).encode())
+
+
+@pytest.mark.parametrize('data', ['[]', 'null', '42', '"broken"'])
+def test_source_metadata_requires_object(data, tmp_path):
+    folder = tmp_path / 'QQQ'
+    folder.mkdir()
+    (folder / 'broken.json').write_text(data, encoding='utf-8')
+    with pytest.raises(ValueError, match='object'):
+        load_sources('QQQ', tmp_path)
+
+
+def test_bad_capture_timestamp_type_is_data_validation_error(tmp_path):
+    raw = qqq_bytes()
+    path = store_source('QQQ', raw, parse_invesco(raw), tmp_path, retrieved_at='2026-10-03T14:00:00+00:00')
+    doc = json.loads(path.read_text(encoding='utf-8'))
+    doc['retrieved_at'] = doc['available_at'] = None
+    path.write_text(json.dumps(doc), encoding='utf-8')
+    with pytest.raises(ValueError, match='timestamp'):
+        load_sources('QQQ', tmp_path)
