@@ -718,6 +718,8 @@ def causal_query(
         raise ValueError("[causal] DAG 有环, 不合法")
     if treatment not in g.nodes or outcome not in g.nodes:
         raise ValueError(f"[causal] treatment={treatment} 或 outcome={outcome} 不在 DAG 里")
+    if not nx.has_path(g, treatment, outcome):
+        raise ValueError(f"[causal] DAG 中 {treatment} 到 {outcome} 不存在有向路径；不能把观察回归标为因果效应")
     if treatment not in data.columns or outcome not in data.columns:
         raise ValueError(f"[causal] data 缺 {treatment} 或 {outcome}")
 
@@ -856,7 +858,10 @@ class CounterfactualResult:
 
 
 def _causal_controls(treatment: str, outcome: str, data: pd.DataFrame, cfg: dict) -> list[str]:
-    adjustment = identify_backdoor_set(load_dag_graph(cfg), treatment, outcome, set(data.columns))
+    graph = load_dag_graph(cfg)
+    if treatment not in graph or outcome not in graph or not nx.has_path(graph, treatment, outcome):
+        raise ValueError(f"[causal] DAG 中 {treatment} 到 {outcome} 不存在有向路径")
+    adjustment = identify_backdoor_set(graph, treatment, outcome, set(data.columns))
     if not adjustment.is_identified:
         raise ValueError(f"Causal effect is unidentifiable: {adjustment.missing_confounders}")
     return adjustment.adjustment_set

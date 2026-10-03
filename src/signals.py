@@ -55,10 +55,10 @@ def _classify_pattern(snap: dict) -> SignalSnapshot:
     avg = snap["avg_forward_return"]
     win = snap["win_rate"]
     n = snap["n_matches"]
-    if win >= 0.7 and avg > 0.005:  # 70%+ win, +0.5%+ avg
+    if win >= 0.7 and avg > 0.5:  # avg is already in percentage points.
         direction = "bullish"
         conf = min(1.0, win * 1.2)
-    elif win <= 0.3 and avg < -0.005:
+    elif win <= 0.3 and avg < -0.5:
         direction = "bearish"
         conf = min(1.0, (1 - win) * 1.2)
     else:
@@ -122,10 +122,10 @@ def _classify_event(as_of: Optional[date | str] = None) -> Optional[SignalSnapsh
     )
 
 
-def aggregate_signals(symbol: str, as_of: Optional[str] = None) -> SignalAggregate:
+def aggregate_signals(symbol: str, as_of: Optional[str] = None, layer: Optional[str] = None) -> SignalAggregate:
     """聚合 3 源信号"""
-    thresholds = get_thresholds(symbol, as_of=as_of)
-    patterns = find_similar_patterns(symbol, pattern_length=20, n_matches=10, forecast_horizon=5, end_date=as_of)
+    thresholds = get_thresholds(symbol, as_of=as_of, layer=layer)
+    patterns = find_similar_patterns(symbol, pattern_length=20, n_matches=10, forecast_horizon=5, end_date=as_of, layer=layer)
 
     sigs = [
         _classify_pattern(patterns),

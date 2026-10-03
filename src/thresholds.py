@@ -24,10 +24,22 @@ from loguru import logger
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CACHE_ROOT = PROJECT_ROOT / "data" / "raw"
+YIELD_SYMBOLS = {"^IRX", "^FVX", "^TNX", "^TYX"}
 
 
 def safe_name(symbol: str) -> str:
     return symbol.replace("^", "_").replace("=", "_").replace(".", "_")
+
+
+def resolve_layer(symbol: str, layer: Optional[str] = None) -> str:
+    """Honor an explicit layer, otherwise locate the asset's actual cached data."""
+    if layer is not None:
+        return layer
+    layers = ("indices", "sectors", "macro", "commodities_futures", "commodities_spot")
+    matches = [name for name in layers if (CACHE_ROOT / name / f"{safe_name(symbol)}.parquet").exists()]
+    if len(matches) > 1:
+        raise ValueError(f"{symbol} 存在多个缓存层 {matches}，请显式指定 layer")
+    return matches[0] if matches else "indices"
 
 
 def load_prices(symbol: str, layer: str) -> pd.DataFrame:
@@ -126,7 +138,7 @@ def compute_52w_range(close: pd.Series, high: pd.Series, low: pd.Series) -> dict
     }
 
 
-def get_thresholds(symbol: str, layer: str = "indices", as_of: Optional[str] = None) -> dict:
+def get_thresholds(symbol: str, layer: Optional[str] = None, as_of: Optional[str] = None) -> dict:
     """
     一次性算出某 ticker 的所有关键阈值
 
@@ -141,7 +153,7 @@ def get_thresholds(symbol: str, layer: str = "indices", as_of: Optional[str] = N
             'range_52w': {'high': 750, 'low': 600, 'current': 725.5, 'position_pct': 83.3, ...}
         }
     """
-    df = load_prices(symbol, layer)
+    df = load_prices(symbol, resolve_layer(symbol, layer))
     if as_of:
         df = df.loc[:as_of]
     close = df["close"]

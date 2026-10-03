@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from src.thresholds import load_prices, safe_name
+from src.thresholds import load_prices, safe_name, resolve_layer
 
 INDEX_SYMBOLS = {"DIA", "QQQ", "RSP", "QQQE"}
 SECTOR_SYMBOLS = {"XLK", "XLF", "XLE", "XLY", "XLP", "XLV", "XLI", "XLU", "XLB", "XLRE", "XLC"}
@@ -40,6 +40,7 @@ def find_similar_patterns(
     n_matches: int = 10,
     forecast_horizon: int = 5,
     end_date: Optional[str] = None,
+    layer: Optional[str] = None,
 ) -> dict:
     """
     找历史最相似的 N 个 pattern windows,看后续收益分布
@@ -65,14 +66,7 @@ def find_similar_patterns(
             'top_matches': [{...}, ...]  # 每个 match 的详情
         }
     """
-    if symbol in INDEX_SYMBOLS:
-        layer = "indices"
-    elif symbol in SECTOR_SYMBOLS:
-        layer = "sectors"
-    else:
-        layer = "macro"
-
-    df = load_prices(symbol, layer)
+    df = load_prices(symbol, resolve_layer(symbol, layer))
     rets = df["close"].pct_change().dropna()
 
     if end_date:
