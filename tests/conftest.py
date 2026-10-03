@@ -92,6 +92,8 @@ def isolated_market(monkeypatch, market_root, request):
             monkeypatch.setattr(module, "DATA_RAW", market_root / "data" / "raw")
         if hasattr(module, "RATE_LIMIT_PATH"):
             monkeypatch.setattr(module, "RATE_LIMIT_PATH", yfinance_rate_limit.RATE_LIMIT_CACHE)
+        if hasattr(module, "VIX_PATH"):
+            monkeypatch.setattr(module, "VIX_PATH", market_root / "data" / "raw" / "macro" / "_VIX.parquet")
     scratch = market_root / "scratch"
     scratch.mkdir(exist_ok=True)
     monkeypatch.setattr(tempfile, "tempdir", str(scratch))
