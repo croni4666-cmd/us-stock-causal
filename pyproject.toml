@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "us-stock-causal"
+version = "0.9.5"
+description = "US Stock Causal Analysis Tool (Pearl-style Causality DAG + Attribution + Thresholds)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "croni4666-cmd", email = "croni4666-cmd@users.noreply.github.com"}
+]
+dependencies = [
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "pyarrow>=14.0.0",
+    "scipy>=1.10.0",
+    "matplotlib>=3.7.0",
+    "plotly>=5.18.0",
+    "causal-learn>=0.1.4.8",
+    "dowhy>=0.11",
+    "econml>=0.15.0",
+    "statsmodels>=0.14.0",
+    "networkx>=3.0",
+    "pydot>=3.0.0",
+    "edgar-parser>=0.3.1",
+    "rapidfuzz>=3.0",
+    "requests>=2.31.0",
+    "tenacity>=8.0.0",
+    "yfinance>=0.2.40",
+    "pyyaml>=6.0",
+    "loguru>=0.7.0",
+    "python-dotenv>=1.0.0",
+    "markdown>=3.4.0",
+    "plyer>=2.1.0",
+    "openbb[ta]>=4.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "tools*"]

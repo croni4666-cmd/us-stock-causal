@@ -21,14 +21,15 @@ pandas-ta>=0.4.0
 
 # Causal analysis (Pearl-style, Phase 9)
 causal-learn>=0.1.4.8
-dowhy>=0.14
+dowhy>=0.11
+econml>=0.15.0
 
 # Stats / graph
 statsmodels>=0.14.0
 networkx>=3.0
 pydot>=4.0.0
 
-# SEC EDGAR (mavis sec-filings-fetch skill, R2 license)
+# SEC EDGAR
 edgar-parser>=0.3.1
 rapidfuzz>=3.0
 
@@ -41,6 +42,8 @@ yfinance>=0.2.40
 pyyaml>=6.0
 loguru>=0.7.0
 python-dotenv>=1.0.0
+markdown>=3.4.0
+plyer>=2.1.0
 
 # Dev / test (optional)
 pytest>=7.0.0

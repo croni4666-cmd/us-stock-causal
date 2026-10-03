@@ -61,6 +61,7 @@ def _format_value(symbol_label: str, value: float, decimals: int = 2) -> str:
 def macro_snapshot(
     macro_tickers: Optional[list[tuple[str, str, str]]] = None,
     lookback_days: int = 1,
+    as_of: Optional[str] = None,
 ) -> str:
     """
     顶部情绪 1 行: VIX / 10Y / DXY (v0.6.8 P6-4: 支持 lookback_days)
@@ -71,6 +72,7 @@ def macro_snapshot(
     Args:
         macro_tickers: 3 元组 (ticker, label, kind) 列表
         lookback_days: 1 (1 日变化) / 5 (5 日累计) / 20 (20 日累计)
+        as_of: 截止日期 (YYYY-MM-DD), 默认最新可用日
 
     Returns:
         1 行字符串 (~80 字符)
@@ -82,6 +84,8 @@ def macro_snapshot(
     for ticker, label, kind in macro_tickers:
         try:
             df = load_prices(ticker, "macro")
+            if as_of:
+                df = df.loc[:as_of]
             # need at least lookback_days+1 rows to compute change
             if len(df) < lookback_days + 1:
                 parts.append(f"{label} N/A")
@@ -106,7 +110,11 @@ def macro_snapshot(
     return " | ".join(parts)
 
 
-def indices_1line(symbols: Optional[list[str]] = None, lookback_days: int = 1) -> str:
+def indices_1line(
+    symbols: Optional[list[str]] = None,
+    lookback_days: int = 1,
+    as_of: Optional[str] = None,
+) -> str:
     """
     4 指数 1 日 1 行
 
@@ -116,6 +124,7 @@ def indices_1line(symbols: Optional[list[str]] = None, lookback_days: int = 1) -
     Args:
         symbols: 默认 ["DIA", "QQQ", "RSP", "QQQE"]
         lookback_days: 1 (1 日) / 5 (5 日累计)
+        as_of: 截止日期 (YYYY-MM-DD), 默认最新可用日
     """
     if symbols is None:
         symbols = ["DIA", "QQQ", "RSP", "QQQE"]
@@ -124,6 +133,8 @@ def indices_1line(symbols: Optional[list[str]] = None, lookback_days: int = 1) -
     for sym in symbols:
         try:
             df = load_prices(sym, "indices")
+            if as_of:
+                df = df.loc[:as_of]
             rets = df["close"].pct_change()
             if lookback_days == 1:
                 chg = float(rets.iloc[-1])
@@ -145,6 +156,7 @@ def topline(
     macro: Optional[str] = None,
     indices: Optional[str] = None,
     horizons: tuple[int, ...] = (1, 5, 20),
+    as_of: Optional[str] = None,
 ) -> str:
     """
     顶部 1 行 → 顶部 N 行 (Phase 6 P6-4, v0.6.8)
@@ -162,6 +174,7 @@ def topline(
         indices: 预生成 indices 字符串 (单行模式生效, 多行模式忽略)
         horizons: 时间窗元组, 默认 (1, 5, 20) 短期/中期/长期
                   传 () 或 (1,) 走单行模式 (向后兼容 v0.4.1)
+        as_of: 截止日期 (YYYY-MM-DD), 默认最新可用日
 
     Returns:
         单行 (旧): `**🌡️ 顶部情绪**: ... \n\n**📈 4 指数 1 日**: ...`
@@ -176,16 +189,16 @@ def topline(
         # 单行模式 (向后兼容)
         h = horizons[0] if horizons else 1
         if macro is None:
-            macro = macro_snapshot(lookback_days=h)
+            macro = macro_snapshot(lookback_days=h, as_of=as_of)
         if indices is None:
-            indices = indices_1line(lookback_days=h)
+            indices = indices_1line(lookback_days=h, as_of=as_of)
         return f"**🌡️ 顶部情绪**: {macro}\n\n**📈 4 指数 {h} 日**: {indices}\n"
 
     # 多行模式 (P6-4 v0.6.8 新)
     lines = [f"**🌡️ 顶部情绪** ({' / '.join(f'{h}d' for h in horizons)} 累计, 短期/中期/长期):"]
     for h in horizons:
-        macro_str = macro_snapshot(lookback_days=h)
-        indices_str = indices_1line(lookback_days=h)
+        macro_str = macro_snapshot(lookback_days=h, as_of=as_of)
+        indices_str = indices_1line(lookback_days=h, as_of=as_of)
         lines.append(f"- **{h}d**: {macro_str}  ||  {indices_str}")
     return "\n".join(lines) + "\n"
 

@@ -90,13 +90,17 @@ def find_similar_patterns(
     current_std = current.std() + 1e-9
     current_norm = (current - current_mean) / current_std
 
-    # 滑动窗口匹配
+    # 滑动窗口匹配: 严格保证候选窗口与其前向窗口在当前 pattern 之前结束 (防止前瞻偏差与自重叠)
+    # current 开始于 n - pattern_length
+    # 候选窗口 forward 结束于 s + pattern_length + forecast_horizon
+    # 因此必须满足 s + pattern_length + forecast_horizon <= n - pattern_length
     n = len(rets)
+    max_s = n - 2 * pattern_length - forecast_horizon
+    if max_s < 0:
+        raise ValueError(f"{symbol} 数据长度不足以进行无重叠历史形态匹配 (需要至少 {2 * pattern_length + forecast_horizon} 行)")
+
     candidates = []
-    for s in range(0, n - pattern_length - forecast_horizon):
-        # 跳过包含当前 pattern 的窗口
-        if s >= n - pattern_length:
-            continue
+    for s in range(0, max_s + 1):
         window = rets.iloc[s:s+pattern_length].values
         w_mean = window.mean()
         w_std = window.std() + 1e-9
@@ -105,21 +109,48 @@ def find_similar_patterns(
         corr = float(np.corrcoef(current_norm, w_norm)[0, 1])
         if np.isnan(corr):
             continue
-        # 后续 forecast_horizon 天收益
+        # 后续 forecast_horizon 天收益 (严格在 current 之前)
         forward = rets.iloc[s+pattern_length:s+pattern_length+forecast_horizon].values
         if len(forward) < forecast_horizon:
             continue
         forward_cum = float((1 + pd.Series(forward)).prod() - 1)
         candidates.append({
+            "_s_idx": s,
             "start_date": str(rets.index[s].date()),
             "end_date": str(rets.index[s+pattern_length-1].date()),
             "correlation": round(corr, 4),
             "forward_return": round(forward_cum * 100, 3),
         })
 
-    # 按相关排序
+    # 按相关排序并进行区间去重 (避免连续 1 日平移的同一行情段反复计票)
     candidates.sort(key=lambda x: -x["correlation"])
-    top = candidates[:n_matches]
+    top = []
+    selected_s = []
+    for c in candidates:
+        s_idx = c["_s_idx"]
+        if not any(abs(s_idx - sel) < pattern_length // 2 for sel in selected_s):
+            top.append({
+                "start_date": c["start_date"],
+                "end_date": c["end_date"],
+                "correlation": c["correlation"],
+                "forward_return": c["forward_return"],
+            })
+            selected_s.append(s_idx)
+            if len(top) >= n_matches:
+                break
+
+    if len(top) < n_matches:
+        for c in candidates:
+            clean_item = {
+                "start_date": c["start_date"],
+                "end_date": c["end_date"],
+                "correlation": c["correlation"],
+                "forward_return": c["forward_return"],
+            }
+            if clean_item not in top:
+                top.append(clean_item)
+            if len(top) >= n_matches:
+                break
 
     if not top:
         raise ValueError(f"{symbol} 找不到任何 pattern (数据可能太短)")

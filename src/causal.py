@@ -176,31 +176,34 @@ def discover_dag_pc(
             node_names=list(data.columns), show_progress=False)
 
     # 解析 causallearn GeneralGraph 到 networkx DiGraph
-    # causallearn adjacency matrix convention (从 GeneralGraph docstring + 实测):
-    #   graph[i,j] =  1, graph[j,i] = -1 → directed i → j (1=tail, -1=head)
-    #   graph[i,j] = -1, graph[j,i] = -1 → undirected i -- j
-    #   graph[i,j] =  0, graph[j,i] =  0 → 无边
+    # causallearn convention (Endpoint.TAIL=-1, Endpoint.ARROW=1):
+    #   cg.G.graph[i, j] 是边在节点 i 处的端点类型
+    #   graph[i, j] = -1, graph[j, i] =  1 → directed i → j (tail at i, arrow at j)
+    #   graph[i, j] =  1, graph[j, i] = -1 → directed j → i (arrow at i, tail at j)
+    #   graph[i, j] = -1, graph[j, i] = -1 → undirected i -- j (CPDAG 未定向骨架)
+    #   graph[i, j] =  0, graph[j, i] =  0 → 无边
     n = cg.G.get_num_nodes()
     node_names = list(data.columns)
 
     g = nx.DiGraph()
     g.add_nodes_from(node_names)
+    undirected_edges = []
 
     for i in range(n):
-        for j in range(n):
-            if i == j:
-                continue
+        for j in range(i + 1, n):
             a_ij = cg.G.graph[i, j]
             a_ji = cg.G.graph[j, i]
-            if a_ij == 1 and a_ji == -1:
+            if a_ij == -1 and a_ji == 1:
                 # directed i → j
                 g.add_edge(node_names[i], node_names[j])
-            elif a_ij == -1 and a_ji == -1 and i < j:
-                # undirected i -- j, 选字母序方向 (确定性, 便于 cache/diff)
-                if node_names[i] < node_names[j]:
-                    g.add_edge(node_names[i], node_names[j])
-                else:
-                    g.add_edge(node_names[j], node_names[i])
+            elif a_ij == 1 and a_ji == -1:
+                # directed j → i
+                g.add_edge(node_names[j], node_names[i])
+            elif a_ij == -1 and a_ji == -1:
+                # undirected i -- j: CPDAG 未定向边，保留为未定向骨架，不强编造因果方向
+                undirected_edges.append((node_names[i], node_names[j]))
+
+    g.graph["undirected_edges"] = undirected_edges
 
     # v0.8.0: 写 PC cache (date-based, 同一天 re-run 0s)
     _PC_CACHE[cache_key] = g
@@ -222,29 +225,38 @@ def compare_dags(
           - 'overlap': 两边都有的有向边 (强因果证据)
           - 'manual_only': 手工有 PC 没有 (理论画了, 数据不显著 → 可能是 manual 高估)
           - 'pc_only': PC 有手工没有 (数据有, 理论没画 → 可能是被忽略的因果或同期相关)
+          - 'skeleton_overlap': 无视方向的骨架重叠边
+          - 'undirected_pc': PC 算法中未定向的边 (CPDAG 骨架)
           - 'summary': 文字摘要, 含重叠率
     """
     manual_edges = set(manual_dag.edges())
-    pc_edges = set(pc_dag.edges())
+    pc_directed = set(pc_dag.edges())
+    pc_undirected = set(pc_dag.graph.get("undirected_edges", []))
 
-    overlap = manual_edges & pc_edges
-    manual_only = manual_edges - pc_edges
-    pc_only = pc_edges - manual_edges
+    overlap = manual_edges & pc_directed
+    manual_only = manual_edges - pc_directed
+    pc_only = pc_directed - manual_edges
+
+    manual_skeleton = {tuple(sorted(e)) for e in manual_edges}
+    pc_skeleton = {tuple(sorted(e)) for e in pc_directed} | {tuple(sorted(e)) for e in pc_undirected}
+    skeleton_overlap = manual_skeleton & pc_skeleton
 
     total = len(overlap) + len(manual_only) + len(pc_only)
     overlap_rate = len(overlap) / total if total > 0 else 0
+    skel_rate = len(skeleton_overlap) / len(manual_skeleton) if manual_skeleton else 0
 
     summary = (
-        f"Manual DAG: {len(manual_edges)} edges, PC DAG: {len(pc_edges)} edges. "
-        f"Overlap: {len(overlap)} ({overlap_rate*100:.0f}%). "
-        f"Manual only: {len(manual_only)} (理论画了数据不支持). "
-        f"PC only: {len(pc_only)} (数据有理论没画)."
+        f"Manual DAG: {len(manual_edges)} edges, PC DAG: {len(pc_directed)} directed, {len(pc_undirected)} undirected. "
+        f"Directed overlap: {len(overlap)} ({overlap_rate*100:.0f}%). "
+        f"Skeleton overlap: {len(skeleton_overlap)}/{len(manual_skeleton)} ({skel_rate*100:.0f}%)."
     )
 
     return {
         "overlap": sorted(overlap),
         "manual_only": sorted(manual_only),
         "pc_only": sorted(pc_only),
+        "skeleton_overlap": sorted(skeleton_overlap),
+        "undirected_pc": sorted(pc_undirected),
         "summary": summary,
     }
 
@@ -339,6 +351,73 @@ class CausalEffect:
         return asdict(self)
 
 
+def _compute_data_hash(df: pd.DataFrame | None) -> int:
+    """计算 DataFrame 的确定性指纹 (包含行数、列名、索引首尾与数值样本哈希)."""
+    if df is None or len(df) == 0:
+        return 0
+    meta = (len(df), tuple(df.columns), str(df.index[0]), str(df.index[-1]))
+    vals_sum = float(np.nansum(df.values))
+    return hash((meta, round(vals_sum, 5)))
+
+
+def identify_backdoor_set(
+    g: "nx.DiGraph",  # type: ignore[name-defined]
+    treatment: str,
+    outcome: str,
+    available_columns: set[str] | None = None,
+) -> list[str]:
+    """根据 Pearl Backdoor 准则从 DAG 识别混杂调整集.
+
+    Backdoor 准则 (Pearl 2009, Def 3.3.1):
+    集合 Z 满足后门准则当且仅当:
+    1. Z 中没有任何节点是 Treatment 的后代 (避免控制中介或对撞偏差);
+    2. 在去除所有从 Treatment 发出的有向边后的图 G_{\bar{T}} 中, Z 阻断了 Treatment 和 Outcome 之间的所有后门路径 (即在 G_{\bar{T}} 中 d-分离 Treatment 与 Outcome).
+
+    注意: 若在 G_{\bar{T}} 中空集已实现 d-分离 (即无未阻断的后门路径), 则调整集为空集 (避免因控制工具变量/无混杂前置变量引入 Z-bias 或严重共线性).
+    """
+    if g is None or treatment not in g or outcome not in g:
+        return []
+
+    try:
+        from networkx.algorithms.d_separation import is_d_separator
+    except ImportError:
+        is_d_separator = None
+
+    g_bar_t = g.copy()
+    g_bar_t.remove_edges_from(list(g.out_edges(treatment)))
+
+    # 若空集已在 G_{\bar{T}} 中 d-分离 T 与 Y, 无需混杂控制
+    if is_d_separator is not None:
+        try:
+            if is_d_separator(g_bar_t, {treatment}, {outcome}, set()):
+                return []
+        except Exception:
+            pass
+
+    descendants = nx.descendants(g, treatment) if treatment in g else set()
+    parents = set(g.predecessors(treatment)) - {outcome} - descendants
+    if available_columns is not None:
+        parents = parents.intersection(available_columns)
+
+    # 仅保留在 G_{\bar{T}} 中与 outcome 连通的真正混杂候选
+    valid_controls = set()
+    for p in parents:
+        try:
+            if nx.has_path(g_bar_t.to_undirected(), p, outcome):
+                valid_controls.add(p)
+        except Exception:
+            valid_controls.add(p)
+
+    if is_d_separator is not None and valid_controls:
+        try:
+            if is_d_separator(g_bar_t, {treatment}, {outcome}, valid_controls):
+                return sorted(list(valid_controls))
+        except Exception:
+            pass
+
+    return sorted(list(parents))
+
+
 # v0.6.9l: P9-1.5.5 升级 — statsmodels OLS 路径 (替代 DoWhy refutation, 5-10x 更快)
 # DoWhy refutation 跑 N 次 full causal model (~10s/重, 21 节点 175s)
 # statsmodels OLS refutation: 用 OLS 重算 ATE (5-50ms/重, 21 节点 < 5s 总)
@@ -353,14 +432,10 @@ def _refute_with_ols(
     g: "nx.DiGraph",  # type: ignore[name-defined]
     original_ate: float,
     n_refutations: int,
+    controls: list[str] | None = None,
     rng_seed: int = 42,
 ) -> dict:
-    """v0.6.9l (P9-1.5.5 升级): statsmodels OLS 路径替代 DoWhy refutation.
-
-    实测 21 节点 135 边: ~50ms 总 (vs DoWhy 175s, 3500x 加速)
-    跟 DoWhy 3 重一一对应 (random_common_cause / placebo / data_subset)
-    用 OLS 简单回归重算 ATE, 不跑 full causal model
-    """
+    """v0.6.9l (P9-1.5.5 升级): statsmodels OLS 路径替代 DoWhy refutation (支持 controls 调整)."""
     import statsmodels.api as sm
     import numpy as np
     rng = np.random.default_rng(rng_seed)
@@ -372,27 +447,31 @@ def _refute_with_ols(
     refuter_names = refuter_priority.get(n_refutations, refuter_priority[3])
     result = {}
 
+    ctrl_cols = [c for c in (controls or []) if c in data.columns and c != treatment and c != outcome]
+    reg_cols = [treatment] + ctrl_cols
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for refuter_name in refuter_names:
             try:
                 if refuter_name == "random_common_cause":
                     # 加 unobserved confounder noise (Gaussian N(0, σ)) 跟 T/Y 都相关
-                    # 重算 OLS (T, confounder) → Y
                     confounder = rng.standard_normal(len(data)) * 0.5
-                    X = sm.add_constant(data[[treatment]].assign(confounder=confounder))
+                    X = sm.add_constant(data[reg_cols].assign(confounder=confounder))
                     ols_res = sm.OLS(data[outcome], X).fit()
                     new_ate = float(ols_res.params[treatment])
                 elif refuter_name == "placebo_treatment_refuter":
                     # 把 treatment 随机化 (shuffle) → ATE 应 ≈ 0
                     placebo_t = rng.permutation(data[treatment].values)
-                    X = sm.add_constant(pd.Series(placebo_t, index=data.index, name=treatment))
+                    df_placebo = data[ctrl_cols].copy() if ctrl_cols else pd.DataFrame(index=data.index)
+                    df_placebo[treatment] = placebo_t
+                    X = sm.add_constant(df_placebo[reg_cols])
                     ols_res = sm.OLS(data[outcome], X).fit()
                     new_ate = float(ols_res.params[treatment])
                 elif refuter_name == "data_subset_refuter":
                     # 80% sub-sample → ATE 应跟原 ATE 接近
                     subset = data.sample(frac=0.8, random_state=rng_seed)
-                    X = sm.add_constant(subset[[treatment]])
+                    X = sm.add_constant(subset[reg_cols])
                     ols_res = sm.OLS(subset[outcome], X).fit()
                     new_ate = float(ols_res.params[treatment])
                 else:
@@ -423,7 +502,7 @@ def _get_refutation_cached(
     if n_refutations == 0:
         # v0.6.9k: 大 DAG auto-fallback 0 重, 跳过 refutation
         return {}
-    key = (treatment, outcome, len(data), n_refutations)
+    key = (treatment, outcome, _compute_data_hash(data), n_refutations)
     if key in _REFUTE_CACHE:
         logger.debug(f"[causal] refutation cache hit T={treatment} O={outcome} (n_refutations={n_refutations}, cache size={len(_REFUTE_CACHE)})")
         return _REFUTE_CACHE[key]
@@ -526,9 +605,9 @@ def causal_query(
 
     # v0.9.5 RC1 prep (P10-1 性能优化): function-level _QUERY_CACHE
     # 缓存整次查询结果 (ATE + refutation + estimand), 跨调用复用
-    # 1st call ~0.94s (OLS + DoWhy build), 2nd call < 5ms
-    # key = (treatment, outcome, n_refutations, refute_method, len(data))
-    _qk = (treatment, outcome, n_refutations, refute_method, len(data))
+    # 使用包含数据与维度的确定性指纹作为 cache key，避免同长度数据误命中
+    data_hash = _compute_data_hash(data)
+    _qk = (treatment, outcome, n_refutations, refute_method, data_hash)
     if _qk in _QUERY_CACHE:
         logger.debug(f"[causal] causal_query cache hit T={treatment} O={outcome} (cache size={len(_QUERY_CACHE)})")
         return _QUERY_CACHE[_qk]
@@ -560,9 +639,11 @@ def causal_query(
         )
         n_refutations = 0
 
-    # Step 1+2: OLS (快, 0.001s) + Step 3: refutation (P9-1.5.5 加 cache)
+    # Step 1+2: 后门混杂调整回归 (Pearl Backdoor Adjustment)
+    adjustment_set = identify_backdoor_set(g, treatment, outcome, set(data.columns))
     import statsmodels.api as sm
-    X = sm.add_constant(data[[treatment]])
+    reg_cols = [treatment] + adjustment_set
+    X = sm.add_constant(data[reg_cols])
     y = data[outcome]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -572,14 +653,18 @@ def causal_query(
     std_err = float(ols_result.bse[treatment])
 
     # Refutation
-    estimand_str = ""
+    if adjustment_set:
+        estimand_str = f"Pearl L2 Backdoor Adjustment (controlled: {adjustment_set})"
+    else:
+        estimand_str = "Pearl L2 (No backdoor confounders identified in DAG)"
     refutation_results = {}
     if n_refutations > 0:
         if refute_method == "ols":
-            # v0.6.9l: OLS 路径, 21 节点 3 重 < 200ms, 保留 1 重 / 3 重 refutation 验证
-            # 完全跳过 DoWhy (不需 identify estimand_str, 节省 1.4s build time)
-            refutation_results = _refute_with_ols(treatment, outcome, data, g, ate, n_refutations)
-            estimand_str = f"Pearl L2 (OLS refutation, {n_refutations} 重)"
+            # v0.6.9l: OLS 路径, 保留 controls 调整
+            refutation_results = _refute_with_ols(
+                treatment, outcome, data, g, ate, n_refutations, controls=adjustment_set
+            )
+            estimand_str += f"; OLS refutation ({n_refutations} 重)"
         else:
             # DoWhy 路径 (跟 v0.6.9f 一致, cache)
             from dowhy import CausalModel
@@ -591,12 +676,15 @@ def causal_query(
             estimand_str = str(identified)
             refutation_results = _get_refutation_cached(treatment, outcome, data, g, n_refutations)
 
-    # 人类可读解读
+    # 人类可读解读: 严谨区分回归斜率与 1% 扰动响应
     direction = "↑" if ate > 0 else "↓"
     sig = "显著" if p_value < 0.05 else "不显著"
+    ctrl_info = f", 控制后门混杂: {adjustment_set}" if adjustment_set else ""
+    delta_log_y = ate * 0.01
+    pct_y = ate * 1.0  # +1% treatment shock 引起的 outcome 百分比变化
     interpretation = (
-        f"{treatment} 上升 1 单位 (~1% log return), {outcome} 预期{direction} {abs(ate):.4f} "
-        f"(~{abs(ate)*100:.2f}%); p={p_value:.3f} ({sig}); "
+        f"{treatment} 变动 +1% (log return +0.01), {outcome} 预期{direction} {abs(delta_log_y):.4f} "
+        f"({pct_y:+.2f}%, p={p_value:.3f} {sig}{ctrl_info}); "
         f"基于 {len(data)} 个交易日, std_err={std_err:.4f}"
     )
 
@@ -649,9 +737,9 @@ def _get_cfdml_cached(
     n_obs 进 key 是因为数据窗口 (start/end) 变化时 fit 必然不同.
     n_estimators 固定 100 (P9-1.5 决策: cache 已经够用, 不要再调参; subforest_size=4 要求 n_estimators 能被 4 整除, 50/52 等会报错).
     """
-    key = (treatment, outcome, tuple(controls), len(data))
+    key = (treatment, outcome, tuple(sorted(controls)), _compute_data_hash(data))
     if key in _FIT_CACHE:
-        logger.debug(f"[causal] CausalForestDML cache hit T={treatment} O={outcome} n={len(data)} (cache size={len(_FIT_CACHE)})")
+        logger.debug(f"[causal] CausalForestDML cache hit T={treatment} O={outcome} (cache size={len(_FIT_CACHE)})")
         return _FIT_CACHE[key]
 
     from econml.dml import CausalForestDML
@@ -683,7 +771,7 @@ def _get_scm_cached(
     第一次 build + fit ~5ms, 重复 query < 0.001s lookup.
     key = (n_nodes, n_edges, n_obs) — 当 DAG 变化或数据窗口变化时 invalidate.
     """
-    key = (g.number_of_nodes(), g.number_of_edges(), len(data), tuple(sorted(g.nodes())))
+    key = (tuple(sorted(g.nodes())), tuple(sorted(g.edges())), _compute_data_hash(data))
     if key in _SCM_CACHE:
         logger.debug(f"[causal] SCM cache hit (cache size={len(_SCM_CACHE)})")
         return _SCM_CACHE[key]
@@ -910,8 +998,8 @@ def cate_heterogeneity(
 
     # v0.9.5 RC1 prep (P10-1 性能优化): function-level _CATE_CACHE
     # 缓存整次异质性结果, 跨调用复用 (1st ~1.7s, 2nd < 5ms)
-    # key = (treatment, outcome, heterogeneity_var, n_quantiles, n_obs)
-    _ck = (treatment, outcome, heterogeneity_var, n_quantiles, len(data))
+    # key = (treatment, outcome, heterogeneity_var, n_quantiles, data_hash)
+    _ck = (treatment, outcome, heterogeneity_var, n_quantiles, _compute_data_hash(data))
     if _ck in _CATE_CACHE:
         logger.debug(f"[causal] cate_heterogeneity cache hit T={treatment} O={outcome} H={heterogeneity_var} (cache size={len(_CATE_CACHE)})")
         return _CATE_CACHE[_ck]

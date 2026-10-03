@@ -126,7 +126,7 @@ def compute_52w_range(close: pd.Series, high: pd.Series, low: pd.Series) -> dict
     }
 
 
-def get_thresholds(symbol: str, layer: str = "indices") -> dict:
+def get_thresholds(symbol: str, layer: str = "indices", as_of: Optional[str] = None) -> dict:
     """
     一次性算出某 ticker 的所有关键阈值
 
@@ -142,6 +142,8 @@ def get_thresholds(symbol: str, layer: str = "indices") -> dict:
         }
     """
     df = load_prices(symbol, layer)
+    if as_of:
+        df = df.loc[:as_of]
     close = df["close"]
     high = df["high"]
     low = df["low"]

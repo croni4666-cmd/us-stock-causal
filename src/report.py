@@ -38,9 +38,11 @@ from src.signals import aggregate_signals
 from src.macro import topline as macro_topline, macro_snapshot, indices_1line
 
 
-def _segment_1_market(symbol: str, layer: str, lookback_days: int) -> str:
+def _segment_1_market(symbol: str, layer: str, lookback_days: int, as_of: Optional[str] = None) -> str:
     """① 5 日行情"""
     df = load_prices(symbol, layer)
+    if as_of:
+        df = df.loc[:as_of]
     rets = compute_returns(df["close"], method="simple")
     daily = rets.iloc[-lookback_days:]
 
@@ -57,9 +59,9 @@ def _segment_1_market(symbol: str, layer: str, lookback_days: int) -> str:
     )
 
 
-def _segment_2_attribution(symbol: str, lookback_days: int) -> str:
+def _segment_2_attribution(symbol: str, lookback_days: int, as_of: Optional[str] = None) -> str:
     """② 5 日归因"""
-    r = attribute_index(symbol, lookback_days=lookback_days)
+    r = attribute_index(symbol, date=as_of, lookback_days=lookback_days)
     # top 3 贡献(按绝对值)
     contribs = sorted(
         r["sector_contributions_pct"].items(),
@@ -78,9 +80,9 @@ def _segment_2_attribution(symbol: str, lookback_days: int) -> str:
     )
 
 
-def _segment_3_thresholds(symbol: str, layer: str) -> str:
+def _segment_3_thresholds(symbol: str, layer: str, as_of: Optional[str] = None) -> str:
     """③ 关键阈值"""
-    t = get_thresholds(symbol)
+    t = get_thresholds(symbol, layer=layer, as_of=as_of)
     s200 = t["vs_sma"]["sma_200"]
     s200_str = f"200 SMA {s200['position']} {s200['pct']:+.2f}%"
     pos52w = t["range_52w"]["position_pct"]
@@ -92,9 +94,9 @@ def _segment_3_thresholds(symbol: str, layer: str) -> str:
     )
 
 
-def _segment_4_patterns(symbol: str, layer: str) -> str:
+def _segment_4_patterns(symbol: str, layer: str, as_of: Optional[str] = None) -> str:
     """④ 历史相似"""
-    p = find_similar_patterns(symbol, pattern_length=20, n_matches=10, forecast_horizon=5)
+    p = find_similar_patterns(symbol, pattern_length=20, n_matches=10, forecast_horizon=5, end_date=as_of)
     return (
         f"20d pattern 相似 top {p['n_matches']}, "
         f"5d fwd avg {p['avg_forward_return']:+.2f}% / "
@@ -103,9 +105,9 @@ def _segment_4_patterns(symbol: str, layer: str) -> str:
     )
 
 
-def _segment_5_risk(symbol: str) -> str:
+def _segment_5_risk(symbol: str, as_of: Optional[str] = None) -> str:
     """⑤ 风险"""
-    agg = aggregate_signals(symbol)
+    agg = aggregate_signals(symbol, as_of=as_of)
     warnings = []
 
     # 信号矛盾
@@ -123,7 +125,7 @@ def _segment_5_risk(symbol: str) -> str:
             warnings.append(f"{ne.days_until}d 后 {ne.kind}")
 
     # 距离超买
-    t = get_thresholds(symbol)
+    t = get_thresholds(symbol, as_of=as_of)
     s200_pct = t["vs_sma"]["sma_200"]["pct"]
     if s200_pct > 12:
         warnings.append(f"200 SMA {s200_pct:+.1f}% 距超买较近")
@@ -131,17 +133,23 @@ def _segment_5_risk(symbol: str) -> str:
     return "; ".join(warnings) if warnings else "近期无重大风险"
 
 
-def five_segment_report(symbol: str, layer: str = "indices", lookback_days: int = 5) -> dict:
+def five_segment_report(
+    symbol: str,
+    layer: str = "indices",
+    lookback_days: int = 5,
+    as_of: Optional[str] = None,
+) -> dict:
     """生成 5 段制报告"""
+    report_date = as_of or str(date.today())
     return {
         "symbol": symbol,
-        "as_of": str(date.today()),
+        "as_of": report_date,
         "lookback_days": lookback_days,
-        "segment_1_market": _segment_1_market(symbol, layer, lookback_days),
-        "segment_2_attribution": _segment_2_attribution(symbol, lookback_days),
-        "segment_3_thresholds": _segment_3_thresholds(symbol, layer),
-        "segment_4_patterns": _segment_4_patterns(symbol, layer),
-        "segment_5_risk": _segment_5_risk(symbol),
+        "segment_1_market": _segment_1_market(symbol, layer, lookback_days, as_of=as_of),
+        "segment_2_attribution": _segment_2_attribution(symbol, lookback_days, as_of=as_of),
+        "segment_3_thresholds": _segment_3_thresholds(symbol, layer, as_of=as_of),
+        "segment_4_patterns": _segment_4_patterns(symbol, layer, as_of=as_of),
+        "segment_5_risk": _segment_5_risk(symbol, as_of=as_of),
     }
 
 
@@ -167,10 +175,14 @@ def render_markdown(report: dict) -> str:
 _REPORT_CACHE: dict[tuple, str] = {}
 
 
-def render_full_report(symbols: list[str], layer: str = "indices") -> str:
+def render_full_report(
+    symbols: list[str],
+    layer: str = "indices",
+    as_of: Optional[str] = None,
+) -> str:
     """渲染 4 指数完整 5 段制报告 + 因果机制段 (Phase 9)
 
-    v0.7.5 (P9-1.5.5 升级): date-based LRU cache (key = today + tuple(symbols) + layer)
+    v0.7.5 (P9-1.5.5 升级): date-based LRU cache (key = as_of + tuple(symbols) + layer)
     - 同一天同 process 多次跑 → cache hit < 0.05s
     - 跨 process 不共享 (daily cron 1 process 1 run, 不影响)
     - 隔天 cache miss (date key 变)
@@ -180,26 +192,26 @@ def render_full_report(symbols: list[str], layer: str = "indices") -> str:
     - ThreadPoolExecutor(4) 并发: ~0.3s 总 (节省 0.7s)
     - 单进程 daily report 实测从 12.9s → 8.4s
     """
-    today = date.today()
-    cache_key = (today, tuple(symbols), layer)
+    report_date = as_of or str(date.today())
+    cache_key = (report_date, tuple(symbols), layer)
     if cache_key in _REPORT_CACHE:
         logger.debug(f"[report] render_full_report cache hit ({cache_key})")
         return _REPORT_CACHE[cache_key]
 
     lines = [
-        f"# 📊 美股每日分析报告 (5 段制) — {today}",
+        f"# 📊 美股每日分析报告 (5 段制) — {report_date}",
         f"\n**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"**模型**: Phase 2 全套 + Phase 3 顶部情绪 + Phase 9 Pearl 因果",
         f"**字数**: 每标的 ~600 字,5 段结构 (行情 / 归因 / 阈值 / 相似 / 风险) + 1 段因果机制",
         f"\n---\n",
     ]
     # 顶部情绪 1 行 (Phase 3.2 P3-3)
-    lines.append(macro_topline())
+    lines.append(macro_topline(as_of=as_of))
     lines.append("\n---\n")
     # 因果机制 1 段 (Phase 9.0, v0.6.9+)
     # 默认 include_l3=False (L3 CausalForestDML 慢 ~30s, daily report 怕超 cron timeout)
     # Phase 9.1.5 优化 CausalForestDML 性能 + 加缓存后可改回 True
-    causal_section = render_causal_section(include_l3=False)
+    causal_section = render_causal_section(include_l3=False, as_of=as_of)
     if causal_section:
         lines.append(causal_section)
         lines.append("\n---\n")
@@ -212,7 +224,7 @@ def render_full_report(symbols: list[str], layer: str = "indices") -> str:
     sym_reports = {}
     with ThreadPoolExecutor(max_workers=min(len(symbols), 4)) as executor:
         future_to_sym = {
-            executor.submit(five_segment_report, sym, layer): sym
+            executor.submit(five_segment_report, sym, layer, as_of=as_of): sym
             for sym in symbols
         }
         for future in future_to_sym:
@@ -234,7 +246,7 @@ def render_full_report(symbols: list[str], layer: str = "indices") -> str:
     return result
 
 
-def render_causal_section(include_l3: bool = False) -> str:
+def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None) -> str:
     """v0.6.9 (P9.1.6) 渲染 Pearl-style 因果机制段
 
     Pearl 3 层因果阶梯 (L1 关联 = Phase 2 attribution 已写在每段报告里):
@@ -246,6 +258,7 @@ def render_causal_section(include_l3: bool = False) -> str:
 
     Args:
         include_l3: 是否含 L3 反事实 (慢, 约 30s CausalForestDML fit)
+        as_of: 截止日期 (YYYY-MM-DD), 默认最新可用日
 
     Returns:
         Markdown 字符串 (~200-300 字), 失败时返回 ""
@@ -258,7 +271,7 @@ def render_causal_section(include_l3: bool = False) -> str:
 
     cfg = causal_mod.load_dag_config()
     try:
-        data = causal_mod.load_dag_data(cfg=cfg)
+        data = causal_mod.load_dag_data(end=as_of, cfg=cfg)
     except FileNotFoundError as e:
         logger.warning(f"[causal section] 缺 parquet: {e}")
         return ""
@@ -276,12 +289,26 @@ def render_causal_section(include_l3: bool = False) -> str:
             )
             direction = "↑" if eff.estimate > 0 else "↓"
             sig = "显著" if eff.p_value < 0.05 else "不显著"
-            refute_pass = sum(1 for v in eff.refutation.values() if "new_effect" in v)
+            delta_log_y = eff.estimate * 0.01
+            pct_y = eff.estimate * 1.0  # percentage points change for +1% treatment shock
+            n_executed = len(eff.refutation)
+            n_passed = 0
+            for rname, rres in eff.refutation.items():
+                if not isinstance(rres, dict) or "new_effect" not in rres:
+                    continue
+                new_eff = rres.get("new_effect", 0.0)
+                if "placebo" in rname.lower():
+                    if abs(new_eff) <= max(0.3 * abs(eff.estimate), 0.02):
+                        n_passed += 1
+                else:
+                    if abs(new_eff - eff.estimate) <= max(0.35 * abs(eff.estimate), 0.05):
+                        n_passed += 1
+            refute_str = f"反驳测试 {n_passed}/{n_executed} 通过" if n_executed > 0 else "未运行反驳测试"
             lines.append(
                 f"- **L2 干预**: {label} `do(+1%)` → {outcome} 预期{direction} "
-                f"{abs(eff.estimate):.4f} ({abs(eff.estimate)*100:+.2f}%, "
+                f"{abs(delta_log_y):.4f} ({abs(pct_y):+.2f}%, "
                 f"p={eff.p_value:.3f} {sig}); "
-                f"反驳测试 {refute_pass}/3 通过"
+                f"{refute_str}"
             )
     except Exception as e:
         logger.warning(f"[causal section] L2 query 失败: {e}")

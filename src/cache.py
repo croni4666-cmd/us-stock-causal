@@ -9,6 +9,8 @@ src/cache.py - Parquet 增量缓存
 """
 from __future__ import annotations
 
+import os
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable, Optional
@@ -34,11 +36,23 @@ def cache_path(symbol: str, layer: str, cache_root: Path) -> Path:
 
 
 def is_fresh(parquet_path: Path, max_age_days: int = 1) -> bool:
-    """缓存是否新鲜 (今天已拉过)"""
+    """缓存是否新鲜: 同时检查文件 mtime 与 parquet 内最新交易数据日期."""
     if not parquet_path.exists():
         return False
     mtime = datetime.fromtimestamp(parquet_path.stat().st_mtime)
-    return (datetime.now() - mtime) < timedelta(days=max_age_days)
+    if (datetime.now() - mtime) >= timedelta(days=max_age_days):
+        return False
+    # 检查实际数据最新日期
+    try:
+        df = read_cache(parquet_path)
+        if df is None or len(df) == 0:
+            return False
+        last_dt = pd.to_datetime(df.index[-1])
+        if (datetime.now() - last_dt) > timedelta(days=5):
+            return False
+    except Exception:
+        return False
+    return True
 
 
 def read_cache(parquet_path: Path) -> Optional[pd.DataFrame]:
@@ -53,10 +67,24 @@ def read_cache(parquet_path: Path) -> Optional[pd.DataFrame]:
 
 
 def write_cache(df: pd.DataFrame, parquet_path: Path) -> None:
-    """写 parquet"""
-    df.to_parquet(parquet_path, index=True)
-    size_kb = parquet_path.stat().st_size / 1024
-    logger.info(f"缓存写入: {parquet_path.name} ({size_kb:.1f} KB, {len(df)} rows)")
+    """原子写 parquet (写入临时文件并校验后原子替换，防止中断破坏文件)."""
+    if df is None or len(df) == 0:
+        logger.warning(f"跳过写入空缓存: {parquet_path.name}")
+        return
+    parquet_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = parquet_path.with_suffix(f".tmp_{os.getpid()}_{int(time.time()*1000)%100000}.parquet")
+    try:
+        df.to_parquet(tmp_path, index=True)
+        # 校验可读
+        pd.read_parquet(tmp_path)
+        os.replace(tmp_path, parquet_path)
+        size_kb = parquet_path.stat().st_size / 1024
+        logger.info(f"缓存写入: {parquet_path.name} ({size_kb:.1f} KB, {len(df)} rows)")
+    except Exception as e:
+        if tmp_path.exists():
+            tmp_path.unlink()
+        logger.error(f"原子写入缓存失败 {parquet_path}: {e}")
+        raise
 
 
 def update_or_fetch(
@@ -78,16 +106,15 @@ def update_or_fetch(
         cache_root: e.g. PROJECT_ROOT / "data" / "raw"
         start: 缓存为空时,从此日期开始拉
         end: None = 今天
-        force_refresh: 强制全量重拉
+        force_refresh: 强制全量重拉 (安全刷新: 成功才覆盖, 失败保留旧缓存)
 
     Returns:
         (DataFrame, status)
-        status: "full" / "incremental" / "cached" / "empty"
+        status: "full" / "incremental" / "cached" / "empty" / "rate_limited" / "refresh_failed_cached"
     """
     path = cache_path(symbol, layer, cache_root)
 
     # 0. v0.6.8j (P7-6): yfinance 限流检测 — 限流时跳过 fetch, 返回旧缓存
-    #    防止 daily cron 静默挂掉, Phase 8 alert 推送
     from src.yfinance_rate_limit import is_rate_limited, get_rate_limit_info
     if is_rate_limited() and not force_refresh:
         info = get_rate_limit_info()
@@ -98,13 +125,23 @@ def update_or_fetch(
         cached = read_cache(path)
         if cached is not None and len(cached) > 0:
             return cached, "rate_limited"
-        # 无缓存 + 限流 = 拿不到数据, 返回空
         return pd.DataFrame(), "rate_limited_empty"
 
-    # 1. 强制刷新
-    if force_refresh and path.exists():
-        path.unlink()
-        logger.info(f"[{symbol}] force_refresh,删旧缓存")
+    # 1. 强制刷新: 先拉取新数据，成功后再原子替换旧缓存；如果失败则安全保留旧缓存降级返回
+    if force_refresh:
+        try:
+            df = fetcher(symbol, start=start, end=end)
+            if df is not None and len(df) > 0:
+                write_cache(df, path)
+                return df, "full"
+            else:
+                logger.warning(f"[{symbol}] force_refresh 拉取结果为空, 保留旧缓存")
+        except Exception as e:
+            logger.error(f"[{symbol}] force_refresh 拉取失败, 保留旧缓存: {e}")
+        cached = read_cache(path)
+        if cached is not None and len(cached) > 0:
+            return cached, "refresh_failed_cached"
+        return pd.DataFrame(), "empty"
 
     # 2. 缓存存在 + 新鲜 (今天拉过) → 直接返回
     if is_fresh(path, max_age_days=1) and not force_refresh:
@@ -116,9 +153,7 @@ def update_or_fetch(
     cached = read_cache(path)
     if cached is not None and len(cached) > 0:
         last_date = cached.index[-1]
-        # 从 last_date + 1d 拉到今天
         fetch_start = (last_date + timedelta(days=1)).strftime("%Y-%m-%d")
-        # 如果 last_date 已经是今天,跳过
         if pd.Timestamp(fetch_start) > pd.Timestamp.now().normalize():
             return cached, "cached"
         try:

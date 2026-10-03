@@ -81,14 +81,14 @@ def step_fetch(skip: bool = False) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}", "elapsed_s": round(time.time() - t0, 1)}
 
 
-def step_attribution() -> dict:
+def step_attribution(date_str: Optional[str] = None) -> dict:
     """Step 2: 归因 (4 指数 × 3 窗口)"""
-    _step_banner(2, "归因 (4 指数 × 3 窗口)")
+    _step_banner(2, f"归因 (4 指数 × 3 窗口, {date_str or 'latest'})")
     from src.attribution import attribute_all_indices
     t0 = time.time()
     results_by_window = {}
     for lb in WINDOWS:
-        results = attribute_all_indices(date=None, lookback_days=lb, symbols=INDICES)
+        results = attribute_all_indices(date=date_str, lookback_days=lb, symbols=INDICES)
         results_by_window[lb] = results
         for r in results:
             res = r["residual_pct"]
@@ -97,9 +97,9 @@ def step_attribution() -> dict:
     return {"ok": True, "results": results_by_window, "elapsed_s": round(time.time() - t0, 1)}
 
 
-def step_residual_regression() -> dict:
+def step_residual_regression(date_str: Optional[str] = None) -> dict:
     """Step 3: 残差回归测试 (P7-5) — 跟 v0.6.8f baseline 比对"""
-    _step_banner(3, "残差回归 (P7-5 baseline 比对)")
+    _step_banner(3, f"残差回归 (P7-5 baseline 比对, {date_str or 'latest'})")
     try:
         baseline = load_baseline()
     except FileNotFoundError as e:
@@ -107,7 +107,7 @@ def step_residual_regression() -> dict:
         return {"ok": "skip", "reason": "no baseline", "elapsed_s": 0}
 
     t0 = time.time()
-    current = capture_residuals()
+    current = capture_residuals(date=date_str)
     ok, violations = compare_to_baseline(current, baseline, tolerance=1.5, abs_floor=0.05)
 
     if ok:
@@ -148,7 +148,7 @@ def step_markdown_report(date_str: str) -> dict:
     t0 = time.time()
     try:
         OUTPUT_DIR.mkdir(exist_ok=True)
-        md = render_full_report(INDICES)
+        md = render_full_report(INDICES, as_of=date_str)
         md_path = OUTPUT_DIR / f"report_{date_str}.md"
         md_path.write_text(md, encoding="utf-8")
         kb = md_path.stat().st_size / 1024
@@ -370,7 +370,7 @@ def step_causal(date_str: str) -> dict:
 
     try:
         cfg = causal.load_dag_config()
-        data = causal.load_dag_data(cfg=cfg)
+        data = causal.load_dag_data(end=date_str, cfg=cfg)
 
         # P9-1.1: PC algorithm 学 DAG, 跟手工 DAG 对比 (诊断 manual 是否高估/漏画)
         t_pc_start = time.time()
@@ -396,9 +396,23 @@ def step_causal(date_str: str) -> dict:
             "interpretation": vix_qqq.interpretation,
         })
         direction = "↑" if vix_qqq.estimate > 0 else "↓"
-        print(f"  [L2 do-calculus] VIX do(+1%) → QQQ: {direction}{abs(vix_qqq.estimate):.4f} "
-              f"({abs(vix_qqq.estimate)*100:+.2f}%, p={vix_qqq.p_value:.3f}, n={vix_qqq.n_obs})")
-        print(f"    反驳测试 PASS 数: {sum(1 for v in vix_qqq.refutation.values() if 'new_effect' in v)}/3")
+        delta_log_y = vix_qqq.estimate * 0.01
+        pct_y = vix_qqq.estimate * 1.0
+        n_executed = len(vix_qqq.refutation)
+        n_passed = 0
+        for rname, rres in vix_qqq.refutation.items():
+            if not isinstance(rres, dict) or "new_effect" not in rres:
+                continue
+            new_eff = rres.get("new_effect", 0.0)
+            if "placebo" in rname.lower():
+                if abs(new_eff) <= max(0.3 * abs(vix_qqq.estimate), 0.02):
+                    n_passed += 1
+            else:
+                if abs(new_eff - vix_qqq.estimate) <= max(0.35 * abs(vix_qqq.estimate), 0.05):
+                    n_passed += 1
+        print(f"  [L2 do-calculus] VIX do(+1%) → QQQ: {direction}{abs(delta_log_y):.4f} "
+              f"({abs(pct_y):+.2f}%, p={vix_qqq.p_value:.3f}, n={vix_qqq.n_obs})")
+        print(f"    反驳测试 PASS 数: {n_passed}/{n_executed}")
 
         # L3 反事实: 用最近一天, 假设 VIX 比实际低 (恐慌小, 应该利好)
         # P9-1.5 跑 2 个 L3 query 演示 cache 价值 (第一 fit, 第二 hit)
@@ -594,10 +608,10 @@ def run_daily_report(
             print(f"  [WARN] fetch 失败, 后续步骤可能受影响 (用 cache)")
 
     # 2. attribution (关键, 失败则中断)
-    steps["attribution"] = step_attribution()
+    steps["attribution"] = step_attribution(date_str)
 
     # 3. residual regression (P7-5)
-    steps["residual_regression"] = step_residual_regression()
+    steps["residual_regression"] = step_residual_regression(date_str)
 
     # 4. markdown report
     if not skip_md:

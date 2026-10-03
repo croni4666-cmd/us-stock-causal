@@ -54,12 +54,9 @@ def capture_residuals(date: str = None) -> dict:
             "avg_abs": {"1": 0.141, "5": 0.343, "20": 0.674}
         }
     """
-    all_results = attribute_all_indices(date=None, lookback_days=1, symbols=INDICES)
-    # All windows in one call? attribute_all_indices takes one lookback at a time
-    # So we need 3 calls (1d, 5d, 20d)
     residuals = {idx: {} for idx in INDICES}
     for lb in WINDOWS:
-        results = attribute_all_indices(date=None, lookback_days=lb, symbols=INDICES)
+        results = attribute_all_indices(date=date, lookback_days=lb, symbols=INDICES)
         for r in results:
             residuals[r["index"]][str(lb)] = round(r["residual_pct"], 4)
 

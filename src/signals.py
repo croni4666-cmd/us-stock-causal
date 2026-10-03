@@ -122,10 +122,10 @@ def _classify_event() -> Optional[SignalSnapshot]:
     )
 
 
-def aggregate_signals(symbol: str) -> SignalAggregate:
+def aggregate_signals(symbol: str, as_of: Optional[str] = None) -> SignalAggregate:
     """聚合 3 源信号"""
-    thresholds = get_thresholds(symbol)
-    patterns = find_similar_patterns(symbol, pattern_length=20, n_matches=10, forecast_horizon=5)
+    thresholds = get_thresholds(symbol, as_of=as_of)
+    patterns = find_similar_patterns(symbol, pattern_length=20, n_matches=10, forecast_horizon=5, end_date=as_of)
 
     sigs = [
         _classify_pattern(patterns),
@@ -168,7 +168,7 @@ def aggregate_signals(symbol: str) -> SignalAggregate:
 
     return SignalAggregate(
         symbol=symbol,
-        as_of=str(date.today()),
+        as_of=as_of or str(date.today()),
         signals=[asdict(s) if hasattr(s, '__dataclass_fields__') else s for s in sigs],
         bullish_count=bull,
         bearish_count=bear,
