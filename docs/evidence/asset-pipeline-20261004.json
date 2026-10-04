@@ -1,0 +1,2262 @@
+{
+  "schema_version": 1,
+  "collection": {
+    "schema_version": 1,
+    "started_at": "2026-10-04T01:40:38.608319+00:00",
+    "query_start": "2026-09-24",
+    "query_end_exclusive": "2026-10-03",
+    "with_constituents": true,
+    "source_root": ".review\\p2-live\\s",
+    "market_store": ".review\\p2-live\\m",
+    "sources": [
+      {
+        "symbol": "QQQ",
+        "status": "saved",
+        "path": ".review\\p2-live\\s\\QQQ\\6f91615adacaf98ecd05e4eeb4b528b4b696308cd9b87373070b32e1566ff787-0907a0fb9ef04741ade8665e52f60d0b.json",
+        "sha256": "6f91615adacaf98ecd05e4eeb4b528b4b696308cd9b87373070b32e1566ff787",
+        "as_of": "2026-10-02",
+        "available_at": "2026-10-04T01:40:43.960352+00:00"
+      },
+      {
+        "symbol": "IEF",
+        "status": "saved",
+        "path": ".review\\p2-live\\s\\IEF\\a6c12ab1261fa5931c3e6a0aa4f9ce100565d6b69cd11636462998b87cf34f47-d5a9c43ff7d2484ba0dbc672b09875f2.json",
+        "sha256": "a6c12ab1261fa5931c3e6a0aa4f9ce100565d6b69cd11636462998b87cf34f47",
+        "as_of": "2026-10-01",
+        "available_at": "2026-10-04T01:40:44.883369+00:00"
+      },
+      {
+        "symbol": "TLT",
+        "status": "saved",
+        "path": ".review\\p2-live\\s\\TLT\\52d189c4580b0fc9d8a795204c7eb8eef3aa2d0c613fc1aaa80ca60367fb20de-469a917075f74120bd466d3122e0f659.json",
+        "sha256": "52d189c4580b0fc9d8a795204c7eb8eef3aa2d0c613fc1aaa80ca60367fb20de",
+        "as_of": "2026-10-01",
+        "available_at": "2026-10-04T01:40:45.505049+00:00"
+      },
+      {
+        "symbol": "GLD",
+        "status": "saved",
+        "path": ".review\\p2-live\\s\\GLD\\5cff24592bf949c0293556ea4f4feb396526ff2b5b346883a05cccb54a62c2e6-65384d5aa5234ab692524774d80211f5.json",
+        "sha256": "5cff24592bf949c0293556ea4f4feb396526ff2b5b346883a05cccb54a62c2e6",
+        "as_of": "2026-10-01",
+        "available_at": "2026-10-04T01:40:47.412219+00:00"
+      }
+    ],
+    "markets": [
+      {
+        "symbol": "QQQ",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\QQQ\\846fdf01917d49f787cea9e3aa37215f.json",
+        "sha256": "c91dbac2b23ef6f112d2fa6ef88fc0de5ae14740c092f53f12c39b48dd0f0ac5",
+        "available_at": "2026-10-04T01:40:52.519464+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "IEF",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\IEF\\eb148077ee4f4366b6b451ef4859cc42.json",
+        "sha256": "95ee925c39c3ecc1c724675c7a0cbef559b6619cdce1926b0257d513756e6f43",
+        "available_at": "2026-10-04T01:41:06.305748+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "TLT",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\TLT\\e9b396d2050e4a6f87fe8a648e28e7ed.json",
+        "sha256": "eefc64b2b24245ec8af0e142ce60451dc069c153b686f2ef3df8a2a62476cecf",
+        "available_at": "2026-10-04T01:41:07.073229+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "GLD",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\GLD\\c030ca22a41e4c88b7ef48613f39db3c.json",
+        "sha256": "bd057fb86e683785c30195f9a0e5927589b28278fab0ae85db8e6ae02ba0cf89",
+        "available_at": "2026-10-04T01:41:07.877431+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "GC=F",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\GC%3DF\\08b7bd56db6c407f9bc1e25550948aee.json",
+        "sha256": "c4d7c1a554c1c43ab1599ad1fb41e4d7f462221a9451105b7372d29a4a07248b",
+        "available_at": "2026-10-04T01:41:08.595174+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "^IXIC",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\%5EIXIC\\343c27f800a54081ba8d7556a866d1c1.json",
+        "sha256": "dc4bfa487ce4295ee1073b97923986b1a098b813bc595e1c676b9c6814c2d43c",
+        "available_at": "2026-10-04T01:41:09.260129+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "^NDX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\%5ENDX\\f591bac640dc446c96abe09503605331.json",
+        "sha256": "81191e2d0e1f9347ef14d2a8d01d3dbb04c497533ed378525b086c02fcc5d6ef",
+        "available_at": "2026-10-04T01:41:09.975454+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "^IRX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\%5EIRX\\ae9b191805c1409dad3105da73e8dc10.json",
+        "sha256": "cd529037434b248603f74b2d77a76001c620b19cebe087093f68f41ed2606a06",
+        "available_at": "2026-10-04T01:41:10.676497+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "^FVX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\%5EFVX\\60dfdb8c983447cdb7dfc7a3ed7f5d9c.json",
+        "sha256": "c08ffa607116200bbe83793793cec7c952f2e3605d656142be35b8bc723c3979",
+        "available_at": "2026-10-04T01:41:11.395642+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "^TNX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\%5ETNX\\3b8293c34aa749d4892a4db70eaa098b.json",
+        "sha256": "2bda9586a0018f9d256460bc6ba4195956073618772e1f278f500cce0c6614a1",
+        "available_at": "2026-10-04T01:41:12.091261+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "^TYX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\%5ETYX\\04152b286c3d4831aeb345e1513c8530.json",
+        "sha256": "2b4ced9dc5f2c42db3632ee56810ce4a9e9a55ce22396bd0bbba26bd3150103a",
+        "available_at": "2026-10-04T01:41:12.796416+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "AAPL",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\AAPL\\63516fd9ac9a4c8eb37bb05682b1e82e.json",
+        "sha256": "16ba215b0b9c88abb26a6c0f8dbf25b0f50cd54b3defe9b311829eb97826a8ad",
+        "available_at": "2026-10-04T01:41:14.025394+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ABNB",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ABNB\\9a9d601ce03e49dd8fbd966b24566541.json",
+        "sha256": "b0b55bfa4364686ee6a4dcfab7e60b79ad3e9cd44247530f93a5319cac533714",
+        "available_at": "2026-10-04T01:41:15.152497+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ADBE",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ADBE\\c0dfed81e4014905a73fd645de3377f6.json",
+        "sha256": "37658adf8603a3234c9a10398b0acd0027be851bcfc5c36547379eca113818d2",
+        "available_at": "2026-10-04T01:41:16.405476+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ADI",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ADI\\dd4a2b0eec294fc3bf5a5c0d82738f0f.json",
+        "sha256": "1a940868f17747629b233984053ab467ca2f40e57524c0e9024f33a538e64bf6",
+        "available_at": "2026-10-04T01:41:17.640427+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ADP",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ADP\\c9f10e07da5c461385b4b5666abbf30d.json",
+        "sha256": "b20760f543d72ada34ef4eb771e04141bd66a5d13513ccc6d495e972a5a6f277",
+        "available_at": "2026-10-04T01:41:18.838274+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ADSK",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ADSK\\819338366878476ca590ce1748293fde.json",
+        "sha256": "c83d84a9a4fbd630c8b417ddeccb21812702dddebdf40e7895bfb4fe901a87eb",
+        "available_at": "2026-10-04T01:41:19.974186+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "AEP",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\AEP\\91207d5c5888480bb67473145a516e7c.json",
+        "sha256": "d70432615dc8a420f838d3dfe63e8343e557e6aedb7269ac98a10902a46f9a45",
+        "available_at": "2026-10-04T01:41:21.225398+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ALAB",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ALAB\\8892b8b9680d4e01bf03ce78437cca25.json",
+        "sha256": "a2c3b6ec29b067534ff0e80f6ef86055102a3c736b9ca900de92ffd0fdd344fa",
+        "available_at": "2026-10-04T01:41:22.390227+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ALNY",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ALNY\\172fd81a0bb649118bc5f6f827070aff.json",
+        "sha256": "70e5105aa827ad133026448ccfe0f7640e10d48947438945e51b8258f93ce6fa",
+        "available_at": "2026-10-04T01:41:23.584489+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "AMAT",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\AMAT\\b103d819da8d4c408a15f074f489d983.json",
+        "sha256": "4e92ce7596e8f454f0a113301ad8f8f696efcca40f32aca3eedf51aa3e53d523",
+        "available_at": "2026-10-04T01:41:25.131289+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "AMD",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\AMD\\90237456332240a5b69bb792d634828a.json",
+        "sha256": "630a3afeb5ac31dc0f3e95869a7589bb6f01e485c9192d65885eb27084104a28",
+        "available_at": "2026-10-04T01:41:26.648850+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "AMGN",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\AMGN\\81bd597ab9164b6a9a0eadee6c47c041.json",
+        "sha256": "0aeec1df23020a089f7fa54909518141b1734a25da45d76c3449f1b3e45a7bf7",
+        "available_at": "2026-10-04T01:41:29.571589+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "AMZN",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\AMZN\\e0a0791baec549d4a01e58eb8fc17422.json",
+        "sha256": "c0d93fb2f32ab5052a27de607306362273acf4dbc443c38c26c00c7ef045f7d7",
+        "available_at": "2026-10-04T01:41:30.886291+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "APP",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\APP\\ce09883e6379400eabc51aa946be0c0d.json",
+        "sha256": "89650181860f6b8e39d10d80d5d7ef27a3c0c16d462d6dcffe8d7eff9715ce7f",
+        "available_at": "2026-10-04T01:41:35.340151+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ARM",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ARM\\e93eadf5041d4423af304823b9c3d969.json",
+        "sha256": "c1c769a0ff354982bed33b0e07d7145b0e9f165404090808c2f529a236576197",
+        "available_at": "2026-10-04T01:41:36.584579+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ASML",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ASML\\5338a2fe17c947179d64384945188390.json",
+        "sha256": "36ab21d35c3248ca983514f385010ada24ad7b120703455f88d7484bec26feed",
+        "available_at": "2026-10-04T01:41:37.899050+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "AVGO",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\AVGO\\f280b9d4e0bf485094a68b7d8538f07f.json",
+        "sha256": "065a70ff77124869a9686c6af708c042b83bfa6f25fdc17ad734b625f17ca111",
+        "available_at": "2026-10-04T01:41:39.408183+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "AXON",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\AXON\\fdfda5ce943e432696551a1ebbb058b0.json",
+        "sha256": "12c5def1d1e1055a3372089f98df9444145fc54812065deda442d67911acf1cb",
+        "available_at": "2026-10-04T01:41:44.101474+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "BKNG",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\BKNG\\27ea34a66e7e485fbc5684787fc3cda6.json",
+        "sha256": "b13e665b0d5a75297d46c8c930de861758d79f796bf57b07c789748bc09c84b1",
+        "available_at": "2026-10-04T01:41:45.502118+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "BKR",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\BKR\\0a6bb1e4822f4f8fa7ff742653aad94b.json",
+        "sha256": "9e015372e4fb1bcb20076c9209f1f04149c431e723cd0d01fb74a7468a15b8d7",
+        "available_at": "2026-10-04T01:41:46.725532+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "CCEP",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\CCEP\\f9b22cde58a94c0091a40179de1b9efa.json",
+        "sha256": "8b2d260bb56f4f5574e6785849c6c9de68286409c14d64df1e0066d82f42cd97",
+        "available_at": "2026-10-04T01:41:48.040150+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "CDNS",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\CDNS\\be7f3a64f096430bb71a3dae082b5b55.json",
+        "sha256": "00ad41eb72b96a3b70c05a5594a7b11028b2b59170daf1eab2d3c86527d5c550",
+        "available_at": "2026-10-04T01:41:49.143307+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "CEG",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\CEG\\3e53488ed71d4ae78d6a338cb718a6fd.json",
+        "sha256": "02e1752ed6439487c659309dd1e611d34f503f6e378a49f27754de7738af5e33",
+        "available_at": "2026-10-04T01:41:50.679679+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "CMCSA",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\CMCSA\\2e3816bcf63f4beaa0c3372817d4cfe6.json",
+        "sha256": "a1a31a3ac817de4b72b0097a26982e3edbc1cb41d803d1303eb3a1795d51f9fd",
+        "available_at": "2026-10-04T01:41:52.252540+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "COST",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\COST\\0b4a16ea86db4327b0f573607ff94f0e.json",
+        "sha256": "ccc406561eb7eba273e29b447921ae255fbbbbcc5c6ede71265c0a43f4702b41",
+        "available_at": "2026-10-04T01:41:56.306272+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "CPRT",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\CPRT\\cae0c2247ff24eb2a0ce732bce056926.json",
+        "sha256": "34ee28c06d8f951befe6c9bdb681d95e8ce635c0258fdc77fd4d5fcad8329e4b",
+        "available_at": "2026-10-04T01:41:57.448410+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "CRWD",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\CRWD\\fa427a66c4ff4a158bef0cd743646881.json",
+        "sha256": "8c0b0a0d8aba6f928e926b4062c37c538f7ea62f5c4aea0fc4905c2a577a6fac",
+        "available_at": "2026-10-04T01:41:58.785460+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "CRWV",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\CRWV\\e18c24a2d3d246b4a81e48e405dee44c.json",
+        "sha256": "c4477597e2dfa5185e61a2928640c1d543352e8aa0f560c3750b661b9b76943c",
+        "available_at": "2026-10-04T01:41:59.882262+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "CSCO",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\CSCO\\c5919a27c4c947a6ac32764e7a0a305d.json",
+        "sha256": "201b2c1daba69fefe09d27b5f7a29d99060672c8a63145d77ace1f25366e4eef",
+        "available_at": "2026-10-04T01:42:01.017216+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "CSX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\CSX\\2eb70a84d79e4d5f9540eb39aeb1cbda.json",
+        "sha256": "0f7e75a37f807e79925c67e997551eb1802dc324d9ee1344dd876937beca24b0",
+        "available_at": "2026-10-04T01:42:03.567574+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "CTAS",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\CTAS\\ced02e8042f84fd29b5f7b0cef756447.json",
+        "sha256": "1691f348ad533f82ebb51738c019c9122fce4876eabcbbcfb75cfb4cc964a53e",
+        "available_at": "2026-10-04T01:42:04.806234+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "DASH",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\DASH\\af058e64b68343edad9f4f30a500fa01.json",
+        "sha256": "d246ea8352f9bbd2f3e8543ad38786f39306023d78e2aea0b952b39e9f02ec64",
+        "available_at": "2026-10-04T01:42:06.042579+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "DDOG",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\DDOG\\2f08b0414e654fe1b397f9cca09865ca.json",
+        "sha256": "b1b32be2e9f28fde7ca17672626e9a957c3dca035ab001424d099fd9b92664c6",
+        "available_at": "2026-10-04T01:42:07.702189+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "DXCM",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\DXCM\\22e00aacd0f74c2594d6f6e85a7d5ad0.json",
+        "sha256": "df4f0757db3df92eb764bddd190332422b427ccc04b014a350a7b05041c98035",
+        "available_at": "2026-10-04T01:42:09.904742+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "EXC",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\EXC\\025cb660c4a74127bc20587048a34183.json",
+        "sha256": "166f3c685844ac000cc5bf4c40342c7044e6b2e5e51c74833873c26bd01adc79",
+        "available_at": "2026-10-04T01:42:11.212043+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "FANG",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\FANG\\7cdc47cd2f8f4b80a926e2b31b158a94.json",
+        "sha256": "90bcd00baea70c3da0092c00ce7336f74483656c2bd5d0193fc50b3eeb2246ef",
+        "available_at": "2026-10-04T01:42:15.689341+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "FAST",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\FAST\\f65ea08661bf4382acb5bb83476d411c.json",
+        "sha256": "f2a52350f3b3fb3210f7be5af7f4ed02e7b9cbfd5f9a18486a7eea535798ca71",
+        "available_at": "2026-10-04T01:42:17.767198+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "FER",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\FER\\078e93d3b885487dbf1f43f52ded2c96.json",
+        "sha256": "abc713158eec977668b322370d558dd80a70e14c61a9768930a8d421869f8197",
+        "available_at": "2026-10-04T01:42:20.378022+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "FTNT",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\FTNT\\fe6a583433884ecbacf9a2c84108a4c0.json",
+        "sha256": "419e79960f589cbbeb22cf5bc36839d8a4d3cbd127d092b1d8b373ab854c330a",
+        "available_at": "2026-10-04T01:42:21.494270+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "GEHC",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\GEHC\\499038a6e4ec4372a0ba61eaee930133.json",
+        "sha256": "110fb90abf074f5bb5ffda5349f6d205d7611a2fab87d1f86e8f63801f1577b0",
+        "available_at": "2026-10-04T01:42:22.634401+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "GILD",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\GILD\\150be97695614897ad314bce3be43d32.json",
+        "sha256": "190c6fe18f0db4db03d169bf69b90a57920b6edeeb52d4f6bd729aa26868a09e",
+        "available_at": "2026-10-04T01:42:25.812231+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "GOOG",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\GOOG\\6d2dd4818ef34530a64af5eef845e565.json",
+        "sha256": "7ccaf00888aac7cf20e079e1eb5e56a0eca31c664b1fcab204cb4c0cb6e3fe69",
+        "available_at": "2026-10-04T01:42:28.937156+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "GOOGL",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\GOOGL\\73b1ffc7fc2b4868a12da154830e87f7.json",
+        "sha256": "aa3f50665a914f616f4e61abaa1c8e1ffa1974e89fcb04ee394354dd5ff80ef1",
+        "available_at": "2026-10-04T01:42:30.025313+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "HON",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\HON\\638a1e32081a4bb1a8e0c5d0b41e6d11.json",
+        "sha256": "5173acad85830ca48484b6eb705bcdbd0a5174185c13bea67584bfa9e6b54a34",
+        "available_at": "2026-10-04T01:42:31.289850+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "HONA",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\HONA\\98348711c6af43f4b731a50ce4d5bfa1.json",
+        "sha256": "9dd7a2a756fbef74700ee8578b17a36a2421a9e337febee72a8fc8439bf5db1b",
+        "available_at": "2026-10-04T01:42:32.389147+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "IDXX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\IDXX\\aaa4123c50954523afe0e52774b26701.json",
+        "sha256": "78480f3c98191cc97d71222fb099275dae6b8bee513ec375a64e1586cb38bee1",
+        "available_at": "2026-10-04T01:42:33.465419+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "INTC",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\INTC\\4f7863715e1c49d8a9ebf5344fac5ac7.json",
+        "sha256": "0fa3227be0300c3333f4f0527cc2b50d57825ff34764ae8c0612d8f4490094fa",
+        "available_at": "2026-10-04T01:42:34.641980+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "INTU",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\INTU\\4960e033ddfc49b1abf1cc88ca8726ad.json",
+        "sha256": "529123ae34f6e565712f75e92bcb8b37515eb08dd1b4a8de03989f0d9a9d7180",
+        "available_at": "2026-10-04T01:42:35.786449+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ISRG",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ISRG\\60c19c4cfb1044558261d957c656493d.json",
+        "sha256": "74f1f1e62b87b0d07de351d0549973a8af98163d45936464baab70b63d72c65c",
+        "available_at": "2026-10-04T01:42:36.931403+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "KDP",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\KDP\\bd4dedff1fc9499fbb73b3bd22fdd6fb.json",
+        "sha256": "a989b850dad4a8838d33530b02fe5468d4b0d56ceb10ebec238de3d05ed2d257",
+        "available_at": "2026-10-04T01:42:38.283553+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "KLAC",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\KLAC\\bc4223d591e14c83bc381c5d8a0f5066.json",
+        "sha256": "e2871e999d57440e45dce0ebf19b3772d812744d21ac3682403aa505b91e62f6",
+        "available_at": "2026-10-04T01:42:39.678110+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "LIN",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\LIN\\c1450edbf2724ef9b31c7655c7084eb4.json",
+        "sha256": "3ad3fc8eaf64de04e5eab9069fb069d1543a683932dbe1e908c289d2af448cc8",
+        "available_at": "2026-10-04T01:42:40.874266+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "LITE",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\LITE\\584cb3c7e3294f0aa45ca55669a27532.json",
+        "sha256": "5078fce7603ee4e3d08c80a75a837e9c6641677e2eb21f4d7f3cf721c8c584c1",
+        "available_at": "2026-10-04T01:42:42.141107+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "LRCX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\LRCX\\c04f49349cb24b179cb86f2c70469156.json",
+        "sha256": "f8727549a0e9d4bd9b1f77000302832081b2dc450f2b476ca2b378a26fd97158",
+        "available_at": "2026-10-04T01:42:43.226379+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "MAR",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\MAR\\3d08790e5f6540bba18b5425f892331d.json",
+        "sha256": "74ba3eace92b0be17446e332faa924a7b582ef11dbe6e9f6a513e4b39769a724",
+        "available_at": "2026-10-04T01:42:44.338374+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "MCHP",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\MCHP\\7e07bd57ced04be3b006d8c36e8e2d8c.json",
+        "sha256": "b90460245d5a7d88355b274f18fecd19214337aef01177c479fc774a18d7cb32",
+        "available_at": "2026-10-04T01:42:45.555242+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "MDLZ",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\MDLZ\\f97f212ad1954328ac073d6de8536b35.json",
+        "sha256": "1fa1a544380d803083040b96fdf4090ffdd3f4262e4776d37d32af9a74282f02",
+        "available_at": "2026-10-04T01:42:46.710143+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "MELI",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\MELI\\4742f97329664bb1ab58f9cf0837d788.json",
+        "sha256": "88d7c442005b12b655aa993086d4cf2c90ba95f741c59023be56211ce9958b10",
+        "available_at": "2026-10-04T01:42:47.819205+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "META",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\META\\d1c3ae1f94684037abb5c2d02fe93645.json",
+        "sha256": "d478ded4e022b8074e66d2f390d8035e259993544cd39fc8b4414334c7b91391",
+        "available_at": "2026-10-04T01:42:48.958149+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "MNST",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\MNST\\81eac1b840ef457b9729db5ad350cb48.json",
+        "sha256": "4137747c7e0a68d595190ad26ad28890d74fceadd121864ba289bb4463e635d6",
+        "available_at": "2026-10-04T01:42:50.081258+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "MPWR",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\MPWR\\48335fd240a94b1fa63922ea9c3dd477.json",
+        "sha256": "a8e9c4e504502c9ae201d7786a532e8cd5321d1b1c2685b4ac0a3a56f23cb76c",
+        "available_at": "2026-10-04T01:42:51.198403+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "MRVL",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\MRVL\\0b294761b1944d79a37138e5ed7cac95.json",
+        "sha256": "6210440e2fcd5619f7c2b6592cd09711fa9d07af7a4be3b8fe55f66d6a056930",
+        "available_at": "2026-10-04T01:42:52.297417+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "MSFT",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\MSFT\\e130120ababd4ceda0bec98320daf42b.json",
+        "sha256": "2f3f60367df4fca0861cfc303d7ba0bf4e1c1de44245bcc714383feb2722a8c2",
+        "available_at": "2026-10-04T01:42:53.442086+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "MSTR",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\MSTR\\203a6adcb14a459bbbe88f8d0b35ff84.json",
+        "sha256": "182b3e1bee877f762672a65ec57cd4542e5307600fded36d0546bf87534b4bfa",
+        "available_at": "2026-10-04T01:42:54.566135+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "MU",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\MU\\83beea173c884f38a6d037aa0824fdcf.json",
+        "sha256": "f3465455ad4a38fda679d0ee419b9cadca748c755564d2a6a54e0c0195db24b7",
+        "available_at": "2026-10-04T01:42:57.954565+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "NBIS",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\NBIS\\23c570496a774dab903135e3766d6d72.json",
+        "sha256": "dbfa5e592c35fd461bb9a5e40f7785410e03d59da23372c0c4973be91efc04c5",
+        "available_at": "2026-10-04T01:42:59.061621+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "NFLX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\NFLX\\e96c6aed10a34d97a966c76529b9f3eb.json",
+        "sha256": "bbee617738ab5b0db6f314d06604ed2d995c8899f5e6cf8fba1203fd37a1cf45",
+        "available_at": "2026-10-04T01:43:00.076355+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "NVDA",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\NVDA\\c3b5db6ed5de493cb13ebb838f54aeb4.json",
+        "sha256": "d496a30cb9a660fd94a01b47e85cf0b24d9239886b990b24171b69d17a0534c4",
+        "available_at": "2026-10-04T01:43:01.135177+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "NXPI",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\NXPI\\469007fe4be747e19cdf02fbd9a98497.json",
+        "sha256": "81b072c54357ccfc6fa365e8315c033c657d09cdb9605cc12f6db165f828a71a",
+        "available_at": "2026-10-04T01:43:02.192217+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ODFL",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ODFL\\7b0fb90d01384398baa35725ad45ad8e.json",
+        "sha256": "4c97e1ed27c3252b0c0534be87e11c27d8fd1d52120ac6af4af581493c63b3b2",
+        "available_at": "2026-10-04T01:43:05.519250+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ORLY",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ORLY\\ac04f59a617849b0bcfb999bbe998be8.json",
+        "sha256": "4780a0a057d69276c4c1ac62c2eab71ad7889ba1116b027a1bbe90d89bd9cb77",
+        "available_at": "2026-10-04T01:43:08.300246+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "PANW",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\PANW\\ec5130b50a8f4dfab549ac5d4c023ff8.json",
+        "sha256": "4bebba896098622de4ef3b732a740d072aee530c3f62b2081cc3507584a9fac8",
+        "available_at": "2026-10-04T01:43:09.423403+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "PAYX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\PAYX\\70867e43ce414b4ba7e336aae88ab83a.json",
+        "sha256": "1ed8813ea243c6625dc8fb7a265ba0a630511e96893ff4fd1330e749792ed794",
+        "available_at": "2026-10-04T01:43:10.519584+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "PCAR",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\PCAR\\3136f1c13fb4478a803acc34b5c12d0f.json",
+        "sha256": "49a06fa38267eb1e4060bd183dc132112fceff5ecce0de4d7ef69c5d959f6ccf",
+        "available_at": "2026-10-04T01:43:11.568483+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "PDD",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\PDD\\33e88cb4315144949a6924fbe4f8d7bd.json",
+        "sha256": "399fafae11110e5321f669a1b6c378a547a798db89f2cd86afeba62acfd8681b",
+        "available_at": "2026-10-04T01:43:13.032170+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "PEP",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\PEP\\7d6ebd4433114f03a622516d27938b31.json",
+        "sha256": "024698b441d451f4eae79e102880a5c8b09c7fe775349fddfcb00aaf55eef28e",
+        "available_at": "2026-10-04T01:43:15.065242+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "PLTR",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\PLTR\\cd59c1fc329643798680d788e43ebf6e.json",
+        "sha256": "64d852f5262367eda50f0f805163131163c67d7770066aef79fdba971eeb41d9",
+        "available_at": "2026-10-04T01:43:16.585195+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "PYPL",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\PYPL\\42239f81cd58477f83dd171144e1d2dc.json",
+        "sha256": "e413641b7257a1acbe8dcb388b39cfdade02ec56506e42f6f9809e36d0e88401",
+        "available_at": "2026-10-04T01:43:18.219111+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "QCOM",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\QCOM\\1f88d015d15f43f8b4c012ee83f85acd.json",
+        "sha256": "4bc04ae15a20dbe54dae4857f44ec2c503aa6ea8df5ccc4c30e6c733ad98a653",
+        "available_at": "2026-10-04T01:43:20.069177+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "REGN",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\REGN\\603b8eab234c45debcb4fc6d174217de.json",
+        "sha256": "5a93289b1c0fcbad85acf9b3f91c0b15b0cabbaeb30986ff0e108f25f710e152",
+        "available_at": "2026-10-04T01:43:22.245514+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "RKLB",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\RKLB\\6aa59c5caf594c5dac2df1c7e6abd1b5.json",
+        "sha256": "f339c19d82b0789f7ca1064946881175bff110c538cb828aeb3ff653056ebb03",
+        "available_at": "2026-10-04T01:43:24.245233+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ROP",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ROP\\6e38d705792a40cbb675ad04f8afa8e8.json",
+        "sha256": "a738e8da025bac74e29a0fbc6637227f75a6e490f19334005a01a238af1c1f7a",
+        "available_at": "2026-10-04T01:43:25.383608+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "ROST",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\ROST\\d9f2783d11154f1fba2b5e7d4c2ab3c3.json",
+        "sha256": "4be415e0492804d9cf06e499c8c73964a01ea3557dd03e46e968ee520837e74d",
+        "available_at": "2026-10-04T01:43:26.510622+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "SBUX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\SBUX\\3ab5e8291ab14b0f9554e83bc901e7bd.json",
+        "sha256": "1f6b9c9793b25a197045426611fe358343e13faf6850bd9fd74a99b36edc7887",
+        "available_at": "2026-10-04T01:43:27.570135+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "SHOP",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\SHOP\\514fe96a787f4b7d9d307b8392bf3f60.json",
+        "sha256": "718654cf37e891f4c0f4280f6c4a9401b1110bb978fe335103ff696b08184fdf",
+        "available_at": "2026-10-04T01:43:28.608105+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "SNDK",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\SNDK\\dc8abf74690647e285ec1be6cc681072.json",
+        "sha256": "1d027c7b1cc4a57cfb9ab962a7f1792384f0f11175a1c97e02326b65c1cd8009",
+        "available_at": "2026-10-04T01:43:29.595297+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "SNPS",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\SNPS\\274b759182894022956204cbf10d94d3.json",
+        "sha256": "707b9637225ff4593829dec7a130c69d2c91708b419f20aee7cbe7ace2aafe3f",
+        "available_at": "2026-10-04T01:43:30.751178+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "SPCX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\SPCX\\d713b53db7e346a48b0f7b9e98e34b05.json",
+        "sha256": "5a84f3492816f1db137d213f1b0878cb13a767fde71327e1f202abbd8d5013d2",
+        "available_at": "2026-10-04T01:43:32.265213+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "STX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\STX\\c3c6b5824f164c32861aa387184bf086.json",
+        "sha256": "7bf61d22c1b820fcda61749b4a8b96015e0b5d2bdee103a4b60e8bd4d0901d42",
+        "available_at": "2026-10-04T01:43:33.377541+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "TER",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\TER\\ca68d8419d1340bbace1f580b150cb61.json",
+        "sha256": "7b0319986521ed306d28852b1aef4af8a65471106f66be0266899b05b4165abd",
+        "available_at": "2026-10-04T01:43:34.667546+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "TMUS",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\TMUS\\6a6b9f62eac342e58c718a1849d7c7c1.json",
+        "sha256": "fb6b2fcbc5e62d209b1dd86ad49b9d2c1c1d0653a1adafbceaeb262c54e15aa5",
+        "available_at": "2026-10-04T01:43:38.295345+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "TRI",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\TRI\\55b1d2a1e3c7441aad11545cc7732974.json",
+        "sha256": "91f5a06c0653e41109253343532561483fbd383b445a88908b54d510aaf2db1d",
+        "available_at": "2026-10-04T01:43:39.348485+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "TSLA",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\TSLA\\eeacf93d3dda4c1f9eceae11502ed2b9.json",
+        "sha256": "78a1c7acf3d96ce3ed7818422ea21f62258ff8a38c1c2eb5d3fd82a5dde735fe",
+        "available_at": "2026-10-04T01:43:40.356144+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "TTWO",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\TTWO\\c6f5c035753c4c968a5c5f68b1e9e839.json",
+        "sha256": "28b14433733642f4e73a4257a3c46d8bb19344209f6b5be51f0afc2c5da37381",
+        "available_at": "2026-10-04T01:43:41.362305+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "TXN",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\TXN\\e2c5ae0caaf348b8ae80b5cca067ae94.json",
+        "sha256": "3b54c1b7d89ce0347675c4b26382fa5def7e07a9cbb2e29285c1bfd7ddc0ba30",
+        "available_at": "2026-10-04T01:43:42.446541+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "VRTX",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\VRTX\\ac0b41c405e04b86a1dc09f0f2f88a0e.json",
+        "sha256": "2c58be53b3ade33e60b2973a0a18bba58c7169894b119ab736ab31567271edb6",
+        "available_at": "2026-10-04T01:43:43.388976+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "WBD",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\WBD\\0285bf28e494443db55d1dbdaf0d4f54.json",
+        "sha256": "fae77cfe94bf429ada58f58376bcc0aadad7b89baef07c7c40d0acbd45a5ef25",
+        "available_at": "2026-10-04T01:43:44.340233+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "WDAY",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\WDAY\\dac1a38f8c9e421b93cc76fa9666121e.json",
+        "sha256": "0a5d7b314b4dd64b69d33fd60344d5ec65f68a1140923d563345707a35a35456",
+        "available_at": "2026-10-04T01:43:45.326457+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "WDC",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\WDC\\b8ea9dfd60a34c35b553a29f5999be21.json",
+        "sha256": "55dceea5cf008b22f96f2e36bbe197c32061bb49c8035ec274ddd5642b7e42d2",
+        "available_at": "2026-10-04T01:43:46.301020+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "WMT",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\WMT\\3ad4f5eec0b14d0e8ecfea62ea9527ff.json",
+        "sha256": "d741652464bda1f140e083d254197b70e963753249d802d837cff14271f12321",
+        "available_at": "2026-10-04T01:43:47.504660+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      },
+      {
+        "symbol": "XEL",
+        "status": "saved",
+        "path": ".review\\p2-live\\m\\XEL\\c6f3745417c742779d1dfbfc3346c1c8.json",
+        "sha256": "542019ba4697d36fc9727e09e138c1bfc2f9996c3a2a5195ca1fbe21ae6162fd",
+        "available_at": "2026-10-04T01:43:49.396336+00:00",
+        "row_count": 7,
+        "first_date": "2026-09-24",
+        "last_date": "2026-10-02"
+      }
+    ],
+    "errors": [],
+    "historical_trade_backtest_ready": false,
+    "status": "complete",
+    "completed_at": "2026-10-04T01:43:49.573462+00:00",
+    "manifest_path": ".review\\p2-live\\runs\\d76262add09d42d8b6558c28dcf3d5ba.json"
+  },
+  "reports": {
+    "five_sessions": [
+      {
+        "symbol": "GLD",
+        "returns": {
+          "symbol": "GLD",
+          "kind": "gold_etf",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": -0.033730685265108695,
+          "adjusted_return_proxy": -0.033730685265108695,
+          "adjustment_gap": 0.0
+        },
+        "actions": {
+          "events": [],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.0,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "unavailable",
+        "source": {
+          "symbol": "GLD",
+          "provider": "SPDR",
+          "source_url": "https://api.spdrgoldshares.com/api/v1/historical-archive?product=gld&exchange=NYSE&lang=en",
+          "sha256": "5cff24592bf949c0293556ea4f4feb396526ff2b5b346883a05cccb54a62c2e6",
+          "as_of": "2026-10-01",
+          "retrieved_at": "2026-10-04T01:40:47.412219+00:00",
+          "available_at": "2026-10-04T01:40:47.412219+00:00",
+          "warnings": [
+            "independent licensed LBMA benchmark absent; NAV and close have different pricing times"
+          ]
+        },
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "GC=F",
+        "returns": {
+          "symbol": "GC=F",
+          "kind": "continuous_futures_quote",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "continuous futures quote change excludes roll, collateral and margin effects"
+          ],
+          "price_return": -0.036772281644662064,
+          "adjusted_return_proxy": null,
+          "adjustment_gap": null
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "IEF",
+        "returns": {
+          "symbol": "IEF",
+          "kind": "treasury_etf",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": -0.010555521647135468,
+          "adjusted_return_proxy": -0.007142608028458786,
+          "adjustment_gap": 0.003412913618676683
+        },
+        "actions": {
+          "events": [
+            {
+              "date": "2026-10-01",
+              "field": "dividends",
+              "value": 0.307
+            }
+          ],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.307,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "unavailable",
+        "source": {
+          "symbol": "IEF",
+          "provider": "iShares",
+          "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+          "sha256": "a6c12ab1261fa5931c3e6a0aa4f9ce100565d6b69cd11636462998b87cf34f47",
+          "as_of": "2026-10-01",
+          "retrieved_at": "2026-10-04T01:40:44.883369+00:00",
+          "available_at": "2026-10-04T01:40:44.883369+00:00",
+          "warnings": []
+        },
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "TLT",
+        "returns": {
+          "symbol": "TLT",
+          "kind": "treasury_etf",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": -0.023197129916412318,
+          "adjusted_return_proxy": -0.019263100551071055,
+          "adjustment_gap": 0.003934029365341263
+        },
+        "actions": {
+          "events": [
+            {
+              "date": "2026-10-01",
+              "field": "dividends",
+              "value": 0.312
+            }
+          ],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.312,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "unavailable",
+        "source": {
+          "symbol": "TLT",
+          "provider": "iShares",
+          "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+          "sha256": "52d189c4580b0fc9d8a795204c7eb8eef3aa2d0c613fc1aaa80ca60367fb20de",
+          "as_of": "2026-10-01",
+          "retrieved_at": "2026-10-04T01:40:45.505049+00:00",
+          "available_at": "2026-10-04T01:40:45.505049+00:00",
+          "warnings": []
+        },
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "QQQ",
+        "returns": {
+          "symbol": "QQQ",
+          "kind": "equity_etf",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": 0.006823394344988243,
+          "adjusted_return_proxy": 0.006823394344988243,
+          "adjustment_gap": 0.0
+        },
+        "actions": {
+          "events": [],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.0,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "unavailable",
+        "source": {
+          "symbol": "QQQ",
+          "provider": "Invesco",
+          "source_url": "https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/46090E103/holdings/fund?idType=cusip&productType=ETF",
+          "sha256": "6f91615adacaf98ecd05e4eeb4b528b4b696308cd9b87373070b32e1566ff787",
+          "as_of": "2026-10-02",
+          "retrieved_at": "2026-10-04T01:40:43.960352+00:00",
+          "available_at": "2026-10-04T01:40:43.960352+00:00",
+          "warnings": [
+            "unknown weight: USDPDV:Currency"
+          ]
+        },
+        "daily_missing_weight_dates": [
+          "2026-09-25",
+          "2026-09-28",
+          "2026-09-29",
+          "2026-09-30",
+          "2026-10-01"
+        ],
+        "errors": []
+      },
+      {
+        "symbol": "^NDX",
+        "returns": {
+          "symbol": "^NDX",
+          "kind": "price_index",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "price index change excludes reinvested dividends; QQQ weights are not index weights"
+          ],
+          "price_return": 0.006527638980731831,
+          "adjusted_return_proxy": null,
+          "adjustment_gap": null
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^IXIC",
+        "returns": {
+          "symbol": "^IXIC",
+          "kind": "price_index",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "price index change excludes reinvested dividends; QQQ weights are not index weights"
+          ],
+          "price_return": 0.004512170087923595,
+          "adjusted_return_proxy": null,
+          "adjustment_gap": null
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^IRX",
+        "returns": {
+          "symbol": "^IRX",
+          "kind": "yield_quote",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 4.070000171661377,
+          "yield_end_pct": 3.993000030517578,
+          "yield_delta_bp": -7.700014114379883
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^FVX",
+        "returns": {
+          "symbol": "^FVX",
+          "kind": "yield_quote",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 5.006999969482422,
+          "yield_end_pct": 5.054999828338623,
+          "yield_delta_bp": 4.799985885620117
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^TNX",
+        "returns": {
+          "symbol": "^TNX",
+          "kind": "yield_quote",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 5.184000015258789,
+          "yield_end_pct": 5.2769999504089355,
+          "yield_delta_bp": 9.299993515014648
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^TYX",
+        "returns": {
+          "symbol": "^TYX",
+          "kind": "yield_quote",
+          "start": "2026-09-25",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 5.504000186920166,
+          "yield_end_pct": 5.630000114440918,
+          "yield_delta_bp": 12.599992752075195
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      }
+    ],
+    "daily": [
+      {
+        "symbol": "GLD",
+        "returns": {
+          "symbol": "GLD",
+          "kind": "gold_etf",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": -0.006845007446811935,
+          "adjusted_return_proxy": -0.006845007446811935,
+          "adjustment_gap": 0.0
+        },
+        "actions": {
+          "events": [],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.0,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "unavailable",
+        "source": {
+          "symbol": "GLD",
+          "provider": "SPDR",
+          "source_url": "https://api.spdrgoldshares.com/api/v1/historical-archive?product=gld&exchange=NYSE&lang=en",
+          "sha256": "5cff24592bf949c0293556ea4f4feb396526ff2b5b346883a05cccb54a62c2e6",
+          "as_of": "2026-10-01",
+          "retrieved_at": "2026-10-04T01:40:47.412219+00:00",
+          "available_at": "2026-10-04T01:40:47.412219+00:00",
+          "warnings": [
+            "independent licensed LBMA benchmark absent; NAV and close have different pricing times"
+          ]
+        },
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "GC=F",
+        "returns": {
+          "symbol": "GC=F",
+          "kind": "continuous_futures_quote",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "continuous futures quote change excludes roll, collateral and margin effects"
+          ],
+          "price_return": -0.009518597401209083,
+          "adjusted_return_proxy": null,
+          "adjustment_gap": null
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "IEF",
+        "returns": {
+          "symbol": "IEF",
+          "kind": "treasury_etf",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": -0.0027995519759960175,
+          "adjusted_return_proxy": -0.0027995519759960175,
+          "adjustment_gap": 0.0
+        },
+        "actions": {
+          "events": [],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.0,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "approximation",
+        "source": {
+          "symbol": "IEF",
+          "provider": "iShares",
+          "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+          "sha256": "a6c12ab1261fa5931c3e6a0aa4f9ce100565d6b69cd11636462998b87cf34f47",
+          "as_of": "2026-10-01",
+          "retrieved_at": "2026-10-04T01:40:44.883369+00:00",
+          "available_at": "2026-10-04T01:40:44.883369+00:00",
+          "warnings": []
+        },
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "TLT",
+        "returns": {
+          "symbol": "TLT",
+          "kind": "treasury_etf",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": -0.0029596670988124574,
+          "adjusted_return_proxy": -0.0029596670988124574,
+          "adjustment_gap": 0.0
+        },
+        "actions": {
+          "events": [],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.0,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "approximation",
+        "source": {
+          "symbol": "TLT",
+          "provider": "iShares",
+          "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+          "sha256": "52d189c4580b0fc9d8a795204c7eb8eef3aa2d0c613fc1aaa80ca60367fb20de",
+          "as_of": "2026-10-01",
+          "retrieved_at": "2026-10-04T01:40:45.505049+00:00",
+          "available_at": "2026-10-04T01:40:45.505049+00:00",
+          "warnings": []
+        },
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "QQQ",
+        "returns": {
+          "symbol": "QQQ",
+          "kind": "equity_etf",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": 0.010174773924072733,
+          "adjusted_return_proxy": 0.010174773924072733,
+          "adjustment_gap": 0.0
+        },
+        "actions": {
+          "events": [],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.0,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "unavailable",
+        "source": {
+          "symbol": "QQQ",
+          "provider": "Invesco",
+          "source_url": "https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/46090E103/holdings/fund?idType=cusip&productType=ETF",
+          "sha256": "6f91615adacaf98ecd05e4eeb4b528b4b696308cd9b87373070b32e1566ff787",
+          "as_of": "2026-10-02",
+          "retrieved_at": "2026-10-04T01:40:43.960352+00:00",
+          "available_at": "2026-10-04T01:40:43.960352+00:00",
+          "warnings": [
+            "unknown weight: USDPDV:Currency"
+          ]
+        },
+        "daily_missing_weight_dates": [
+          "2026-10-01"
+        ],
+        "errors": []
+      },
+      {
+        "symbol": "^NDX",
+        "returns": {
+          "symbol": "^NDX",
+          "kind": "price_index",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "price index change excludes reinvested dividends; QQQ weights are not index weights"
+          ],
+          "price_return": 0.010044375931328897,
+          "adjusted_return_proxy": null,
+          "adjustment_gap": null
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^IXIC",
+        "returns": {
+          "symbol": "^IXIC",
+          "kind": "price_index",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "price index change excludes reinvested dividends; QQQ weights are not index weights"
+          ],
+          "price_return": 0.01188093638882659,
+          "adjusted_return_proxy": null,
+          "adjustment_gap": null
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^IRX",
+        "returns": {
+          "symbol": "^IRX",
+          "kind": "yield_quote",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 3.9820001125335693,
+          "yield_end_pct": 3.993000030517578,
+          "yield_delta_bp": 1.099991798400879
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^FVX",
+        "returns": {
+          "symbol": "^FVX",
+          "kind": "yield_quote",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 5.005000114440918,
+          "yield_end_pct": 5.054999828338623,
+          "yield_delta_bp": 4.999971389770508
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^TNX",
+        "returns": {
+          "symbol": "^TNX",
+          "kind": "yield_quote",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 5.236999988555908,
+          "yield_end_pct": 5.2769999504089355,
+          "yield_delta_bp": 3.9999961853027344
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^TYX",
+        "returns": {
+          "symbol": "^TYX",
+          "kind": "yield_quote",
+          "start": "2026-10-01",
+          "end": "2026-10-02",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 5.603000164031982,
+          "yield_end_pct": 5.630000114440918,
+          "yield_delta_bp": 2.6999950408935547
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      }
+    ],
+    "gold_archive": [
+      {
+        "symbol": "GLD",
+        "returns": {
+          "symbol": "GLD",
+          "kind": "gold_etf",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": 0.005041522545417898,
+          "adjusted_return_proxy": 0.005041522545417898,
+          "adjustment_gap": 0.0
+        },
+        "actions": {
+          "events": [],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.0,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "ok",
+        "source": {
+          "symbol": "GLD",
+          "provider": "SPDR",
+          "source_url": "https://api.spdrgoldshares.com/api/v1/historical-archive?product=gld&exchange=NYSE&lang=en",
+          "sha256": "5cff24592bf949c0293556ea4f4feb396526ff2b5b346883a05cccb54a62c2e6",
+          "as_of": "2026-10-01",
+          "retrieved_at": "2026-10-04T01:40:47.412219+00:00",
+          "available_at": "2026-10-04T01:40:47.412219+00:00",
+          "warnings": [
+            "independent licensed LBMA benchmark absent; NAV and close have different pricing times"
+          ]
+        },
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "GC=F",
+        "returns": {
+          "symbol": "GC=F",
+          "kind": "continuous_futures_quote",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "continuous futures quote change excludes roll, collateral and margin effects"
+          ],
+          "price_return": 0.0037259915081728767,
+          "adjusted_return_proxy": null,
+          "adjustment_gap": null
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "IEF",
+        "returns": {
+          "symbol": "IEF",
+          "kind": "treasury_etf",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": -0.00011190804063543336,
+          "adjusted_return_proxy": 0.003337019035383859,
+          "adjustment_gap": 0.0034489270760192925
+        },
+        "actions": {
+          "events": [
+            {
+              "date": "2026-10-01",
+              "field": "dividends",
+              "value": 0.307
+            }
+          ],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.307,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "unavailable",
+        "source": {
+          "symbol": "IEF",
+          "provider": "iShares",
+          "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+          "sha256": "a6c12ab1261fa5931c3e6a0aa4f9ce100565d6b69cd11636462998b87cf34f47",
+          "as_of": "2026-10-01",
+          "retrieved_at": "2026-10-04T01:40:44.883369+00:00",
+          "available_at": "2026-10-04T01:40:44.883369+00:00",
+          "warnings": []
+        },
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "TLT",
+        "returns": {
+          "symbol": "TLT",
+          "kind": "treasury_etf",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": -0.0008999703769968503,
+          "adjusted_return_proxy": 0.0031239274425503005,
+          "adjustment_gap": 0.004023897819547151
+        },
+        "actions": {
+          "events": [
+            {
+              "date": "2026-10-01",
+              "field": "dividends",
+              "value": 0.312
+            }
+          ],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.312,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "unavailable",
+        "source": {
+          "symbol": "TLT",
+          "provider": "iShares",
+          "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+          "sha256": "52d189c4580b0fc9d8a795204c7eb8eef3aa2d0c613fc1aaa80ca60367fb20de",
+          "as_of": "2026-10-01",
+          "retrieved_at": "2026-10-04T01:40:45.505049+00:00",
+          "available_at": "2026-10-04T01:40:45.505049+00:00",
+          "warnings": []
+        },
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "QQQ",
+        "returns": {
+          "symbol": "QQQ",
+          "kind": "equity_etf",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "adjusted series is a provider total-return proxy, not an official fund return"
+          ],
+          "price_return": 0.0030550167024301356,
+          "adjusted_return_proxy": 0.0030550167024301356,
+          "adjustment_gap": 0.0
+        },
+        "actions": {
+          "events": [],
+          "missing_fields": [],
+          "missing_market_dates": [],
+          "dividend_per_share": 0.0,
+          "capital_gain_per_share": 0.0,
+          "limitations": [
+            "provider close already reflects splits; split ratios are not reapplied",
+            "per-share cash events do not certify historical share basis or official total return"
+          ]
+        },
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": [
+          "2026-09-30"
+        ],
+        "errors": []
+      },
+      {
+        "symbol": "^NDX",
+        "returns": {
+          "symbol": "^NDX",
+          "kind": "price_index",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "price index change excludes reinvested dividends; QQQ weights are not index weights"
+          ],
+          "price_return": 0.003060346510844081,
+          "adjusted_return_proxy": null,
+          "adjustment_gap": null
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^IXIC",
+        "returns": {
+          "symbol": "^IXIC",
+          "kind": "price_index",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "price index change excludes reinvested dividends; QQQ weights are not index weights"
+          ],
+          "price_return": 0.0003923546682607082,
+          "adjusted_return_proxy": null,
+          "adjustment_gap": null
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^IRX",
+        "returns": {
+          "symbol": "^IRX",
+          "kind": "yield_quote",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 4.03000020980835,
+          "yield_end_pct": 3.9820001125335693,
+          "yield_delta_bp": -4.800009727478027
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^FVX",
+        "returns": {
+          "symbol": "^FVX",
+          "kind": "yield_quote",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 5.089000225067139,
+          "yield_end_pct": 5.005000114440918,
+          "yield_delta_bp": -8.40001106262207
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^TNX",
+        "returns": {
+          "symbol": "^TNX",
+          "kind": "yield_quote",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 5.293000221252441,
+          "yield_end_pct": 5.236999988555908,
+          "yield_delta_bp": -5.60002326965332
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      },
+      {
+        "symbol": "^TYX",
+        "returns": {
+          "symbol": "^TYX",
+          "kind": "yield_quote",
+          "start": "2026-09-30",
+          "end": "2026-10-01",
+          "causal_status": "not_identified",
+          "limitations": [
+            "yield quote change is not a bond investment return"
+          ],
+          "yield_start_pct": 5.638000011444092,
+          "yield_end_pct": 5.603000164031982,
+          "yield_delta_bp": -3.4999847412109375
+        },
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": []
+      }
+    ],
+    "strict": [
+      {
+        "symbol": "GLD",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: GLD"
+        ]
+      },
+      {
+        "symbol": "GC=F",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: GC=F"
+        ]
+      },
+      {
+        "symbol": "IEF",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: IEF"
+        ]
+      },
+      {
+        "symbol": "TLT",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: TLT"
+        ]
+      },
+      {
+        "symbol": "QQQ",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: QQQ"
+        ]
+      },
+      {
+        "symbol": "^NDX",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: ^NDX"
+        ]
+      },
+      {
+        "symbol": "^IXIC",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: ^IXIC"
+        ]
+      },
+      {
+        "symbol": "^IRX",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: ^IRX"
+        ]
+      },
+      {
+        "symbol": "^FVX",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: ^FVX"
+        ]
+      },
+      {
+        "symbol": "^TNX",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: ^TNX"
+        ]
+      },
+      {
+        "symbol": "^TYX",
+        "returns": null,
+        "actions": null,
+        "attribution_status": "unavailable",
+        "source": null,
+        "daily_missing_weight_dates": null,
+        "errors": [
+          "no eligible market snapshot with exact endpoints: ^TYX"
+        ]
+      }
+    ]
+  },
+  "historical_trade_backtest_ready": false,
+  "causal_status": "not_identified"
+}

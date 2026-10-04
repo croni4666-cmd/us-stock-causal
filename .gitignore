@@ -88,6 +88,9 @@ output\_*.py
 test_*.log
 
 # Backups and Task Scheduler exports
+data/asset_market/
+data/asset_runs/
+output/asset_inventory.json
 *.bak*
 *.task.xml*
 scripts/*.xml*

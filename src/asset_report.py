@@ -11,6 +11,8 @@ import pandas as pd
 from src.asset_models import (ASSET_KINDS, duration_effect, equity_contributions,
                               gold_archive_metrics, period_return, return_summary, treasury_profile)
 from src.asset_sources import SOURCE_SPECS, eligible_snapshot, load_sources
+from src.asset_market import action_summary, select_market
+from src.asset_daily import daily_equity_attribution
 
 
 def _read_market(symbol, root, market_files=None):
@@ -60,13 +62,19 @@ def _qqq_profile(doc):
 
 
 def build_asset_report(symbols: list[str], start: str, end: str, market_root: Path,
-                       source_root: Path, *, mode: str = "point_in_time", market_files: dict | None = None) -> dict:
+                       source_root: Path, *, mode: str = "point_in_time", market_files: dict | None = None,
+                       market_store: Path | None = None) -> dict:
     if mode not in ("point_in_time", "retrospective"):
         raise ValueError("mode must be point_in_time or retrospective")
     if date.fromisoformat(start) > date.fromisoformat(end):
         raise ValueError("start must not be after end")
     if not symbols or len(symbols) != len(set(symbols)) or any(s not in ASSET_KINDS for s in symbols):
         raise ValueError("expected unique supported asset symbols")
+    if market_store is not None and market_files:
+        raise ValueError('market-store and explicit legacy market-file cannot be combined')
+    def read_market(symbol):
+        return (select_market(symbol, market_store, start, end, mode=mode) if market_store is not None
+                else _read_market(symbol, market_root, market_files))
     result = {"schema_version": 1, "generated_at": datetime.now(timezone.utc).isoformat(),
               "start": start, "end": end, "mode": mode, "assets": [],
               "historical_trade_backtest_ready": False,
@@ -77,14 +85,17 @@ def build_asset_report(symbols: list[str], start: str, end: str, market_root: Pa
                   "time-held-out validation, placebo tests and uncertainty intervals"]}}
     for symbol in symbols:
         item = {"symbol": symbol, "kind": ASSET_KINDS[symbol], "returns": None,
-                "profile": None, "source": None, "market_source": None,
+                "profile": None, "source": None, "market_source": None, "actions": None,
+                'daily_attribution': None,
                 "attribution": _unavailable("asset-specific inputs unavailable"),
                 "errors": []}
         result["assets"].append(item)
         try:
-            market = _read_market(symbol, market_root, market_files)
+            market = read_market(symbol)
             item["market_source"] = market.attrs['market_source']
             item["returns"] = return_summary(symbol, market, start, end)
+            if ASSET_KINDS[symbol].endswith('etf'):
+                item['actions'] = action_summary(market, start, end)
         except (ValueError, OSError, KeyError) as exc:
             item["errors"].append(str(exc))
         if symbol not in SOURCE_SPECS:
@@ -95,6 +106,11 @@ def build_asset_report(symbols: list[str], start: str, end: str, market_root: Pa
             valid = [doc for doc in docs if _available(doc, end, mode) and
                      (doc["kind"] == "gold_archive" or doc["as_of"] <= end)]
             current = max(valid, key=lambda d: (d["as_of"], d["available_at"]), default=None)
+            if symbol == 'QQQ' and item['returns'] is not None:
+                def read_daily_stock(ticker, first, last):
+                    return (select_market(ticker, market_store, first, last, mode=mode, availability_end=end)
+                            if market_store is not None else _read_market(ticker, market_root, market_files))
+                item['daily_attribution'] = daily_equity_attribution(docs, market, read_daily_stock, start, end, mode=mode)
             if current is None:
                 item["attribution"] = _unavailable("no official source meeting analysis date/availability cutoff")
                 continue
@@ -120,7 +136,7 @@ def build_asset_report(symbols: list[str], start: str, end: str, market_root: Pa
                     if row["asset_class"] != "Equity" or not row.get("ticker"):
                         continue
                     try:
-                        stock_data = _read_market(row["ticker"], market_root, market_files)
+                        stock_data = read_market(row["ticker"])
                         stocks[row["ticker"]] = period_return(stock_data["close"], start, end)
                         stock_sources[row["ticker"]] = stock_data.attrs['market_source']
                     except (ValueError, OSError, KeyError):
@@ -134,7 +150,7 @@ def build_asset_report(symbols: list[str], start: str, end: str, market_root: Pa
                     item["attribution"] = _unavailable("beginning portfolio duration coverage incomplete")
                     continue
                 proxy = "^TNX" if symbol == "IEF" else "^TYX"
-                yield_data = _read_market(proxy, market_root, market_files)
+                yield_data = read_market(proxy)
                 yields = return_summary(proxy, yield_data, start, end)
                 effect = duration_effect(profile["weighted_duration_years"], yields["yield_delta_bp"])
                 item["attribution"] = {"status": "approximation", "method": "single-tenor yield proxy; linear duration",
@@ -177,6 +193,29 @@ def render_asset_report(result: dict) -> str:
             lines.append(f"官方数据所属日期：{source['as_of']}；取得/保守可用时间：{source['available_at']}。")
             lines.append(f"来源：[{source['provider']}]({source['source_url']})；SHA256：`{source['sha256']}`。")
             lines.extend(source["warnings"])
+        if item.get('actions'):
+            actions = item['actions']
+            lines.append('公司行动（区间起点不包含、终点包含；保留提供商每股金额与拆股比率）：')
+            for event in actions['events']:
+                lines.append(f"- {event['date']}：{event['field']} = {event['value']}。")
+            if not actions['events']:
+                lines.append('已提供字段未记录非零事件。')
+            if actions['missing_fields']:
+                lines.append('事件字段不完整：' + ', '.join(actions['missing_fields']) + '；不补零。')
+            if actions.get('missing_market_dates'):
+                lines.append('公司行动观察缺少交易日：' + ', '.join(actions['missing_market_dates']) + '；期间现金合计未知。')
+            lines.append('价格已含提供商拆股调整，不重复乘拆股比率；每股分红记录不等于认证总收益。')
+        if item.get('daily_attribution'):
+            daily = item['daily_attribution']
+            if daily['status'] == 'unavailable':
+                lines.append('QQQ逐日核算未就绪；完整期间链接贡献未输出。')
+                if daily['missing_weight_dates']:
+                    lines.append('缺少同日期期初权重/可用时间：' + ', '.join(daily['missing_weight_dates']) + '。')
+                if daily['missing_market_dates']:
+                    lines.append('缺少行情交易日：' + ', '.join(daily['missing_market_dates']) + '。')
+            else:
+                lines.append(f"QQQ逐日财富链接贡献 {_pct(daily['linked_contribution'])}；链接残差 {_pct(daily['linked_residual'])}；两者合计为ETF价格回报 {_pct(daily['etf_price_return'])}。")
+                lines.append('逐日保留原始权重，缺失股票不重归一化；机械核算不代表因果效应。')
         if profile:
             lines.append(f"结构日期：{profile['as_of']}。")
             if symbol in ("IEF", "TLT"):

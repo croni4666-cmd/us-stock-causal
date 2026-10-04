@@ -135,3 +135,4 @@ v3 方向: **掌控数据 (47 ticker 一手 yfinance) + 一手模型 (Pearl 因�
 新增官方 QQQ / IEF / TLT 持仓、GLD 历史档案和离线资产分析。
 使用方法及模型边界见 [资产专用分析](docs/asset-specific-attribution.md)，
 详细路线见 [设计文档](docs/superpowers/specs/2026-10-03-asset-specific-attribution-design.md)。
+可重复采集行情、分红拆股与每日官方快照见 [数据积累流程](docs/asset-data-pipeline.md)。

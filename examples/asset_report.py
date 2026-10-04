@@ -9,6 +9,7 @@ import sys
 from src.asset_models import ASSET_KINDS
 from src.asset_report import build_asset_report, render_asset_report
 from src.asset_sources import SOURCE_SPECS, capture_source
+from src.asset_collection import collect_assets, inventory
 
 
 def main(argv=None) -> int:
@@ -17,10 +18,22 @@ def main(argv=None) -> int:
     sync = commands.add_parser("sync", help="Download official sources explicitly")
     sync.add_argument("--symbols", nargs="+", choices=SOURCE_SPECS, default=list(SOURCE_SPECS))
     sync.add_argument("--source-root", type=Path, default=Path("data/asset_sources"))
+    collect = commands.add_parser('collect', help='Explicit manual collection of official sources and daily histories')
+    collect.add_argument('--start', required=True)
+    collect.add_argument('--end', required=True, help='Exclusive end of daily history query')
+    collect.add_argument('--source-root', type=Path, default=Path('data/asset_sources'))
+    collect.add_argument('--market-store', type=Path, default=Path('data/asset_market'))
+    collect.add_argument('--manifest-root', type=Path, default=Path('data/asset_runs'))
+    collect.add_argument('--with-constituents', action='store_true')
+    stock = commands.add_parser('inventory', help='Offline evidence coverage, with no date filling')
+    stock.add_argument('--source-root', type=Path, default=Path('data/asset_sources'))
+    stock.add_argument('--market-store', type=Path, default=Path('data/asset_market'))
+    stock.add_argument('--output', type=Path, default=Path('output/asset_inventory.json'))
     report = commands.add_parser("report", help="Use local data only; never fetch")
     report.add_argument("--symbols", nargs="+", choices=ASSET_KINDS, default=["GLD", "GC=F", "IEF", "TLT", "QQQ", "^NDX", "^IXIC"])
     report.add_argument("--source-root", type=Path, default=Path("data/asset_sources"))
     report.add_argument("--market-root", type=Path, default=Path("data/raw"))
+    report.add_argument('--market-store', type=Path, help='Use immutable captures exclusively, without legacy fallback')
     report.add_argument("--start", required=True)
     report.add_argument("--end", required=True)
     report.add_argument("--mode", choices=("point_in_time", "retrospective"), default="point_in_time")
@@ -29,6 +42,21 @@ def main(argv=None) -> int:
     report.add_argument("--market-file", action="append", default=[], metavar="SYMBOL=PATH",
                         help="Explicit cache selection when a symbol exists in multiple layers; repeatable")
     args = parser.parse_args(argv)
+    if args.command in ('collect', 'inventory'):
+        try:
+            if args.command == 'collect':
+                result = collect_assets(args.start, args.end, args.source_root, args.market_store,
+                                        args.manifest_root, with_constituents=args.with_constituents)
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+                return 0 if result['status'] == 'complete' else 1
+            result = inventory(args.source_root, args.market_store)
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+            print(f'Inventory saved to {args.output}')
+            return 1 if result['errors'] else 0
+        except (ValueError, OSError) as exc:
+            print(f'Collection/inventory failed: {exc}', file=sys.stderr)
+            return 1
     if args.command == "sync":
         failures = 0
         for symbol in args.symbols:
@@ -55,7 +83,7 @@ def main(argv=None) -> int:
                 raise ValueError("duplicate symbol or empty market-file path")
             market_files[symbol] = Path(path)
         result = build_asset_report(args.symbols, args.start, args.end, args.market_root, args.source_root,
-                                    mode=args.mode, market_files=market_files)
+                                    mode=args.mode, market_files=market_files, market_store=args.market_store)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(render_asset_report(result), encoding="utf-8")
         if args.json_output:
