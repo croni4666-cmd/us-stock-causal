@@ -38,7 +38,11 @@ def _read_svg_inline(svg_path: Path) -> str:
     # 去 XML decl (<?xml ...?>) 和 DOCTYPE, 浏览器 inline SVG 不需要
     text = re.sub(r"<\?xml[^?]*\?>", "", text, count=1)
     text = re.sub(r"<!DOCTYPE[^>]*>", "", text, count=1)
-    return text.strip()
+    from lxml import etree
+    from src.svg_metadata import namespace_svg_ids
+    root=etree.fromstring(text.encode('utf-8'))
+    namespace_svg_ids(root)
+    return etree.tostring(root,encoding='unicode')
 
 
 def render_html_report(

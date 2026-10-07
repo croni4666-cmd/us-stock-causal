@@ -34,6 +34,9 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional, Union
+import json
+import math
+from uuid import uuid4
 
 import numpy as np
 import pandas as pd
@@ -144,26 +147,41 @@ def _draw_events(ax: plt.Axes, df: pd.DataFrame, events: Optional[list] = None) 
     return n_drawn
 
 
-def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
+def _draw_candles(ax: plt.Axes, df: pd.DataFrame, symbol='unknown',unit='unverified') -> str:
     """在 ax 上画 OHLC 蜡烛
 
-    v0.6.6 (P6-5): 给每根 candle 设 gid 前缀 (candle-wick-YYYY-MM-DD / candle-body-...),
-    后处理 _inject_ohlcv_hover 按 gid 找元素加 <title>
+    Each series gets a unique source key; raw values accompany wick/body/doji.
+    SVG export uses that key rather than interpreting rendered geometry.
 
     注意: matplotlib 的 ax.vlines/hlines 返回 LineCollection, 不支持 gid 参数
     → 用 ax.plot 画 1 段 Line2D, 然后 set_gid() 显式设
     """
+    fig=ax.figure
+    if not hasattr(fig,'_candle_source_namespace'): fig._candle_source_namespace=uuid4().hex
+    fig._candle_series_count=getattr(fig,'_candle_series_count',0)+1
+    series=f'{fig._candle_source_namespace}-s{fig._candle_series_count}'
+    metadata=getattr(ax,'_candle_metadata',{})
+    ax._candle_metadata=metadata
+    def value(raw):
+        try: return float(raw) if pd.notna(raw) and math.isfinite(float(raw)) else None
+        except (TypeError,ValueError): return None
     for idx, row in df.iterrows():
         is_up = row["close"] >= row["open"]
         color = COLOR_UP if is_up else COLOR_DOWN
         date_str = idx.strftime("%Y-%m-%d")
+        observation={'symbol':symbol,'unit':unit,'date':date_str,
+            **{field:value(row[field]) for field in ('open','high','low','close')},
+            'volume':value(row.get('volume')) if pd.notna(row.get('volume')) else None}
+        wick_gid=f'candle-wick-{series}-{date_str}'
+        body_gid=f'candle-body-{series}-{date_str}'
+        metadata[wick_gid]=observation; metadata[body_gid]=observation
 
         # Wick (high-low) — ax.plot 2 点, 显式 set_gid
         wick_line, = ax.plot(
             [idx, idx], [row["low"], row["high"]],
             color=color, linewidth=0.6, alpha=0.9,
         )
-        wick_line.set_gid(f"candle-wick-{date_str}")
+        wick_line.set_gid(wick_gid)
 
         # Body (open-close rectangle)
         body_height = abs(row["close"] - row["open"])
@@ -174,7 +192,7 @@ def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
                 [row["close"], row["close"]],
                 color=color, linewidth=0.9,
             )
-            body_line.set_gid(f"candle-body-{date_str}")
+            body_line.set_gid(body_gid)
         else:
             body_bottom = min(row["close"], row["open"])
             bar_container = ax.bar(
@@ -189,7 +207,8 @@ def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
             )
             # ax.bar 返回 BarContainer, 给每个 Rectangle 设 gid
             for rect in bar_container:
-                rect.set_gid(f"candle-body-{date_str}")
+                rect.set_gid(body_gid)
+    return series
 
 
 def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bool = True, layer: str = "indices",
@@ -290,8 +309,9 @@ def plot_single(
         visible_start = df.index[-lookback_days]
         ax.set_xlim(visible_start, df.index[-1])
 
-    # 蜡烛
-    _draw_candles(ax, df)
+    unit = price_unit or ('USD/oz' if symbol == 'GC=F' else 'USD/share' if layer in ('indices','commodities_spot_etf') else 'USD')
+    # Preserve raw observation metadata instead of inferring open/close from geometry.
+    series=_draw_candles(ax, df,symbol=symbol,unit=unit)
     # 阈值线
     _draw_thresholds(ax, df, symbol, show_50sma=show_50sma, layer=layer,
                      sma_windows=sma_windows,show_pivots=show_pivots)
@@ -309,7 +329,6 @@ def plot_single(
     else:
         period = f"{lookback_days}d"
     # Separate instrument/window from the latest observed price and indicator key.
-    unit = price_unit or ('USD/oz' if symbol == 'GC=F' else 'USD/share' if layer in ('indices','commodities_spot_etf') else 'USD')
     if ma_review:
         from src.chart_review import analyze_ma_crossings
         ax._ma_review = analyze_ma_crossings(df,symbol,unit,windows=review_windows,
@@ -326,7 +345,7 @@ def plot_single(
                      xy=(.985,.965),xycoords='axes fraction',ha='right',va='top',
                      fontsize=9,fontweight='bold',color='#174a7e',zorder=10,
                      bbox={'boxstyle':'round,pad=0.45','facecolor':'white','edgecolor':'#174a7e','alpha':.95})
-    price.set_gid(f'latest-close-label-{symbol.replace("=", "_").replace("^", "_")}')
+    price.set_gid(f'latest-close-label-{series}')
     if ax.get_legend_handles_labels()[0]:
         ax.legend(loc="upper left", fontsize=7, framealpha=0.85, ncol=2)
     ax.grid(True, alpha=0.3, linestyle="-", linewidth=0.5)
@@ -387,20 +406,18 @@ def plot_4_indices(
 
 def _inject_ohlcv_hover(svg_path: Path, fig: plt.Figure) -> int:
     """
-    v0.6.6 (P6-5): 给 SVG 加 <title> 标签, 浏览器 hover 显示 OHLCV
-
-    matplotlib 的 set_gid() 设到 SVG 的 `id` 属性 (不是 `gid`), 蜡烛
-    patch 在 SVG 输出里是 `<g id="candle-body-YYYY-MM-DD">...</g>`, 直接按 id 找
+    Bind each wick/body/doji to its own raw observation, then namespace SVG IDs.
+    Re-injection replaces titles using the preserved source key. XML/source
+    verification is recorded separately from browser and human visual acceptance.
 
     Args:
         svg_path: 写完的 SVG 路径
-        fig: matplotlib Figure (不直接用, 但保留接口一致)
+        fig: Figure containing per-axis source observation metadata
 
     Returns: 注入的 <title> 数量
     """
     from lxml import etree
-    import re as _re
-    import matplotlib.dates as mdates
+    from src.svg_metadata import namespace_svg_ids
 
     # 解析 SVG
     parser = etree.XMLParser(remove_blank_text=False)
@@ -408,40 +425,42 @@ def _inject_ohlcv_hover(svg_path: Path, fig: plt.Figure) -> int:
     root = tree.getroot()
     ns = "{http://www.w3.org/2000/svg}"
 
-    # 找所有 id="candle-body-YYYY-MM-DD" 的元素
-    # matplotlib 把 gid="candle-body-..." 输出成 id="..." (svg id 属性, 不是 gid)
+    metadata={}
+    def axes_tree(ax):
+        yield ax
+        for child in ax.child_axes: yield from axes_tree(child)
+    for ax in fig.axes:
+        for candidate in axes_tree(ax): metadata.update(getattr(candidate,'_candle_metadata',{}))
     n_injected = 0
-    for el in root.iter():
-        el_id = el.get("id") or ""
-        if not el_id.startswith("candle-body-"):
-            continue
-        date_str = el_id.replace("candle-body-", "")
-        # 从 ax.patches 找对应 candle (按 x 位置)
-        # 简单方案: 用 ax.patches 找 gid="candle-body-{date_str}" 的
-        # 但 fig 在 savefig 之后, ax 还有 patch 数据吗? — 有, fig 一直持有
-        candle = None
-        try:
-            ax = fig.axes[0]
-            for patch in ax.patches:
-                if (patch.get_gid() or "") == f"candle-body-{date_str}":
-                    candle = patch
-                    break
-        except Exception:
-            pass
-        if candle is None:
-            continue
-        body_low = float(candle.get_y())
-        body_high = float(candle.get_y() + candle.get_height())
-        title_text = (
-            f"{date_str}  body: USD {body_low:.2f} - USD {body_high:.2f}"
-        )
-        title_el = etree.SubElement(el, f"{ns}title")
-        title_el.text = title_text
+    # Snapshot before replacing existing title children: mutating a live lxml
+    # iterator can stop traversal during re-injection.
+    for el in list(root.iter()):
+        key=el.get('data-source-gid') or el.get('id')
+        if key not in metadata: continue
+        observation=metadata[key]
+        for previous_title in list(el.findall(ns+'title')): el.remove(previous_title)
+        title_el=etree.Element(ns+'title')
+        o,c=observation['open'],observation['close']
+        digits=4 if o is not None and c is not None and o!=c and round(o,2)==round(c,2) else 2
+        def price(v): return 'unavailable' if v is None else f'{v:,.{digits}f}'
+        volume=observation['volume']
+        volume_text='unavailable' if volume is None else f'{volume:,.4f}'.rstrip('0').rstrip('.')
+        title_el.text=(f"{observation['symbol']} | {observation['date']} | {observation['unit']}\n"
+            f"Open {price(o)}; High {price(observation['high'])}; Low {price(observation['low'])}; Close {price(c)}\n"
+            f"Provider volume {volume_text} (provider units)")
+        el.insert(0,title_el)
+        el.set('data-source-gid',key)
+        el.set('data-ohlcv',json.dumps(observation,ensure_ascii=False,allow_nan=False))
         n_injected += 1
-
-    if n_injected > 0:
-        tree.write(str(svg_path), xml_declaration=True, encoding="utf-8")
-        logger.info(f"[kline] injected {n_injected} OHLCV hover titles into {svg_path.name}")
+    id_count=namespace_svg_ids(root)
+    tree.write(str(svg_path),xml_declaration=True,encoding='utf-8')
+    verified=bool(metadata) and n_injected==len(metadata) and all(
+        all(r[k] is not None for k in ('open','high','low','close')) and r['symbol']!='unknown' and r['unit']!='unverified'
+        for r in metadata.values())
+    statuses=getattr(fig,'_svg_export_status',{}); fig._svg_export_status=statuses
+    statuses[str(svg_path.resolve())]={'source_metadata_verified':verified,'hover_entries':n_injected,
+        'expected_hover_entries':len(metadata),'unique_document_ids':id_count,'local_references_resolved':True}
+    logger.info(f'[kline] injected {n_injected} source OHLCV titles into {svg_path.name}')
     return n_injected
 
 
@@ -481,6 +500,8 @@ def savefig_multi_format(
                 _inject_ohlcv_hover(out, fig)
             except Exception as e:
                 logger.warning(f"[kline] hover inject failed (non-fatal): {e}")
+                statuses=getattr(fig,'_svg_export_status',{}); fig._svg_export_status=statuses
+                statuses[str(out.resolve())]={'source_metadata_verified':False,'reason':str(e)}
             written.append(out)
             logger.info(f"[kline] saved SVG (vector): {out} ({out.stat().st_size // 1024}KB)")
         elif fmt == "pdf":

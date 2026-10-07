@@ -456,7 +456,7 @@ def test_performance_dashboard_runs_v068h():
     # 画图不报错
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
     plot_performance_dashboard(ax)
-    assert len(ax.patches) > 0, "应有 bar patches"
+    assert len(ax._performance_panels['prices'].patches) > 0, "价格面板应有 bar patches"
     assert ax.get_title() != "", "应有标题"
     plt.close(fig)
 
@@ -471,7 +471,7 @@ def test_performance_table_renders_v068h():
     # markdown 格式
     assert "| 中文名 |" in md, "应有表头"
     assert "|" in md, "应有多行表格"
-    assert "1d 涨跌幅" in md
+    assert "相邻观察变化" in md
     # 至少 10 行 (去掉表头表分隔)
     lines = [l for l in md.split("\n") if l.strip().startswith("|")]
     assert len(lines) >= 12, f"应至少 12 行 (表头 + 分隔 + 10 数据), 实际 {len(lines)}"
@@ -480,7 +480,7 @@ def test_performance_table_renders_v068h():
     html = render_performance_table_html()
     assert "<table" in html
     assert "中文名" in html
-    assert "1d 涨跌幅" in html
+    assert "相邻观察变化" in html
     # 验证颜色: 涨绿 (#137333) 或 跌红 (#c5221f)
     assert "#137333" in html or "#c5221f" in html, "应有 inline 颜色"
 
@@ -571,10 +571,9 @@ def test_kline_svg_hover_inject():
         titles = tree.findall(f".//{ns}title")
         # 至少 30+ 个 (60 day lookback, 1 candle/day)
         assert len(titles) > 30, f"Expected > 30 hover titles, got {len(titles)}"
-        # title 文本格式: "YYYY-MM-DD  body: USD x.xx - USD y.yy"
         sample = titles[0].text
-        assert "body: USD" in sample, f"Title format wrong: {sample}"
-        assert "  body: USD" in sample, f"Title format wrong (date prefix): {sample}"
+        assert 'GC=F' in sample and 'USD/oz' in sample
+        assert all(label in sample for label in ('Open','High','Low','Close','Provider volume'))
 
 
 def test_attribute_all_indices_symbols_param():

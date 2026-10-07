@@ -89,6 +89,7 @@ def main(argv=None):
         for ax in list(axes.flat)[len(inputs):]: fig.delaxes(ax)
         fig.tight_layout()
         files=kline.savefig_multi_format(fig,output,formats=formats,png_dpi=args.dpi)
+        svg_exports=getattr(fig,'_svg_export_status',{})
         plt.close(fig); fig=None
         artifacts=[str(p.resolve()) for p in files]
         if options.review:
@@ -96,10 +97,12 @@ def main(argv=None):
         manifest={'schema_version':1,'generated_at_utc':datetime.now(timezone.utc).isoformat(),
             'options':options.to_dict(),'explicit_overrides':overrides,
             'formats':formats,'dpi':args.dpi,'inputs':[item[4] for item in inputs],
-            'macro_event_overlays':False,'artifacts':artifacts,
+            'macro_event_overlays':False,'artifacts':artifacts,'svg_exports':svg_exports,
             'known_limits':['historical daily close data, not an authenticated real-time spot quote',
                             'human visual acceptance and exchange-session completeness not certified']+
-                           (['existing SVG candle-hover metadata remains unverified; read prices from PNG or numerical report'] if 'svg' in formats else [])}
+                           (['SVG source metadata could not be verified; read the numerical report']
+                            if 'svg' in formats and (not svg_exports or not all(s.get('source_metadata_verified') for s in svg_exports.values())) else [])+
+                           (['SVG source/XML verification does not certify browser interaction or human readability'] if 'svg' in formats else [])}
         manifest_path=output.with_suffix('.manifest.json')
         manifest_path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2,allow_nan=False),encoding='utf-8')
         print(f'Profile {options.profile}: '+', '.join(options.symbols))

@@ -4,8 +4,8 @@ plot_gold.py - 黄金近期价格走势图 (1y K-line + 5 SMA + R1/S1 + 性能�
 输出: output/gold_1y_<date>.{png,svg}
   - 上: GC=F 黄金期货 (1y 蜡烛)
   - 中: GLD SPDR Gold ETF (1y 蜡烛)
-  - 下: 全标的 1d 涨跌幅总览 (Performance Dashboard)
-  - 终端打印: 中文 Google 风格表格 (现价 / 1d 涨跌幅 / 52w 高低)
+  - 下: 报价变化总览（价格与宏观单位分开） (Performance Dashboard)
+  - 终端打印: 中文 Google 风格表格 (最新报价 / 相邻观察变化 / 近252观察高低)
 
 跑: python examples/plot_gold.py
 """
@@ -79,7 +79,7 @@ def main() -> int:
     )
     axes[1].set_title("GLD  SPDR Gold Shares ETF (USD/share) — 1y K-line", fontsize=11, fontweight="bold")
 
-    # 下: 全标的 1d 涨跌幅总览 (Google Finance 风格)
+    # 下: 报价变化总览（价格与宏观单位分开） (Google Finance 风格)
     plot_performance_dashboard(axes[2])
 
     plt.tight_layout(rect=[0, 0, 1, 0.97])
@@ -104,7 +104,7 @@ def main() -> int:
     print()
 
     # 终端打印中文 Google 风格表格
-    print("[PERF] 全标的现价 + 1d 涨跌幅 (Google Finance 风格):")
+    print("[PERF] 最新报价与相邻观察变化（逐行单位）:")
     print()
     print(render_performance_table())
     print()
@@ -124,8 +124,8 @@ h1 {{ font-size: 18px; color: #202124; border-bottom: 2px solid #1a73e8; padding
 </style>
 </head>
 <body>
-<h1>us-stock-causal — 全标的 1d 涨跌幅总览 ({today_str})</h1>
-<p class="note">数据来源: cache parquet + yfinance, 报告时点: {today_str}</p>
+<h1>us-stock-causal — 报价变化总览（价格与宏观单位分开） ({today_str})</h1>
+<p class="note">数据来源: 本地历史报价缓存；报价日期逐行列出，生成日期: {today_str}</p>
 {render_performance_table_html()}
 </body>
 </html>"""

@@ -36,6 +36,7 @@ dependencies = [
     "loguru>=0.7.0",
     "python-dotenv>=1.0.0",
     "markdown>=3.4.0",
+    "lxml>=4.9.0",
     "plyer>=2.1.0",
     "openbb[ta]>=4.4.0",
 ]
