@@ -252,7 +252,7 @@ def test_negative_causal_effect_sign_formatting():
     assert fmt["pct_y"] == -0.2
     assert "-0.20%" in fmt["text"]
     assert "+0.20%" not in fmt["text"]
-    assert "预期↓ 0.0020 (-0.20%)" in fmt["text"]
+    assert "模型数值↓ 0.0020 (-0.20%)" in fmt["text"]
 
 
 # =============================================================================
@@ -449,7 +449,7 @@ def test_unidentifiable_causal_rendering_no_l2_or_do():
     assert "无法估计因果干预效应" in vl
     assert "['Z']" in vl
 
-    # When Z is added to data, identifiability is restored!
+    # Z restores formal identification in the candidate graph, not empirical certification.
     df_with_z = df.copy()
     df_with_z["Z"] = z
     with patch.object(causal, "load_dag_config", return_value=cfg), \
@@ -459,8 +459,10 @@ def test_unidentifiable_causal_rendering_no_l2_or_do():
 
     vix_lines_restored = [l for l in rendered_restored.splitlines() if "恐慌指数 (VIX)" in l and "QQQ" in l]
     assert len(vix_lines_restored) == 1
-    assert "**L2 干预**" in vix_lines_restored[0]
-    assert "`do(+1%)`" in vix_lines_restored[0]
+    assert "**候选图下的条件关联**" in vix_lines_restored[0]
+    assert "**L2 干预**" not in vix_lines_restored[0]
+    assert "`do(+1%)`" not in vix_lines_restored[0]
+    assert "正向支持：证据不足" in rendered_restored
 
 
 def test_historical_weights_date_integrity(tmp_path, monkeypatch):

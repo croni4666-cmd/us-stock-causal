@@ -8,7 +8,7 @@ src/causal.py - Pearl-style 因果分析 (Phase 9)
   - L3 反事实 (本模块 counterfactual_query): P(Y_x|X',Y') — "如果当初"
 
 DAG 来自 config/causal_dag.yaml (手工, 经济理论驱动), 不从数据学。
-PC9.0 POC: 核心子图 (3 macro → 4 指数), 无 mediator, 无 confounder。
+默认只作为低可信候选图；图内形式识别、结构探索和模型情景均不是现实因果认证。
 
 依赖: dowhy >= 0.14, econml >= 0.16, pydot, networkx, causal-learn
 """
@@ -26,6 +26,7 @@ import pydot
 import networkx as nx
 import yaml
 from loguru import logger
+from src.hypothesis_review import default_dag_assessment
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DAG_CONFIG = PROJECT_ROOT / "config" / "causal_dag.yaml"
@@ -224,7 +225,7 @@ def compare_dags(
 
     Returns:
         dict with:
-          - 'overlap': 两边都有的有向边 (强因果证据)
+          - 'overlap': 两边共有的结构边 (不能验证因果方向)
           - 'manual_only': 手工有 PC 没有 (理论画了, 数据不显著 → 可能是 manual 高估)
           - 'pc_only': PC 有手工没有 (数据有, 理论没画 → 可能是被忽略的因果或同期相关)
           - 'skeleton_overlap': 无视方向的骨架重叠边
@@ -337,7 +338,7 @@ def load_dag_data(
 
 @dataclass
 class CausalEffect:
-    """因果估计结果 (DoWhy 4 步)"""
+    """候选图下的形式调整数值；因果未建立，证据支持默认不足。"""
     treatment: str
     outcome: str
     estimate: float           # 平均处理效应 ATE (或未调整关联斜率, treatment 1 单位变化 → outcome 变化)
@@ -352,9 +353,12 @@ class CausalEffect:
     adjustment_set: list[str] = field(default_factory=list)
     missing_confounders: list[str] = field(default_factory=list)
     reason: str = ""
+    epistemic_assessment: dict = field(default_factory=default_dag_assessment)
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        from src.hypothesis_review import default_dag_assessment
+        return {**asdict(self), 'epistemic_assessment': default_dag_assessment(),
+                'formal_identification_scope': 'conditional_on_unverified_graph_assumptions'}
 
 
 def _compute_data_hash(df: pd.DataFrame | None) -> str:
@@ -642,13 +646,14 @@ def format_causal_effect(
     Returns:
         dict 包含 direction, delta_log_y, pct_y, p_value, sig, text
     """
+    from src.hypothesis_review import default_dag_assessment
     direction = "↑" if estimate > 0 else "↓"
     delta_log_y = estimate * 0.01
     pct_y = estimate * 1.0  # percentage points for 1% treatment shock
     sig = ""
     if p_value is not None:
         sig = "显著" if p_value < 0.05 else "不显著"
-    text = f"预期{direction} {abs(delta_log_y):.4f} ({pct_y:+.2f}%)"
+    text = f"模型数值{direction} {abs(delta_log_y):.4f} ({pct_y:+.2f}%)"
     if p_value is not None:
         text += f", p={p_value:.3f} {sig}"
     return {
@@ -659,6 +664,7 @@ def format_causal_effect(
         "std_err": std_err,
         "sig": sig,
         "text": text,
+        "epistemic_assessment": default_dag_assessment(),
     }
 
 
@@ -796,26 +802,17 @@ def causal_query(
     if adjustment_set.status == "unidentifiable":
         method_str = "unadjusted_association (unobserved confounders in DAG)"
         interpretation = (
-            f"观察关联 (因果不可识别): {treatment} 与 {outcome} 存在统计关联 "
-            f"(回归斜率 {ate:+.4f}, {pct_y:+.2f}%, p={p_value:.3f} {sig}); "
-            f"⚠️ DAG 中存在未观测混杂变量 {adjustment_set.missing_confounders}，无法通过后门调整估计因果干预效应; "
-            f"基于 {len(data)} 个交易日, std_err={std_err:.4f}"
-        )
-    elif adjustment_set.status == "identified_adjusted":
-        ctrl_info = f", 控制后门混杂: {adjustment_set.adjustment_set}"
-        method_str = f"ols_refute_{actual_refute_method}" if actual_n_refutations > 0 else "ols_backdoor_adjusted"
-        interpretation = (
-            f"{treatment} 变动 +1% (log return +0.01), {outcome} 预期{direction} {abs(delta_log_y):.4f} "
-            f"({pct_y:+.2f}%, p={p_value:.3f} {sig}{ctrl_info}); "
-            f"基于 {len(data)} 个交易日, std_err={std_err:.4f}"
+            f"观察关联 (因果不可识别；DAG默认低可信)：系数 {ate:+.4f}，p={p_value:.3f}；"
+            f"未阻断/未观测混杂 {adjustment_set.missing_confounders}；正向支持：证据不足。"
         )
     else:
-        ctrl_info = ""
-        method_str = f"ols_refute_{actual_refute_method}" if actual_n_refutations > 0 else "ols"
+        method_str = (f"ols_refute_{actual_refute_method}" if actual_n_refutations > 0
+                      else "ols_backdoor_adjusted" if adjustment_set.status == "identified_adjusted" else "ols")
         interpretation = (
-            f"{treatment} 变动 +1% (log return +0.01), {outcome} 预期{direction} {abs(delta_log_y):.4f} "
-            f"({pct_y:+.2f}%, p={p_value:.3f} {sig}{ctrl_info}); "
-            f"基于 {len(data)} 个交易日, std_err={std_err:.4f}"
+            f"候选DAG下的条件关联估计（DAG默认低可信；尚未建立因果效应）："
+            f"系数 {ate:+.4f}，p={p_value:.3f}（统计诊断，不是命题成立概率）；"
+            f"图内形式识别 {adjustment_set.status}；正向支持：证据不足；"
+            f"{len(data)} 个观察，标准误 {std_err:.4f}。"
         )
 
     result = CausalEffect(
@@ -852,9 +849,12 @@ class CounterfactualResult:
     counterfactual_treatment: float  # 假设的 do 值
     counterfactual_outcome: float    # 反事实预测
     delta: float               # counterfactual - actual
+    epistemic_assessment: dict = field(default_factory=default_dag_assessment)
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        from src.hypothesis_review import default_dag_assessment
+        return {**asdict(self), 'epistemic_assessment': default_dag_assessment(),
+                'scope': 'scenario_conditional_on_unverified_structural_model'}
 
 
 def _causal_controls(treatment: str, outcome: str, data: pd.DataFrame, cfg: dict) -> list[str]:
@@ -957,7 +957,7 @@ def _counterfactual_query_econml(
     """P9-1.5: EconML CausalForestDML 近似 L3 (保留作对照, 当前不在主路径用).
 
     数值含义: CATE (在 X=z 条件下, 改变 1 单位 treatment 的预期 Y 变化) × (cf - actual).
-    不是严格 Pearl L3, 是 linear approximation.
+    不是条件于未验证结构假设的SCM情景, 是 linear approximation.
     """
     actual_treatment = float(data.loc[date_ts, treatment])
     actual_outcome = float(data.loc[date_ts, outcome])
@@ -990,7 +990,7 @@ def _counterfactual_query_scm(
     data: pd.DataFrame,
     cfg: dict,
 ) -> CounterfactualResult:
-    """P9-1.3: 严格 Pearl L3 用 DoWhy gcm InvertibleStructuralCausalModel.
+    """P9-1.3: 条件于未验证结构假设的SCM情景 用 DoWhy gcm InvertibleStructuralCausalModel.
 
     Pearl 3-step:
       1. Abduction: 从 observed 推断 noise
@@ -1000,7 +1000,7 @@ def _counterfactual_query_scm(
     比 econml CATE 严格:
       - 用 DAG 结构 (每个节点只从 parents 学习)
       - 推断 exogenous noise (explanatory)
-      - 不是线性近似, 是 Pearl 反事实
+      - 采用结构模型形式，不表示实际个体反事实已经识别
 
     性能: SCM fit ~5ms, query ~3ms, 重复 query 0.001s (cache)
     """
@@ -1043,7 +1043,7 @@ def counterfactual_query(
     cfg: dict | None = None,
     method: str = "scm",
 ) -> CounterfactualResult:
-    """P9-1.3: 严格 Pearl L3 反事实 (用 DoWhy gcm InvertibleStructuralCausalModel).
+    """P9-1.3: 条件于未验证结构假设的SCM情景 反事实 (用 DoWhy gcm InvertibleStructuralCausalModel).
 
     Pearl 3-step 反事实:
       1. Abduction: 从 observed data 推断 exogenous noise (P(U | observed))
@@ -1057,7 +1057,7 @@ def counterfactual_query(
         counterfactual_value: **绝对值** (不是 delta), 单位 = 0.01 = 1% (跟 log return 一致)
                             e.g. 想 "VIX 比实际低 5%", 传 actual_vix - 0.05
         data, cfg: 可选, None = 自动 load
-        method: "scm" (P9-1.3, 严格 Pearl L3, 默认) / "econml" (P9-1.5, CATE 近似, 保留作对照)
+        method: "scm" (P9-1.3, 条件于未验证结构假设的SCM情景, 默认) / "econml" (P9-1.5, CATE 近似, 保留作对照)
 
     Returns:
         CounterfactualResult
@@ -1065,7 +1065,7 @@ def counterfactual_query(
     性能 (实测 7 节点 512 交易日):
       - SCM: build + fit ~5ms, query ~3ms, 重复 query < 1ms (cache)
       - EconML: fit ~130ms (cached 重复 < 1ms), query ~15ms
-      - **SCM 严格更快更准**, 是 P9-1.3 后的默认
+      - **SCM仅提供所设结构下的模型情景；速度不代表识别正确**, 是 P9-1.3 后的默认
 
     数值示例 (VIX 跌 5%, 即 intervention = actual - 0.05, 2026-07-31):
       - QQQ 实际 +0.65%, 反事实 +1.26% (delta +0.61%, 利好)
@@ -1089,7 +1089,7 @@ def counterfactual_query(
     elif method == "econml":
         return _counterfactual_query_econml(date_ts, treatment, outcome, counterfactual_value, data, cfg)
     else:
-        raise ValueError(f"[causal] method={method!r} 不支持, 用 'scm' (默认, P9-1.3 严格 Pearl L3) 或 'econml' (P9-1.5 CATE 近似)")
+        raise ValueError(f"[causal] method={method!r} 不支持, 用 'scm' (默认, P9-1.3 条件于未验证结构假设的SCM情景) 或 'econml' (P9-1.5 CATE 近似)")
 
 
 def cate_heterogeneity(
@@ -1135,6 +1135,7 @@ def cate_heterogeneity(
     """
     from econml.dml import CausalForestDML
     from sklearn.ensemble import RandomForestRegressor
+    from src.hypothesis_review import default_dag_assessment
 
     if cfg is None:
         cfg = load_dag_config()
@@ -1201,6 +1202,7 @@ def cate_heterogeneity(
             "cate": cate_mean,
             "n_obs": n_obs,
             "method": "econml_cfdml",
+            "epistemic_assessment": default_dag_assessment(),
         })
 
     _CATE_CACHE[_ck] = results

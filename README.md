@@ -83,7 +83,7 @@ scripts\install_task.cmd          :: 注册 17:00 daily (美股收盘后 1h)
 | 6. KPI | 5d / 20d 残差回归 (P7-5 baseline) | `src/residual_regression.py` |
 | 7. 异常检测 | 5 类 check (stale / residual / vix_spike / ticker_fail / parquet_corrupt) | `src/checks/` + `src/alert_logger.py` |
 | 8. 告警 | Windows toast (plyer) | `src/notify.py` |
-| 9. **Pearl 因果** | DoWhy + EconML + gcm.InvertibleSCM, 3 层因果阶梯 | `src/causal.py` |
+| 9. **候选因果模型** | DoWhy + EconML + gcm.InvertibleSCM；DAG默认低可信，输出条件关联与模型情景 | `src/causal.py` |
 
 ## 设计原则 (vs v1/v2)
 
@@ -91,7 +91,7 @@ scripts\install_task.cmd          :: 注册 17:00 daily (美股收盘后 1h)
 |---|---|---|
 | **底层** | 自写 fetch + Clash hack | yfinance 直接拉 (跟 OpenBB 一样的后端, 但更轻) |
 | **数据** | 5 个股 | **47 ticker (6 macro + 4 指数 + 11 行业 + 14 期货 + 12 ETF)** |
-| **分析** | 投票出"看多/看空" | **归因 + 模式匹配 + 阈值 + Pearl 因果 (L1/L2/L3)** |
+| **分析** | 投票出"看多/看空" | **归因 + 模式匹配 + 阈值 + 候选图条件关联（因果效应未建立）** |
 | **输出** | 311 行 7 张表 | **5 段制报告 + 因果机制段 + 异常告警 + 性能 dashboard** |
 | **维护** | 全自己 | yfinance / DoWhy / EconML 社区 (月更) |
 | **本地化** | 飞书 1-2 min 推送 (需联网 + 收 push) | **本地化 (2026-07-26 archived 飞书) + Windows toast 弹窗** |
@@ -137,3 +137,9 @@ v3 方向: **掌控数据 (47 ticker 一手 yfinance) + 一手模型 (Pearl 因�
 详细路线见 [设计文档](docs/superpowers/specs/2026-10-03-asset-specific-attribution-design.md)。
 可重复采集行情、分红拆股与每日官方快照见 [数据积累流程](docs/asset-data-pipeline.md)。
 IEF/TLT官方多期限曲线与实验现金流模型见 [美债曲线模型](docs/treasury-curve-model.md)。
+
+## DAG可信度与正向证据
+
+DAG、SCM和CATE默认只是候选假设及条件模型结果。统计显著、PC重叠或扰动稳定不升级因果可信度。
+新增离线登记检验与平衡支持评估，保留反例、事后探索、重复与无法检验项；不输出命题成立概率。
+协议、边界、真实历史示例及使用方法见 [低可信DAG与可证伪命题](docs/dag-hypothesis-review.md)。

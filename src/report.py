@@ -333,8 +333,8 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
         logger.warning(f"[causal section] 缺 parquet: {e}")
         return ""
 
-    lines = ["## 因果机制 (Phase 9.0 Pearl-style)\n",
-             "以下结果依赖手工 DAG、变量口径及无遗漏混杂等假设；回归显著性和反驳测试不能证明这些假设成立。\n"]
+    lines = ["## 候选DAG的关联与模型情景（低可信）\n",
+             "DAG默认低可信；因果效应尚未建立。正向支持：证据不足。图内形式识别仅依赖候选假设；不可检验前提保留为未验证依赖。\n"]
 
     # L2 do-calculus 2 个最 robust 的 query
     try:
@@ -355,30 +355,15 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
                     f"⚠️ DAG 存在未观测混杂变量 {missing}，无法估计因果干预效应"
                 )
             else:
-                direction = "↑" if eff.estimate > 0 else "↓"
-                delta_log_y = eff.estimate * 0.01
-                n_executed = len(eff.refutation)
-                n_passed = 0
-                for rname, rres in eff.refutation.items():
-                    if not isinstance(rres, dict) or "new_effect" not in rres:
-                        continue
-                    new_eff = rres.get("new_effect", 0.0)
-                    if "placebo" in rname.lower():
-                        if abs(new_eff) <= max(0.3 * abs(eff.estimate), 0.02):
-                            n_passed += 1
-                    else:
-                        if abs(new_eff - eff.estimate) <= max(0.35 * abs(eff.estimate), 0.05):
-                            n_passed += 1
-                refute_str = f"反驳测试 {n_passed}/{n_executed} 通过" if n_executed > 0 else "未运行反驳测试"
                 lines.append(
-                    f"- **L2 干预**: {label} `do(+1%)` → {outcome} 预期{direction} "
-                    f"{abs(delta_log_y):.4f} ({pct_y:+.2f}%, "
-                    f"p={eff.p_value:.3f} {sig}); "
-                    f"{refute_str}"
+                    f"- **候选图下的条件关联**: {label} 与 {outcome}，"
+                    f"系数 {eff.estimate:+.4f}，标准误 {eff.std_error:.4f}，p={eff.p_value:.3f}（统计诊断）；"
+                    f"图内形式识别 {eff.identification_status}；"
+                    f"扰动诊断记录 {len(eff.refutation)} 项，未作为已登记证伪或正向支持证据。"
                 )
     except Exception as e:
         logger.warning(f"[causal section] L2 query 失败: {e}")
-        lines.append(f"- L2 干预: 查询失败 ({type(e).__name__}: {e})")
+        lines.append(f"- 条件关联: 查询失败 ({type(e).__name__}: {e})")
 
     # L3 反事实 (可选, 慢)
     if include_l3:
@@ -392,7 +377,7 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
                 method="scm",
             )
             lines.append(
-                f"- **L3 反事实** (DoWhy SCM，线性结构模型，依赖 DAG 假设): "
+                f"- **条件模型情景** (DoWhy SCM，线性结构模型，DAG未验证): "
                 f"{cf.date} 假设 VIX -{abs(cf_vix-actual_vix)*100:.1f}% "
                 f"(从 {actual_vix*100:+.2f}% 到 {cf_vix*100:+.2f}%), "
                 f"{cf.outcome} 实际 {cf.actual_outcome*100:+.2f}% → "
@@ -401,7 +386,7 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
             )
         except Exception as e:
             logger.warning(f"[causal section] L3 query 失败: {e}")
-            lines.append(f"- L3 反事实: 查询失败 ({type(e).__name__}: {e})")
+            lines.append(f"- 条件模型情景: 查询失败 ({type(e).__name__}: {e})")
 
     # P9-1.1: PC algorithm 跟手工 DAG 对比 (DAG 验证)
     try:
@@ -437,10 +422,10 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
             high = cates_valid[-1]  # 末位 = highest VIX
             ratio = abs(high["cate"]) / abs(low["cate"]) if low["cate"] != 0 else float("inf")
             lines.append(
-                f"- **CATE 分组对比**: VIX→QQQ 按 VIX 日对数变化分 {len(cate_h)} 群，"
+                f"- **条件模型分组对比（CATE）**: VIX→QQQ 按 VIX 日对数变化分 {len(cate_h)} 群，"
                 f"q{low['quantile']} ({low['range'][0]*100:+.1f}%~{low['range'][1]*100:+.1f}%) "
                 f"CATE={low['cate']:+.4f} vs q{high['quantile']} ({high['range'][0]*100:+.1f}%~{high['range'][1]*100:+.1f}%) "
-                f"CATE={high['cate']:+.4f}，绝对效应比 {ratio:.2f}x；分组不代表 VIX 点位或牛熊状态。"
+                f"CATE={high['cate']:+.4f}，模型数值比 {ratio:.2f}x；分组不代表 VIX 点位或牛熊状态，也不验证因果异质性。"
             )
     except Exception as e:
         logger.warning(f"[causal section] P9-1.4 CATE 异质性失败: {e}")
@@ -450,7 +435,7 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
     lines.append(
         f"\n*数据基础: {len(data)} 交易日 log return, "
         f"观测 {len(data.columns)} 个节点；手工 DAG {graph.number_of_nodes()} 个节点、{graph.number_of_edges()} 条边。"
-        f"OLS 后门调整、反驳测试和 PC 结构对比；L3 使用 DoWhy SCM，CATE 使用 EconML。*"
+        f"OLS图内调整、扰动诊断和PC结构探索；模型情景使用DoWhy SCM，分组拟合使用EconML。均不作为因果认证。*"
     )
 
     return "\n".join(lines)
