@@ -90,6 +90,7 @@ test_*.log
 # Backups and Task Scheduler exports
 data/asset_market/
 data/asset_runs/
+data/treasury_curves/
 output/asset_inventory.json
 *.bak*
 *.task.xml*

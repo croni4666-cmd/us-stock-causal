@@ -136,3 +136,4 @@ v3 方向: **掌控数据 (47 ticker 一手 yfinance) + 一手模型 (Pearl 因�
 使用方法及模型边界见 [资产专用分析](docs/asset-specific-attribution.md)，
 详细路线见 [设计文档](docs/superpowers/specs/2026-10-03-asset-specific-attribution-design.md)。
 可重复采集行情、分红拆股与每日官方快照见 [数据积累流程](docs/asset-data-pipeline.md)。
+IEF/TLT官方多期限曲线与实验现金流模型见 [美债曲线模型](docs/treasury-curve-model.md)。

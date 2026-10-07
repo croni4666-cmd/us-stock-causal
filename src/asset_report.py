@@ -13,6 +13,8 @@ from src.asset_models import (ASSET_KINDS, duration_effect, equity_contributions
 from src.asset_sources import SOURCE_SPECS, eligible_snapshot, load_sources
 from src.asset_market import action_summary, select_market
 from src.asset_daily import daily_equity_attribution
+from src.treasury_curve import select_curve, NODES
+from src.treasury_pricing import source_bond_terms, curve_repricing
 
 
 def _read_market(symbol, root, market_files=None):
@@ -63,7 +65,7 @@ def _qqq_profile(doc):
 
 def build_asset_report(symbols: list[str], start: str, end: str, market_root: Path,
                        source_root: Path, *, mode: str = "point_in_time", market_files: dict | None = None,
-                       market_store: Path | None = None) -> dict:
+                       market_store: Path | None = None, curve_root: Path | None = None) -> dict:
     if mode not in ("point_in_time", "retrospective"):
         raise ValueError("mode must be point_in_time or retrospective")
     if date.fromisoformat(start) > date.fromisoformat(end):
@@ -87,6 +89,8 @@ def build_asset_report(symbols: list[str], start: str, end: str, market_root: Pa
         item = {"symbol": symbol, "kind": ASSET_KINDS[symbol], "returns": None,
                 "profile": None, "source": None, "market_source": None, "actions": None,
                 'daily_attribution': None,
+                'curve_model': (_unavailable('eligible beginning holdings, price endpoints and official curve required')
+                                if curve_root is not None and symbol in ('IEF','TLT') else None),
                 "attribution": _unavailable("asset-specific inputs unavailable"),
                 "errors": []}
         result["assets"].append(item)
@@ -130,6 +134,23 @@ def build_asset_report(symbols: list[str], start: str, end: str, market_root: Pa
             if item["returns"] is None:
                 item["attribution"] = _unavailable("asset return endpoints unavailable")
                 continue
+            if symbol in ('IEF','TLT') and curve_root is not None:
+                try:
+                    curves = select_curve(curve_root, start, end, mode=mode)
+                    terms = source_bond_terms(symbol, source_root, beginning)
+                    curve_model = curve_repricing(terms, start, curves['start'], curves['end'])
+                    curve_model.update(curve_sources=curves['sources'], curve_changes_bp=curves['changes_bp'],
+                                       beginning_source=_source_summary(beginning))
+                    priced_ids = {row['id'] for row in curve_model['bonds']}
+                    curve_model['known_unmodeled_weight'] = sum(row['weight'] for row in beginning['rows']
+                        if row['id'] not in priced_ids and row.get('weight') is not None)
+                    curve_model['weight_rounding_or_unknown_gap'] = 1-sum(row['weight'] for row in beginning['rows'] if row.get('weight') is not None)
+                    curve_model['unknown_weight_count'] = sum(row.get('weight') is None for row in beginning['rows'])
+                    if curve_model['estimated_price_effect'] is not None:
+                        curve_model['residual'] = item['returns']['price_return'] - curve_model['estimated_price_effect']
+                    item['curve_model'] = curve_model
+                except (ValueError, OSError, KeyError) as exc:
+                    item['curve_model'] = _unavailable(str(exc))
             if symbol == "QQQ":
                 stocks, stock_sources = {}, {}
                 for row in beginning["rows"]:
@@ -216,6 +237,24 @@ def render_asset_report(result: dict) -> str:
             else:
                 lines.append(f"QQQ逐日财富链接贡献 {_pct(daily['linked_contribution'])}；链接残差 {_pct(daily['linked_residual'])}；两者合计为ETF价格回报 {_pct(daily['etf_price_return'])}。")
                 lines.append('逐日保留原始权重，缺失股票不重归一化；机械核算不代表因果效应。')
+        if item.get('curve_model'):
+            curve = item['curve_model']
+            if curve['status'] == 'unavailable':
+                lines.append('官方曲线/现金流模型未就绪：' + curve.get('reason','无可定价债券') + '。')
+            else:
+                lines.append(f"固定期初日期现金流重估近似：已覆盖原始权重 {curve['covered_weight']:.4%}；已知未建模权重 {curve['known_unmodeled_weight']:.4%}；舍入/未知权重差 {curve['weight_rounding_or_unknown_gap']:+.4%}；未知权重记录 {curve['unknown_weight_count']}。")
+                lines.append(f"模型曲线价格贡献 {_pct(curve['estimated_price_effect'])}；与ETF价格回报残差 {_pct(curve['residual'])}。")
+                lines.append(f"节点线性贡献 {_pct(curve['linear_curve_effect'])}；非线性余项 {_pct(curve['nonlinear_remainder'])}。")
+                lines.extend(['','| Par节点 | 实际变化bp | 原始权重加权节点敏感性 |','|---|---:|---:|'])
+                for node in NODES:
+                    lines.append(f"| {node} | {curve['curve_changes_bp'][node]:+.2f} | {curve['key_rate_durations'][node]:.4f} |")
+                source = curve['beginning_source']
+                lines.append(f"现金流持仓日期 {source['as_of']}；SHA256 `{source['sha256']}`；取得时间 {source['available_at']}。")
+                for source in curve['curve_sources']:
+                    lines.append(f"[财政部原文]({source['source_url']})；SHA256 `{source['sha256']}`；取得时间 {source['available_at']}。")
+                if curve['missing_ids']:
+                    lines.append('未定价债券：' + ', '.join(curve['missing_ids']) + '。')
+                lines.append('这是半年par插值和实验bootstrap所得折现曲线，不是财政部官方零息曲线；发行商票息经舍入。固定日期不含carry、rolldown、费用、分红、再平衡及付款日延迟；不能作为官方总收益或因果效应。')
         if profile:
             lines.append(f"结构日期：{profile['as_of']}。")
             if symbol in ("IEF", "TLT"):

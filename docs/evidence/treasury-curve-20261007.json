@@ -1,0 +1,2484 @@
+{
+  "schema_version": 1,
+  "reports": {
+    "current": {
+      "start": "2026-10-05",
+      "end": "2026-10-06",
+      "mode": "retrospective",
+      "historical_trade_backtest_ready": false,
+      "assets": [
+        {
+          "symbol": "IEF",
+          "returns": {
+            "symbol": "IEF",
+            "kind": "treasury_etf",
+            "start": "2026-10-05",
+            "end": "2026-10-06",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": 0.002361663166857708,
+            "adjusted_return_proxy": 0.002361663166857708,
+            "adjustment_gap": 0.0
+          },
+          "source": {
+            "symbol": "IEF",
+            "provider": "iShares",
+            "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+            "sha256": "49c827ba36c5c0f3c532895c5fc6638bc1f482a7345ac1e60fc4d06266724518",
+            "as_of": "2026-10-05",
+            "retrieved_at": "2026-10-07T01:48:45.816915+00:00",
+            "available_at": "2026-10-07T01:48:45.816915+00:00",
+            "warnings": []
+          },
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "IEF",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/IEF/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-30",
+            "query_end_exclusive": "2026-10-07",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-07T01:48:55.503478+00:00",
+            "available_at": "2026-10-07T01:48:55.503478+00:00",
+            "sha256": "b401f68ad95070edb35d2fa6647e385f0857d71f94ecc33be265b0c2e40f1e32",
+            "row_count": 5,
+            "first_date": "2026-09-30",
+            "last_date": "2026-10-06",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits",
+              "capital gains"
+            ],
+            "path": ".review\\p3-live\\m\\IEF\\cda9ddfa586943108f97f2ec0afc9a16.parquet",
+            "metadata_path": ".review\\p3-live\\m\\IEF\\cda9ddfa586943108f97f2ec0afc9a16.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": {
+            "status": "approximation",
+            "method": "fixed-date cashflow repricing on experimental par-bootstrap curve",
+            "valuation_date": "2026-10-05",
+            "covered_weight": 0.9999,
+            "weight_gap_from_one": 9.999999999998899e-05,
+            "missing_ids": [],
+            "bonds": [
+              {
+                "id": "91282CPZ8",
+                "weight": 0.0902,
+                "model_dirty_price_per100": 92.07051733283889,
+                "model_price_change": 0.0030273333979866646,
+                "contribution": 0.00027306547249839714
+              },
+              {
+                "id": "91282CMM0",
+                "weight": 0.0882,
+                "model_dirty_price_per100": 96.49343991993125,
+                "model_price_change": 0.0027230831986251314,
+                "contribution": 0.00024017593811873658
+              },
+              {
+                "id": "91282CLW9",
+                "weight": 0.08810000000000001,
+                "model_dirty_price_per100": 95.16970662271717,
+                "model_price_change": 0.0026525340978038603,
+                "contribution": 0.00023368825401652013
+              },
+              {
+                "id": "91282CNC1",
+                "weight": 0.0873,
+                "model_dirty_price_per100": 94.71790067562057,
+                "model_price_change": 0.002786675225775248,
+                "contribution": 0.00024327674721017915
+              },
+              {
+                "id": "91282CPJ4",
+                "weight": 0.0866,
+                "model_dirty_price_per100": 92.3639908559489,
+                "model_price_change": 0.0029411567247179526,
+                "contribution": 0.00025470417236057467
+              },
+              {
+                "id": "91282CQQ7",
+                "weight": 0.08650000000000001,
+                "model_dirty_price_per100": 94.8299748720117,
+                "model_price_change": 0.003032603602466155,
+                "contribution": 0.00026232021161332243
+              },
+              {
+                "id": "91282CKQ3",
+                "weight": 0.0851,
+                "model_dirty_price_per100": 96.48029913069215,
+                "model_price_change": 0.0025066077958519895,
+                "contribution": 0.0002133123234270043
+              },
+              {
+                "id": "91282CJZ5",
+                "weight": 0.0848,
+                "model_dirty_price_per100": 93.22136287214214,
+                "model_price_change": 0.0024877460529091344,
+                "contribution": 0.0002109608652866946
+              },
+              {
+                "id": "91282CNT4",
+                "weight": 0.08310000000000001,
+                "model_dirty_price_per100": 93.42712963301035,
+                "model_price_change": 0.0028850859120814754,
+                "contribution": 0.00023975063929397063
+              },
+              {
+                "id": "91282CJJ1",
+                "weight": 0.0711,
+                "model_dirty_price_per100": 97.63583829105056,
+                "model_price_change": 0.002360232050116373,
+                "contribution": 0.00016781249876327413
+              },
+              {
+                "id": "91282CLF6",
+                "weight": 0.0701,
+                "model_dirty_price_per100": 91.90640916532418,
+                "model_price_change": 0.002638837059811827,
+                "contribution": 0.00018498247789280908
+              },
+              {
+                "id": "91282CRF0",
+                "weight": 0.0526,
+                "model_dirty_price_per100": 95.47066258400156,
+                "model_price_change": 0.003106984250005995,
+                "contribution": 0.00016342737155031534
+              },
+              {
+                "id": "91282CHT1",
+                "weight": 0.018500000000000003,
+                "model_dirty_price_per100": 93.06107568078424,
+                "model_price_change": 0.0023079069061247015,
+                "contribution": 4.269627776330698e-05
+              },
+              {
+                "id": "912810FT0",
+                "weight": 0.0077,
+                "model_dirty_price_per100": 94.84375914821604,
+                "model_price_change": 0.0029935678524510845,
+                "contribution": 2.305047246387335e-05
+              },
+              {
+                "id": "91282CHC8",
+                "weight": 0.0,
+                "model_dirty_price_per100": 91.37265837916866,
+                "model_price_change": 0.0021608939642716596,
+                "contribution": 0.0
+              },
+              {
+                "id": "91282CRC7",
+                "weight": 0.0,
+                "model_dirty_price_per100": 96.21501455992662,
+                "model_price_change": 0.0022558949237942993,
+                "contribution": 0.0
+              }
+            ],
+            "estimated_price_effect": 0.0027532237222589787,
+            "key_rate_durations": {
+              "6 Mo": -0.0017048147072784507,
+              "1 Yr": -0.006053386849578968,
+              "2 Yr": -0.014053962141319033,
+              "3 Yr": -0.03628499031301053,
+              "5 Yr": -0.06830093282293254,
+              "7 Yr": 3.3880868174244756,
+              "10 Yr": 3.6354090344337067,
+              "20 Yr": 0.0,
+              "30 Yr": 0.0
+            },
+            "linear_curve_effect": 0.0027482782869176136,
+            "nonlinear_remainder": 4.945435341365077e-06,
+            "causal_status": "not_identified",
+            "limitations": [
+              "linear par interpolation on semiannual grid; log discount interpolation; not official Treasury zero curve",
+              "issuer displayed coupons are rounded; security terms not independently certified",
+              "fixed date excludes carry/rolldown, cash, fees, distributions, rebalancing and payment-date shifts",
+              "uncovered weights are not renormalized; this is a covered-portfolio sensitivity, not official ETF total return"
+            ],
+            "curve_sources": [
+              {
+                "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/2026/all?_format=csv&field_tdr_date_value=2026&page=&type=daily_treasury_yield_curve",
+                "sha256": "3e21746899096b3d4615672cf9f0cce3049f59df4904437bf70397c633607c2b",
+                "retrieved_at": "2026-10-07T01:41:06.974448+00:00",
+                "available_at": "2026-10-07T01:41:06.974448+00:00",
+                "year": 2026
+              }
+            ],
+            "curve_changes_bp": {
+              "6 Mo": -1.9999999999999574,
+              "1 Yr": -0.9999999999999787,
+              "2 Yr": -4.999999999999982,
+              "3 Yr": -8.999999999999986,
+              "5 Yr": -2.999999999999936,
+              "7 Yr": -4.0000000000000036,
+              "10 Yr": -4.0000000000000036,
+              "20 Yr": -2.000000000000046,
+              "30 Yr": -2.000000000000046
+            },
+            "beginning_source": {
+              "symbol": "IEF",
+              "provider": "iShares",
+              "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+              "sha256": "49c827ba36c5c0f3c532895c5fc6638bc1f482a7345ac1e60fc4d06266724518",
+              "as_of": "2026-10-05",
+              "retrieved_at": "2026-10-07T01:48:45.816915+00:00",
+              "available_at": "2026-10-07T01:48:45.816915+00:00",
+              "warnings": []
+            },
+            "known_unmodeled_weight": 0.0,
+            "weight_rounding_or_unknown_gap": 9.999999999998899e-05,
+            "unknown_weight_count": 0,
+            "residual": -0.00039156055540127055
+          },
+          "errors": [],
+          "attribution": {
+            "status": "approximation",
+            "method": "single-tenor yield proxy; linear duration",
+            "beginning_as_of": "2026-10-05",
+            "beginning_source": {
+              "symbol": "IEF",
+              "provider": "iShares",
+              "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+              "sha256": "49c827ba36c5c0f3c532895c5fc6638bc1f482a7345ac1e60fc4d06266724518",
+              "as_of": "2026-10-05",
+              "retrieved_at": "2026-10-07T01:48:45.816915+00:00",
+              "available_at": "2026-10-07T01:48:45.816915+00:00",
+              "warnings": []
+            },
+            "yield_proxy": "^TNX",
+            "yield_delta_bp": -4.199981689453125,
+            "yield_source": {
+              "schema_version": 1,
+              "symbol": "^TNX",
+              "provider": "Yahoo Finance via yfinance",
+              "source_url": "https://finance.yahoo.com/quote/%5ETNX/history/",
+              "representation": "provider-normalized daily history, not raw HTTP response",
+              "query_start": "2026-09-30",
+              "query_end_exclusive": "2026-10-07",
+              "auto_adjust": false,
+              "retrieved_at": "2026-10-07T01:48:59.125284+00:00",
+              "available_at": "2026-10-07T01:48:59.125284+00:00",
+              "sha256": "675bbc194d5f84bfb586dcdd6d5cb00458b7f25489346e6eae3ed02cb0801192",
+              "row_count": 5,
+              "first_date": "2026-09-30",
+              "last_date": "2026-10-06",
+              "fields": [
+                "open",
+                "high",
+                "low",
+                "close",
+                "adj close",
+                "volume",
+                "dividends",
+                "stock splits"
+              ],
+              "path": ".review\\p3-live\\m\\%5ETNX\\62550d244b414557948356474412fa74.parquet",
+              "metadata_path": ".review\\p3-live\\m\\%5ETNX\\62550d244b414557948356474412fa74.json",
+              "availability_status": "capture time verified; original publication and revision times unverified"
+            },
+            "duration_years": 6.846788,
+            "estimated_price_effect": 0.0028756384231567386,
+            "residual": -0.0005139752562990305,
+            "causal_status": "not_identified",
+            "limitations": [
+              "not full-curve repricing; carry, nonparallel shifts, convexity and fees remain unmodeled"
+            ]
+          }
+        },
+        {
+          "symbol": "TLT",
+          "returns": {
+            "symbol": "TLT",
+            "kind": "treasury_etf",
+            "start": "2026-10-05",
+            "end": "2026-10-06",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": 0.002204618954736448,
+            "adjusted_return_proxy": 0.002204618954736448,
+            "adjustment_gap": 0.0
+          },
+          "source": {
+            "symbol": "TLT",
+            "provider": "iShares",
+            "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+            "sha256": "aed11f0ad8335e65665f0f0d788d693a3a95a8016e7e09d4e44538f52be09d48",
+            "as_of": "2026-10-05",
+            "retrieved_at": "2026-10-07T01:48:47.279321+00:00",
+            "available_at": "2026-10-07T01:48:47.279321+00:00",
+            "warnings": []
+          },
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "TLT",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/TLT/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-30",
+            "query_end_exclusive": "2026-10-07",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-07T01:48:55.993311+00:00",
+            "available_at": "2026-10-07T01:48:55.993311+00:00",
+            "sha256": "9cfd2737305d3e100aad08a426b1f4008ba68fd46c47513aed67545dd4e31d5a",
+            "row_count": 5,
+            "first_date": "2026-09-30",
+            "last_date": "2026-10-06",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits",
+              "capital gains"
+            ],
+            "path": ".review\\p3-live\\m\\TLT\\3110f010ac744a6aa5ea308fb9d1ca00.parquet",
+            "metadata_path": ".review\\p3-live\\m\\TLT\\3110f010ac744a6aa5ea308fb9d1ca00.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": {
+            "status": "approximation",
+            "method": "fixed-date cashflow repricing on experimental par-bootstrap curve",
+            "valuation_date": "2026-10-05",
+            "covered_weight": 0.9999999999999998,
+            "weight_gap_from_one": 2.220446049250313e-16,
+            "missing_ids": [],
+            "bonds": [
+              {
+                "id": "912810UK2",
+                "weight": 0.0433,
+                "model_dirty_price_per100": 88.8476543294939,
+                "model_price_change": 0.002818943101315474,
+                "contribution": 0.00012206023628696003
+              },
+              {
+                "id": "912810UA4",
+                "weight": 0.041299999999999996,
+                "model_dirty_price_per100": 87.24800567275518,
+                "model_price_change": 0.0027806984915281774,
+                "contribution": 0.00011484284770011371
+              },
+              {
+                "id": "912810UU0",
+                "weight": 0.0407,
+                "model_dirty_price_per100": 92.42433680504973,
+                "model_price_change": 0.0028479704233455028,
+                "contribution": 0.00011591239623016196
+              },
+              {
+                "id": "912810TV0",
+                "weight": 0.0403,
+                "model_dirty_price_per100": 89.04081220714772,
+                "model_price_change": 0.002753635420752465,
+                "contribution": 0.00011097150745632435
+              },
+              {
+                "id": "912810TX6",
+                "weight": 0.0393,
+                "model_dirty_price_per100": 80.77943284623407,
+                "model_price_change": 0.0028215340691524204,
+                "contribution": 0.00011088628891769013
+              },
+              {
+                "id": "912810TT5",
+                "weight": 0.0392,
+                "model_dirty_price_per100": 79.22374810365993,
+                "model_price_change": 0.002801567353591272,
+                "contribution": 0.00010982144026077787
+              },
+              {
+                "id": "912810UP1",
+                "weight": 0.038900000000000004,
+                "model_dirty_price_per100": 87.0280054617181,
+                "model_price_change": 0.002845010363706324,
+                "contribution": 0.00011067090314817602
+              },
+              {
+                "id": "912810UC0",
+                "weight": 0.0388,
+                "model_dirty_price_per100": 80.662642288076,
+                "model_price_change": 0.0028454405196209898,
+                "contribution": 0.0001104030921612944
+              },
+              {
+                "id": "912810UR7",
+                "weight": 0.0387,
+                "model_dirty_price_per100": 87.57208042328706,
+                "model_price_change": 0.0028881885159424137,
+                "contribution": 0.0001117728955669714
+              },
+              {
+                "id": "912810UG1",
+                "weight": 0.0384,
+                "model_dirty_price_per100": 85.97619900078351,
+                "model_price_change": 0.002851508031602723,
+                "contribution": 0.00010949790841354455
+              },
+              {
+                "id": "912810UE6",
+                "weight": 0.0384,
+                "model_dirty_price_per100": 85.28914504704635,
+                "model_price_change": 0.0028083859900804864,
+                "contribution": 0.00010784202201909067
+              },
+              {
+                "id": "912810TB4",
+                "weight": 0.0369,
+                "model_dirty_price_per100": 49.636928895287355,
+                "model_price_change": 0.0027755523669701354,
+                "contribution": 0.00010241788234119801
+              },
+              {
+                "id": "912810UM8",
+                "weight": 0.0345,
+                "model_dirty_price_per100": 87.62955533642209,
+                "model_price_change": 0.0028676730013950102,
+                "contribution": 9.893471854812786e-05
+              },
+              {
+                "id": "912810SZ2",
+                "weight": 0.031400000000000004,
+                "model_dirty_price_per100": 50.999173112077216,
+                "model_price_change": 0.0027724409731120225,
+                "contribution": 8.705464655571752e-05
+              },
+              {
+                "id": "912810TR9",
+                "weight": 0.031200000000000002,
+                "model_dirty_price_per100": 73.24058833633545,
+                "model_price_change": 0.002774706977165531,
+                "contribution": 8.657085768756457e-05
+              },
+              {
+                "id": "912810TL2",
+                "weight": 0.0301,
+                "model_dirty_price_per100": 78.63860776393236,
+                "model_price_change": 0.0027317786372802466,
+                "contribution": 8.222653698213542e-05
+              },
+              {
+                "id": "912810TN8",
+                "weight": 0.0262,
+                "model_dirty_price_per100": 72.42935192520488,
+                "model_price_change": 0.002795486946767678,
+                "contribution": 7.324175800531317e-05
+              },
+              {
+                "id": "912810UW6",
+                "weight": 0.0254,
+                "model_dirty_price_per100": 93.05077404355904,
+                "model_price_change": 0.0028911226209122898,
+                "contribution": 7.343451457117216e-05
+              },
+              {
+                "id": "912810SU3",
+                "weight": 0.024900000000000002,
+                "model_dirty_price_per100": 49.80470239281697,
+                "model_price_change": 0.002733738633521998,
+                "contribution": 6.807009197469776e-05
+              },
+              {
+                "id": "912810SD1",
+                "weight": 0.024300000000000002,
+                "model_dirty_price_per100": 66.43545590646677,
+                "model_price_change": 0.002495840223006862,
+                "contribution": 6.064891741906675e-05
+              },
+              {
+                "id": "912810SC3",
+                "weight": 0.0242,
+                "model_dirty_price_per100": 69.04344767822528,
+                "model_price_change": 0.002448151006660737,
+                "contribution": 5.924525436118983e-05
+              },
+              {
+                "id": "912810SP4",
+                "weight": 0.0236,
+                "model_dirty_price_per100": 43.60494569522363,
+                "model_price_change": 0.0027079998918357884,
+                "contribution": 6.39087974473246e-05
+              },
+              {
+                "id": "912810SF6",
+                "weight": 0.022799999999999997,
+                "model_dirty_price_per100": 66.09190939217602,
+                "model_price_change": 0.0025372384128812264,
+                "contribution": 5.784903581369196e-05
+              },
+              {
+                "id": "912810SS8",
+                "weight": 0.022400000000000003,
+                "model_dirty_price_per100": 47.095491096479655,
+                "model_price_change": 0.0026983701448928255,
+                "contribution": 6.04434912455993e-05
+              },
+              {
+                "id": "912810SA7",
+                "weight": 0.021400000000000002,
+                "model_dirty_price_per100": 66.78971922274954,
+                "model_price_change": 0.0024531973086687753,
+                "contribution": 5.24984224055118e-05
+              },
+              {
+                "id": "912810SE9",
+                "weight": 0.0194,
+                "model_dirty_price_per100": 71.981381879897,
+                "model_price_change": 0.0024886555186980353,
+                "contribution": 4.8279917062741883e-05
+              },
+              {
+                "id": "912810SJ8",
+                "weight": 0.0191,
+                "model_dirty_price_per100": 55.989093178621744,
+                "model_price_change": 0.002583832482663695,
+                "contribution": 4.935120041887657e-05
+              },
+              {
+                "id": "912810SL3",
+                "weight": 0.018600000000000002,
+                "model_dirty_price_per100": 52.2796618612314,
+                "model_price_change": 0.002634993742912206,
+                "contribution": 4.901088361816704e-05
+              },
+              {
+                "id": "912810RZ3",
+                "weight": 0.0181,
+                "model_dirty_price_per100": 64.52319710374987,
+                "model_price_change": 0.002400081877106164,
+                "contribution": 4.344148197562157e-05
+              },
+              {
+                "id": "912810TD0",
+                "weight": 0.016200000000000003,
+                "model_dirty_price_per100": 54.00759295145919,
+                "model_price_change": 0.002799344407642179,
+                "contribution": 4.534937940380331e-05
+              },
+              {
+                "id": "912810TJ7",
+                "weight": 0.0159,
+                "model_dirty_price_per100": 63.96219272903542,
+                "model_price_change": 0.0027942219454144546,
+                "contribution": 4.442812893208983e-05
+              },
+              {
+                "id": "912810TG3",
+                "weight": 0.014499999999999999,
+                "model_dirty_price_per100": 63.176130453364806,
+                "model_price_change": 0.0027516234714553,
+                "contribution": 3.989854033610185e-05
+              },
+              {
+                "id": "912810SH2",
+                "weight": 0.0141,
+                "model_dirty_price_per100": 65.0893749544408,
+                "model_price_change": 0.0025295614042863956,
+                "contribution": 3.5666815800438176e-05
+              },
+              {
+                "id": "912810SN9",
+                "weight": 0.0108,
+                "model_dirty_price_per100": 42.45617743702404,
+                "model_price_change": 0.0026659873826904157,
+                "contribution": 2.879266373305649e-05
+              },
+              {
+                "id": "912810SX7",
+                "weight": 0.0103,
+                "model_dirty_price_per100": 56.917125421244144,
+                "model_price_change": 0.0027036121106149835,
+                "contribution": 2.7847204739334332e-05
+              },
+              {
+                "id": "912810RV2",
+                "weight": 0.0091,
+                "model_dirty_price_per100": 67.531685022284,
+                "model_price_change": 0.0023640813554863804,
+                "contribution": 2.1513140334926062e-05
+              },
+              {
+                "id": "912810RY6",
+                "weight": 0.0077,
+                "model_dirty_price_per100": 64.03746862313218,
+                "model_price_change": 0.0024027625027245314,
+                "contribution": 1.8501271270978893e-05
+              },
+              {
+                "id": "912810SK5",
+                "weight": 0.0043,
+                "model_dirty_price_per100": 58.074643129010056,
+                "model_price_change": 0.0025781766405883477,
+                "contribution": 1.1086159554529896e-05
+              },
+              {
+                "id": "912810RU4",
+                "weight": 0.0040999999999999995,
+                "model_dirty_price_per100": 66.97543218783781,
+                "model_price_change": 0.0023112107972942386,
+                "contribution": 9.475964268906378e-06
+              },
+              {
+                "id": "912810RS9",
+                "weight": 0.001,
+                "model_dirty_price_per100": 62.89662441410897,
+                "model_price_change": 0.0023933262767779073,
+                "contribution": 2.3933262767779075e-06
+              },
+              {
+                "id": "912810RQ3",
+                "weight": 0.0002,
+                "model_dirty_price_per100": 62.63963932667138,
+                "model_price_change": 0.0024853699152354025,
+                "contribution": 4.970739830470806e-07
+              },
+              {
+                "id": "912810UJ5",
+                "weight": 0.0,
+                "model_dirty_price_per100": 90.42214694736536,
+                "model_price_change": 0.002685292102653891,
+                "contribution": 0.0
+              },
+              {
+                "id": "912810RH3",
+                "weight": 0.0,
+                "model_dirty_price_per100": 72.1611987639785,
+                "model_price_change": 0.00282111910919447,
+                "contribution": 0.0
+              },
+              {
+                "id": "912810UN6",
+                "weight": 0.0,
+                "model_dirty_price_per100": 91.58440831172209,
+                "model_price_change": 0.0025982383258280617,
+                "contribution": 0.0
+              },
+              {
+                "id": "912810RK6",
+                "weight": 0.0,
+                "model_dirty_price_per100": 64.14362907661648,
+                "model_price_change": 0.002737583462943949,
+                "contribution": 0.0
+              },
+              {
+                "id": "912810RG5",
+                "weight": 0.0,
+                "model_dirty_price_per100": 76.19360572479499,
+                "model_price_change": 0.0028255979930655872,
+                "contribution": 0.0
+              },
+              {
+                "id": "912810RJ9",
+                "weight": 0.0,
+                "model_dirty_price_per100": 71.07410910578022,
+                "model_price_change": 0.002746462840302888,
+                "contribution": 0.0
+              }
+            ],
+            "estimated_price_effect": 0.0027367596152288124,
+            "key_rate_durations": {
+              "6 Mo": -0.0022280884646079637,
+              "1 Yr": -0.007911125330105859,
+              "2 Yr": -0.01837459790534634,
+              "3 Yr": -0.04744030634301404,
+              "5 Yr": -0.09897501455257068,
+              "7 Yr": -0.19272419545150435,
+              "10 Yr": -0.9831569944967827,
+              "20 Yr": 5.794753435621457,
+              "30 Yr": 10.617801090728713
+            },
+            "linear_curve_effect": 0.002729345620037706,
+            "nonlinear_remainder": 7.413995191106557e-06,
+            "causal_status": "not_identified",
+            "limitations": [
+              "linear par interpolation on semiannual grid; log discount interpolation; not official Treasury zero curve",
+              "issuer displayed coupons are rounded; security terms not independently certified",
+              "fixed date excludes carry/rolldown, cash, fees, distributions, rebalancing and payment-date shifts",
+              "uncovered weights are not renormalized; this is a covered-portfolio sensitivity, not official ETF total return"
+            ],
+            "curve_sources": [
+              {
+                "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/2026/all?_format=csv&field_tdr_date_value=2026&page=&type=daily_treasury_yield_curve",
+                "sha256": "3e21746899096b3d4615672cf9f0cce3049f59df4904437bf70397c633607c2b",
+                "retrieved_at": "2026-10-07T01:41:06.974448+00:00",
+                "available_at": "2026-10-07T01:41:06.974448+00:00",
+                "year": 2026
+              }
+            ],
+            "curve_changes_bp": {
+              "6 Mo": -1.9999999999999574,
+              "1 Yr": -0.9999999999999787,
+              "2 Yr": -4.999999999999982,
+              "3 Yr": -8.999999999999986,
+              "5 Yr": -2.999999999999936,
+              "7 Yr": -4.0000000000000036,
+              "10 Yr": -4.0000000000000036,
+              "20 Yr": -2.000000000000046,
+              "30 Yr": -2.000000000000046
+            },
+            "beginning_source": {
+              "symbol": "TLT",
+              "provider": "iShares",
+              "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+              "sha256": "aed11f0ad8335e65665f0f0d788d693a3a95a8016e7e09d4e44538f52be09d48",
+              "as_of": "2026-10-05",
+              "retrieved_at": "2026-10-07T01:48:47.279321+00:00",
+              "available_at": "2026-10-07T01:48:47.279321+00:00",
+              "warnings": []
+            },
+            "known_unmodeled_weight": 0.0,
+            "weight_rounding_or_unknown_gap": 0.0,
+            "unknown_weight_count": 0,
+            "residual": -0.0005321406604923643
+          },
+          "errors": [],
+          "attribution": {
+            "status": "approximation",
+            "method": "single-tenor yield proxy; linear duration",
+            "beginning_as_of": "2026-10-05",
+            "beginning_source": {
+              "symbol": "TLT",
+              "provider": "iShares",
+              "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+              "sha256": "aed11f0ad8335e65665f0f0d788d693a3a95a8016e7e09d4e44538f52be09d48",
+              "as_of": "2026-10-05",
+              "retrieved_at": "2026-10-07T01:48:47.279321+00:00",
+              "available_at": "2026-10-07T01:48:47.279321+00:00",
+              "warnings": []
+            },
+            "yield_proxy": "^TYX",
+            "yield_delta_bp": -2.4000167846679688,
+            "yield_source": {
+              "schema_version": 1,
+              "symbol": "^TYX",
+              "provider": "Yahoo Finance via yfinance",
+              "source_url": "https://finance.yahoo.com/quote/%5ETYX/history/",
+              "representation": "provider-normalized daily history, not raw HTTP response",
+              "query_start": "2026-09-30",
+              "query_end_exclusive": "2026-10-07",
+              "auto_adjust": false,
+              "retrieved_at": "2026-10-07T01:48:59.663127+00:00",
+              "available_at": "2026-10-07T01:48:59.663127+00:00",
+              "sha256": "b034c33c026399165974fc7ce9803463006a07d7f3c10b86a1caf86f776bed25",
+              "row_count": 5,
+              "first_date": "2026-09-30",
+              "last_date": "2026-10-06",
+              "fields": [
+                "open",
+                "high",
+                "low",
+                "close",
+                "adj close",
+                "volume",
+                "dividends",
+                "stock splits"
+              ],
+              "path": ".review\\p3-live\\m\\%5ETYX\\027318758ae5467d9765195513190149.parquet",
+              "metadata_path": ".review\\p3-live\\m\\%5ETYX\\027318758ae5467d9765195513190149.json",
+              "availability_status": "capture time verified; original publication and revision times unverified"
+            },
+            "duration_years": 14.635,
+            "estimated_price_effect": 0.0035124245643615723,
+            "residual": -0.0013078056096251242,
+            "causal_status": "not_identified",
+            "limitations": [
+              "not full-curve repricing; carry, nonparallel shifts, convexity and fees remain unmodeled"
+            ]
+          }
+        },
+        {
+          "symbol": "GLD",
+          "returns": {
+            "symbol": "GLD",
+            "kind": "gold_etf",
+            "start": "2026-10-05",
+            "end": "2026-10-06",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": 0.007166384687612659,
+            "adjusted_return_proxy": 0.007166384687612659,
+            "adjustment_gap": 0.0
+          },
+          "source": {
+            "symbol": "GLD",
+            "provider": "SPDR",
+            "source_url": "https://api.spdrgoldshares.com/api/v1/historical-archive?product=gld&exchange=NYSE&lang=en",
+            "sha256": "4534c290868487803f3f031b5feee3b0ed9723e3557e20a79b49e8e3ff6495ec",
+            "as_of": "2026-10-05",
+            "retrieved_at": "2026-10-07T01:48:50.283507+00:00",
+            "available_at": "2026-10-07T01:48:50.283507+00:00",
+            "warnings": [
+              "independent licensed LBMA benchmark absent; NAV and close have different pricing times"
+            ]
+          },
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "GLD",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/GLD/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-30",
+            "query_end_exclusive": "2026-10-07",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-07T01:48:56.473620+00:00",
+            "available_at": "2026-10-07T01:48:56.473620+00:00",
+            "sha256": "3cb459ebe2227960900406a7fa157146d0af61acd51beaed36e10a5d84d6d5e7",
+            "row_count": 5,
+            "first_date": "2026-09-30",
+            "last_date": "2026-10-06",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits",
+              "capital gains"
+            ],
+            "path": ".review\\p3-live\\m\\GLD\\e16dbd35928e4314ac88ee5f77ca839c.parquet",
+            "metadata_path": ".review\\p3-live\\m\\GLD\\e16dbd35928e4314ac88ee5f77ca839c.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": null,
+          "errors": [],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "exact GLD archive dates unavailable; no forward fill",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "QQQ",
+          "returns": {
+            "symbol": "QQQ",
+            "kind": "equity_etf",
+            "start": "2026-10-05",
+            "end": "2026-10-06",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": 0.004575457394402571,
+            "adjusted_return_proxy": 0.004575457394402571,
+            "adjustment_gap": 0.0
+          },
+          "source": {
+            "symbol": "QQQ",
+            "provider": "Invesco",
+            "source_url": "https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/46090E103/holdings/fund?idType=cusip&productType=ETF",
+            "sha256": "d94a6228a05674ae6db3948fb544b147c532ce3eff993a3c7e4425b3cf555158",
+            "as_of": "2026-10-05",
+            "retrieved_at": "2026-10-07T01:48:44.272731+00:00",
+            "available_at": "2026-10-07T01:48:44.272731+00:00",
+            "warnings": [
+              "unknown weight: USDPDV:Currency"
+            ]
+          },
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "QQQ",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/QQQ/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-30",
+            "query_end_exclusive": "2026-10-07",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-07T01:48:55.022000+00:00",
+            "available_at": "2026-10-07T01:48:55.022000+00:00",
+            "sha256": "e806429b244cc977485a51d51f78ff9d0724f58198e91631ee7dfa28195efba3",
+            "row_count": 5,
+            "first_date": "2026-09-30",
+            "last_date": "2026-10-06",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits",
+              "capital gains"
+            ],
+            "path": ".review\\p3-live\\m\\QQQ\\c0cade03c65145e8846a702349b6dbf4.parquet",
+            "metadata_path": ".review\\p3-live\\m\\QQQ\\c0cade03c65145e8846a702349b6dbf4.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": null,
+          "errors": [],
+          "attribution": {
+            "status": "ok",
+            "method": "fixed beginning-weight price contribution",
+            "mode": "retrospective",
+            "as_of": "2026-10-05",
+            "covered_weight": 0.99753619,
+            "known_weight": 1.0,
+            "non_equity_weight": 0.0024638100000000003,
+            "unknown_weight_count": 1,
+            "missing_tickers": [],
+            "contribution": 0.004753681197454899,
+            "etf_price_return": 0.004575457394402571,
+            "residual": -0.00017822380305232768,
+            "causal_status": "not_identified",
+            "limitations": [
+              "uncovered holdings, cash, derivatives, dividends, fees and trading remain in residual",
+              "multi-day calculation assumes fixed beginning weights; not daily rebalancing accounting"
+            ],
+            "beginning_source": {
+              "symbol": "QQQ",
+              "provider": "Invesco",
+              "source_url": "https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/46090E103/holdings/fund?idType=cusip&productType=ETF",
+              "sha256": "d94a6228a05674ae6db3948fb544b147c532ce3eff993a3c7e4425b3cf555158",
+              "as_of": "2026-10-05",
+              "retrieved_at": "2026-10-07T01:48:44.272731+00:00",
+              "available_at": "2026-10-07T01:48:44.272731+00:00",
+              "warnings": [
+                "unknown weight: USDPDV:Currency"
+              ]
+            }
+          },
+          "daily_summary": {
+            "status": "partial",
+            "method": "exact-day beginning fund weights; wealth-linked price contributions",
+            "mode": "retrospective",
+            "missing_weight_dates": [],
+            "missing_market_dates": [],
+            "linked_contribution": 0.004753681197454899,
+            "linked_residual": -0.00017822380305232768,
+            "etf_price_return": 0.004575457394402571,
+            "causal_status": "not_identified",
+            "historical_trade_backtest_ready": false,
+            "limitations": [
+              "QQQ fund weights are not official Nasdaq index weights",
+              "uncovered holdings, cash, derivatives, dividends, fees and trading remain in residual",
+              "capture availability does not certify tradable historical execution or original market publication"
+            ],
+            "covered_weights": [
+              0.99753619
+            ],
+            "missing_ticker_counts": [
+              0
+            ]
+          },
+          "constituent_market_hashes": {
+            "NVDA": "3e2eeb7705ce0de53d8b580c5aae402d848e21758030a38ab467ae6d229906d6",
+            "AAPL": "f79d9dc02a1a0bf6f5171e149b3d8813de8dfa921b57306f5dc6376ed9e35557",
+            "MSFT": "b3245bf309645ae07eb06d0aea435e42f4a530c745782fc8f105282c05b1d088",
+            "MU": "aa692bdd7d7b971951ea732e2bf1790b4cc2179779afc3c56a7ffb4c855eab8e",
+            "AMD": "146ef9f5629c67454c05f6ac20831a783c45b9b118c4724625c0a475f036dc51",
+            "AMZN": "78091e8bb85001345faa24e5187231e8cb046f54a433fa3bbf7532348fa4529c",
+            "META": "2ff70e9ab094029a5808f74b7503a2c35bd77a0ad7912930dc75b740a9b56106",
+            "GOOGL": "92d2bac0a798e2af02951ed44f1a09a30ca947755a6cbff4d6b673ca724e2710",
+            "SPCX": "5dc7505fc917acce0f742b6808320e0f3f55cc07de48af2634f00c0e64b123d1",
+            "TSLA": "fc172cc0a707cd4705e81215964866a362d3dc4f5c19498e80742091ff49ba78",
+            "GOOG": "c9653ac21d912778fd581276f0459795740bdc418f418ce0b801fa74f725152c",
+            "AVGO": "05be3de9faa95e7accd26eea11edf75ec23e52cb76336b792dca4d72146945d2",
+            "INTC": "b58ed560d6cab51f5a6643b3cc128fb32d1075009d9135db5e66961abd1f9891",
+            "WMT": "0b8861c84e4c0490fc3968d4b25a61e800a6714947cea05403c164ed172e2bd5",
+            "CSCO": "d8f8faebe3dcf674c4a29776a48964cff148d6cf2971c8be63f1e6bf9c8ddf53",
+            "PLTR": "9c175f972b3aeed021cb3446b21a94fd186e4e2c31a308089c6aada769682902",
+            "LRCX": "f486093b14602ee36c4c4b475701791117b99b7cc2e45f99f6a12cb3cef100f4",
+            "AMAT": "b21eb774f76d3a9204f8cd9d45008978438101a0a4b427f03efb6ebffb667f1e",
+            "COST": "b5e7e9dce1f7ebac7d5deaec4f069ad7137e8bf29b0dfa7ca2f4cf4b913efd03",
+            "PANW": "1c4e7961f319487e2e472f4162b8621236ad3334144fd2d848d19eb39c5b8294",
+            "NFLX": "9fd1e22ba3ad48ab5f455a7655c407fae71a93f987ba47f02ed13fe633fb2208",
+            "CRWD": "4b86251247489047652939c84a54191b048eadb4e28016605f7417f7fe4cb896",
+            "KLAC": "4ab90b70d1da30692e19a741dbd2a12af8e675974262287274471a980119e349",
+            "TXN": "c7afb7f64855a6e95dfca0980f6020925551c44bcc45136104eb4b264fbba46f",
+            "SNDK": "5d25262ec3419630c8cb4a1e9c6ce24e564f228520bec3b6880313a472db6d69",
+            "MRVL": "e7c76e9347604d2e3d9d6ea24201c03797a2898bfff751bc0285d3200c9a496e",
+            "LIN": "816356aa2cfac373730e254ef3547140bdbf00d9ea7a4eacf3ac571f372e2c4c",
+            "AMGN": "774fba8a1e74d023190ce2f1b726326325eaf19a1aa719b57a233738e5ffff32",
+            "ADI": "7d4e9c7c87a08c0164a6c0928f39951aa7a28a828ecad6607c06ca29d0480630",
+            "STX": "a77bcfd9e617ea3180926da2a3dec7dacfdb5f278211667a1c2485ec90e21a9d",
+            "SHOP": "1d6900ad872313e752a76aa7e04f96087346acf5978e49c5945737f0b60a664c",
+            "QCOM": "53c0256e11f0ba8129868cf4c6aba79fe16647d40264b2d951a5dd82610b3ef1",
+            "GILD": "514144bf658c15aa85c9759916a7d1ea5e33d785da3b6e4d6fe706e6129d5526",
+            "TMUS": "5fc7cb18b9a95099a763c06eb22252028cb1ed2478e4c63cd750bc5beba925b7",
+            "ASML": "ca26a089eabe6e34837ae3b52bd94f2e487280237f6785016454ca3ca2f1ccdf",
+            "PEP": "dbbc2cc6f62bc8886df9ae0cbcfba4f2c8b83bfc4ff6f02f462f20d5ad5488a1",
+            "WDC": "31a428caca4899141c35e2344ff6e4f336df691c85b0d96fc9fc3a05c9ac1b0c",
+            "ISRG": "1ca6acc6f3b54c570680f7eb42155912e4810f5686d9358bdb0a6ffdeda0628c",
+            "FTNT": "6942a637a18a5d5c18138569ca7c89a7c04667b26f81e85a1a4f9f031bd0525f",
+            "ARM": "6bf07d2ee5b1a308ba4a6f30bf4d4ea76b347e47c52f06e7228e6b59aac594c9",
+            "VRTX": "d4f2049cf63dfa382e8e0e475981279b621d042897c7db506f9cca97eba4c2fb",
+            "BKNG": "fcb412dc4aa4195c14c5ec41f20f9f83cdbe84717a3e93f6e0a951fdb1a17657",
+            "SBUX": "8de74c8ff23d9046296587c6de44ecfff684b77725b2093398b226690dd4fe1d",
+            "ADP": "3764e5637f62c513ff38868110cf636045a8fc836e2fdad854d8e6ac72bdc9c4",
+            "LITE": "bc495d60992299e39801e1883c9623f113ca39e04e96b586cf2ce3f4b15cdea5",
+            "CDNS": "682c3287b121fc4b1b46ce3a2ea7e96bfc1c1609f342ba99410aa17c04148699",
+            "ADBE": "5ff5387ab7b24f7d9fcef96ebc659cbb5b71b69ac9aaeae88f6a47c47c1ba376",
+            "CEG": "1725a9f3ef045f63fca32b98954474e27f7ff802e6eeb12084c6c2107caf1677",
+            "MELI": "fe8f1713b56e8fb4277276c63d78b6d3ec98e7f985ad000b5b78e3ee60279452",
+            "SNPS": "1b2e4347bbc7b03b0c624b75662c9345c719a68e1a3f1fd99d003a8ae597fdea",
+            "MAR": "57526cf49575711c61a09e1532f9fdaf0942f6f3b13210c68301f9faa22e2c62",
+            "DDOG": "842784b546f4320f82299e58251cfd05c42090b58602baf95d5df6f8f041e385",
+            "CSX": "a11ee2a6d92764a2049321ae8f1c544d064742a2e3c63e650b6d6b24d8ce1142",
+            "APP": "1d53bcfee7f86cf0f9de175cffe58f890bff2ccc1aa97a348c9a5db9523d1c47",
+            "MNST": "28b2bb33248a71b22e2b737320639e33d5b23a10b52fd2308dfe7562b9059bf8",
+            "DASH": "9c17b2c48f697f9fca58d67582e593ec367e78d7d286c20f77cbd4d4f69c5cd2",
+            "CTAS": "8104a36cda380bef9808880973b9d09bb0fe8e52330e8d64175eb10ca9ba223f",
+            "INTU": "ed269b81bdbe07ee2956078ec53a8ab7b1ddbbccd9b3dad874174c267f185e5c",
+            "WBD": "2e890ac50ecb948bcfaa4c5905045183d10423e7aac73054c3415802cd5e553b",
+            "CMCSA": "23d132bdfad085d7ab04603f1a7efae4a33ada05b46dca89c07ae678c8c9d969",
+            "MDLZ": "91b54d2849aaa6d43f54dbf07e4091dc74a2299a105b5bf3e00fc0d9257b7cd2",
+            "REGN": "f276b3af16c2ca25946def68ece2a4aa9ccb4a8e9a9fa6b619317edcb12245db",
+            "MPWR": "76412f70ada81b4bdf7ac5143e9e7937201b0a872595431d749cb7ee3597f4b7",
+            "ROST": "79fcb1eacd505d9b647d44e18064647288f5851686215f57d9ee66799b269299",
+            "TER": "bb19d4d9645d76829c53c360a36ec90a633c03a38cfcb014a1035577e26e65c1",
+            "ABNB": "b9b12b5f6fdf406608da9e90d851feb863789a3aa7bf7275fd4b6beec5b02d80",
+            "ORLY": "fdb904402b8d23d922e7604c6802658b7b4cdf1966c5440bb7b6f745a3986819",
+            "HON": "b92f47530474e85d8fe44a5f7147e518f00d0740e6aaead7e267570090350653",
+            "AEP": "02f56dead79b100592bc379ec524a3c6509b5081492d2f2aa97836198c226d1b",
+            "ALAB": "e00e4cfabc2d22fd7f580a19d61c963d7db96586689bcc8ec6dd99853860c19f",
+            "NXPI": "ee047c673699807046151d343a324ef12b0be07e61af6a127ea4af81d3296141",
+            "MSTR": "850a4a73355936abc5549449191730425b36e498b558ec5ff1cead128651e426",
+            "FAST": "9f605c291724c29a78c26fc7dd1ecd8ba5b26ead4fbd6f1b9b2cf380953a832b",
+            "PCAR": "38b7395a0394d92d226f4c9f211d55fb4297ca10c2fc6fde9d459425d35a7ba4",
+            "BKR": "8d4950384684ce21220a066b952a0459645d95893680b3d000791e45fa8c577a",
+            "NBIS": "efede606484eca15641bce7d22240f2ea6d66dd92e61c34dc93dfc630603fc62",
+            "PDD": "36350c494991da13134e748a163445653f3136c83778e6dc9ac6da2a5da4263d",
+            "FANG": "6e968030acbadf2608dd16df5480c0a0b174c3a0fedccfa2a91a54fa24b4b614",
+            "HONA": "d3529abd33a28dbc84956754e795b21f7fa5a6646cd1a4086a3860564e92f33f",
+            "PYPL": "3e94fb5719fd5db64520cc1483a78f59d5a44bd0c5f3993ae8dbfb9771d70a3e",
+            "ADSK": "4ece8d3ebad5ca4b2ad92868dda03e2d5227c23ad02ec45957533e457c54186b",
+            "XEL": "beb192f22214b208db222edd5f2371df9c1aa654bbf6dc9721cec75e199a6449",
+            "MCHP": "4fdc0cc42458ed8d229b6c5102fb813d064bd614d00401580b4eb179f5f567e5",
+            "CCEP": "a5253ab0fa16850b3f4c45963ed62a0cb2de980dfb20a3b8cf115ff08e49da8e",
+            "RKLB": "75560db575e9b78b330f6d7c24658cedcd107997bb7dea3a84a9080cdd840310",
+            "KDP": "1ecabe381f68c7e93818049d0d8f94561a28bde59317254169d09b6850bf2d01",
+            "EXC": "a1a90161ec52a22d8451a801beec6413441bd0dbaa87d07017faa47b9688a21c",
+            "IDXX": "e36386133bf603e9e64ab934c58bf177143b63e9de90a2500d91198486a91b2d",
+            "CRWV": "9a9499cfa8086dd92b59728bb58c65251721c873ca1b6670bc495ace8d7206be",
+            "TTWO": "55887bec632509b6df51de14dfdb5e34021c68194082ced570ccf6477752248c",
+            "FER": "86c8c6365cf4b07841221432a247b9f60dafd1cb0465d0285bd1b6b1d52d9af4",
+            "ODFL": "ea851b5f77af8b166aa7492f7453b43da59af60614f6073abe3287d2cfe51804",
+            "WDAY": "30081d7bbc29f7ae61077cde2512e4f75537e18587e0cdbdbff43c1bc24d5e9d",
+            "TRI": "95bf54a63faba2618215552cf2cf1eee0452baddd2cfdbe2e2f90801ea9e8e94",
+            "ROP": "80a942dc64b99d8fb30bc44a8b57fefe4fd305a7bac65f9c9d2457d1419aeebe",
+            "PAYX": "a85170d81a1365716a9a553e7b82f85dda26dc0abdc96a1b68892bd5c662c4b6",
+            "AXON": "ed04c635c6256fca801dd096322330ca56c3562598642a742f80fe71f425914e",
+            "DXCM": "9de9622fc09197236f5221b362f7e5752c2e0da04318cbf354b73e6821003b15",
+            "GEHC": "b500f588d244fd3a4627864557149a97afcb9ef39bf495b9a47a7215a2a58657",
+            "ALNY": "6bc42949b16862424ba4005cdc8ab3048ea362aa2ac308644b22aaabfc4d5a91",
+            "CPRT": "f55a36cc230a340ad4143dc299a12b99c1ae54d549e1dc090e622523767b7693"
+          }
+        },
+        {
+          "symbol": "^NDX",
+          "returns": {
+            "symbol": "^NDX",
+            "kind": "price_index",
+            "start": "2026-10-05",
+            "end": "2026-10-06",
+            "causal_status": "not_identified",
+            "limitations": [
+              "price index change excludes reinvested dividends; QQQ weights are not index weights"
+            ],
+            "price_return": 0.004770369333128022,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "source": null,
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "^NDX",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/%5ENDX/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-30",
+            "query_end_exclusive": "2026-10-07",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-07T01:48:57.969420+00:00",
+            "available_at": "2026-10-07T01:48:57.969420+00:00",
+            "sha256": "614564f236ae244846101a8bd97f4706508b629da8b8ad6b47d3193c4699b0ae",
+            "row_count": 5,
+            "first_date": "2026-09-30",
+            "last_date": "2026-10-06",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits"
+            ],
+            "path": ".review\\p3-live\\m\\%5ENDX\\fe580ba9cf364e8b8cfe2d2c9380debd.parquet",
+            "metadata_path": ".review\\p3-live\\m\\%5ENDX\\fe580ba9cf364e8b8cfe2d2c9380debd.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": null,
+          "errors": [],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "^IXIC",
+          "returns": {
+            "symbol": "^IXIC",
+            "kind": "price_index",
+            "start": "2026-10-05",
+            "end": "2026-10-06",
+            "causal_status": "not_identified",
+            "limitations": [
+              "price index change excludes reinvested dividends; QQQ weights are not index weights"
+            ],
+            "price_return": 0.004460995979424176,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "source": null,
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "^IXIC",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/%5EIXIC/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-30",
+            "query_end_exclusive": "2026-10-07",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-07T01:48:57.352389+00:00",
+            "available_at": "2026-10-07T01:48:57.352389+00:00",
+            "sha256": "900e63083e43c46e73270d7201d9914608b72f145282b2b35a7b153700b2e380",
+            "row_count": 5,
+            "first_date": "2026-09-30",
+            "last_date": "2026-10-06",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits"
+            ],
+            "path": ".review\\p3-live\\m\\%5EIXIC\\a4722dfb1d6c48418439d1a3b38f996f.parquet",
+            "metadata_path": ".review\\p3-live\\m\\%5EIXIC\\a4722dfb1d6c48418439d1a3b38f996f.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": null,
+          "errors": [],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "GC=F",
+          "returns": {
+            "symbol": "GC=F",
+            "kind": "continuous_futures_quote",
+            "start": "2026-10-05",
+            "end": "2026-10-06",
+            "causal_status": "not_identified",
+            "limitations": [
+              "continuous futures quote change excludes roll, collateral and margin effects"
+            ],
+            "price_return": 0.005605344029913306,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "source": null,
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "GC=F",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/GC%3DF/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-30",
+            "query_end_exclusive": "2026-10-07",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-07T01:48:56.851047+00:00",
+            "available_at": "2026-10-07T01:48:56.851047+00:00",
+            "sha256": "39450ff3767f4b6a14acb203ff6095667c33473222fd15d855c8b0fb2f23e5b4",
+            "row_count": 5,
+            "first_date": "2026-09-30",
+            "last_date": "2026-10-06",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits"
+            ],
+            "path": ".review\\p3-live\\m\\GC%3DF\\f9f4de4b1df9421a81f2626e2d5b8e5c.parquet",
+            "metadata_path": ".review\\p3-live\\m\\GC%3DF\\f9f4de4b1df9421a81f2626e2d5b8e5c.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": null,
+          "errors": [],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          }
+        }
+      ]
+    },
+    "historical": {
+      "start": "2026-10-01",
+      "end": "2026-10-02",
+      "mode": "retrospective",
+      "historical_trade_backtest_ready": false,
+      "assets": [
+        {
+          "symbol": "IEF",
+          "returns": {
+            "symbol": "IEF",
+            "kind": "treasury_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.0027995519759960175,
+            "adjusted_return_proxy": -0.0027995519759960175,
+            "adjustment_gap": 0.0
+          },
+          "source": {
+            "symbol": "IEF",
+            "provider": "iShares",
+            "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+            "sha256": "a6c12ab1261fa5931c3e6a0aa4f9ce100565d6b69cd11636462998b87cf34f47",
+            "as_of": "2026-10-01",
+            "retrieved_at": "2026-10-04T01:40:44.883369+00:00",
+            "available_at": "2026-10-04T01:40:44.883369+00:00",
+            "warnings": []
+          },
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "IEF",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/IEF/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-24",
+            "query_end_exclusive": "2026-10-03",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-04T01:41:06.305748+00:00",
+            "available_at": "2026-10-04T01:41:06.305748+00:00",
+            "sha256": "95ee925c39c3ecc1c724675c7a0cbef559b6619cdce1926b0257d513756e6f43",
+            "row_count": 7,
+            "first_date": "2026-09-24",
+            "last_date": "2026-10-02",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits",
+              "capital gains"
+            ],
+            "path": ".review\\p2-live\\m\\IEF\\eb148077ee4f4366b6b451ef4859cc42.parquet",
+            "metadata_path": ".review\\p2-live\\m\\IEF\\eb148077ee4f4366b6b451ef4859cc42.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": {
+            "status": "approximation",
+            "method": "fixed-date cashflow repricing on experimental par-bootstrap curve",
+            "valuation_date": "2026-10-01",
+            "covered_weight": 0.9999,
+            "weight_gap_from_one": 9.999999999998899e-05,
+            "missing_ids": [],
+            "bonds": [
+              {
+                "id": "91282CPZ8",
+                "weight": 0.09029999999999999,
+                "model_dirty_price_per100": 92.50811674707826,
+                "model_price_change": -0.003170743426175071,
+                "contribution": -0.0002863181313836089
+              },
+              {
+                "id": "91282CMM0",
+                "weight": 0.0882,
+                "model_dirty_price_per100": 96.89933381612268,
+                "model_price_change": -0.003088686988502398,
+                "contribution": -0.00027242219238591154
+              },
+              {
+                "id": "91282CLW9",
+                "weight": 0.08810000000000001,
+                "model_dirty_price_per100": 95.5596959118416,
+                "model_price_change": -0.003067770006539794,
+                "contribution": -0.00027027053757615587
+              },
+              {
+                "id": "91282CNC1",
+                "weight": 0.0874,
+                "model_dirty_price_per100": 95.12796450576981,
+                "model_price_change": -0.003101693343798395,
+                "contribution": -0.00027108799824797976
+              },
+              {
+                "id": "91282CPJ4",
+                "weight": 0.0867,
+                "model_dirty_price_per100": 92.78948341531631,
+                "model_price_change": -0.0031443881086007375,
+                "contribution": -0.0002726184490156839
+              },
+              {
+                "id": "91282CQQ7",
+                "weight": 0.08650000000000001,
+                "model_dirty_price_per100": 95.28024618164062,
+                "model_price_change": -0.003112962480132375,
+                "contribution": -0.00026927125453145046
+              },
+              {
+                "id": "91282CKQ3",
+                "weight": 0.085,
+                "model_dirty_price_per100": 96.85080387916165,
+                "model_price_change": -0.003006714070289518,
+                "contribution": -0.00025557069597460905
+              },
+              {
+                "id": "91282CJZ5",
+                "weight": 0.08470000000000001,
+                "model_dirty_price_per100": 93.57820840565283,
+                "model_price_change": -0.003042662471671287,
+                "contribution": -0.00025771351135055805
+              },
+              {
+                "id": "91282CNT4",
+                "weight": 0.08310000000000001,
+                "model_dirty_price_per100": 93.84776412877343,
+                "model_price_change": -0.0031482204353704413,
+                "contribution": -0.0002616171181792837
+              },
+              {
+                "id": "91282CJJ1",
+                "weight": 0.0711,
+                "model_dirty_price_per100": 97.98558075067693,
+                "model_price_change": -0.0029315213519455208,
+                "contribution": -0.0002084311681233265
+              },
+              {
+                "id": "91282CLF6",
+                "weight": 0.07,
+                "model_dirty_price_per100": 92.28269335113836,
+                "model_price_change": -0.0031122434853620984,
+                "contribution": -0.0002178570439753469
+              },
+              {
+                "id": "91282CRF0",
+                "weight": 0.0526,
+                "model_dirty_price_per100": 95.93557297713804,
+                "model_price_change": -0.003125271797129736,
+                "contribution": -0.00016438929652902413
+              },
+              {
+                "id": "91282CHT1",
+                "weight": 0.018500000000000003,
+                "model_dirty_price_per100": 93.38704573264076,
+                "model_price_change": -0.002953039172311711,
+                "contribution": -5.463122468776666e-05
+              },
+              {
+                "id": "912810FT0",
+                "weight": 0.0077,
+                "model_dirty_price_per100": 95.2875347243348,
+                "model_price_change": -0.003138353164212182,
+                "contribution": -2.4165319364433804e-05
+              },
+              {
+                "id": "91282CHC8",
+                "weight": 0.0,
+                "model_dirty_price_per100": 91.66956478607821,
+                "model_price_change": -0.002873791983992069,
+                "contribution": -0.0
+              },
+              {
+                "id": "91282CRC7",
+                "weight": 0.0,
+                "model_dirty_price_per100": 96.54084961537222,
+                "model_price_change": -0.0028924492206517938,
+                "contribution": -0.0
+              }
+            ],
+            "estimated_price_effect": -0.0030863639413251393,
+            "key_rate_durations": {
+              "6 Mo": -0.0015855820718237356,
+              "1 Yr": -0.0056283218995110745,
+              "2 Yr": -0.013068696736213047,
+              "3 Yr": -0.03372736669822638,
+              "5 Yr": -0.06351284373326936,
+              "7 Yr": 3.3682098265403586,
+              "10 Yr": 3.6615983233105966,
+              "20 Yr": 0.0,
+              "30 Yr": 0.0
+            },
+            "linear_curve_effect": -0.003092464124630657,
+            "nonlinear_remainder": 6.100183305517669e-06,
+            "causal_status": "not_identified",
+            "limitations": [
+              "linear par interpolation on semiannual grid; log discount interpolation; not official Treasury zero curve",
+              "issuer displayed coupons are rounded; security terms not independently certified",
+              "fixed date excludes carry/rolldown, cash, fees, distributions, rebalancing and payment-date shifts",
+              "uncovered weights are not renormalized; this is a covered-portfolio sensitivity, not official ETF total return"
+            ],
+            "curve_sources": [
+              {
+                "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/2026/all?_format=csv&field_tdr_date_value=2026&page=&type=daily_treasury_yield_curve",
+                "sha256": "3e21746899096b3d4615672cf9f0cce3049f59df4904437bf70397c633607c2b",
+                "retrieved_at": "2026-10-07T01:41:06.974448+00:00",
+                "available_at": "2026-10-07T01:41:06.974448+00:00",
+                "year": 2026
+              }
+            ],
+            "curve_changes_bp": {
+              "6 Mo": 0.0,
+              "1 Yr": 1.9999999999999574,
+              "2 Yr": 4.999999999999982,
+              "3 Yr": 4.999999999999982,
+              "5 Yr": 4.999999999999982,
+              "7 Yr": 4.999999999999982,
+              "10 Yr": 4.0000000000000036,
+              "20 Yr": 3.000000000000025,
+              "30 Yr": 1.9999999999999574
+            },
+            "beginning_source": {
+              "symbol": "IEF",
+              "provider": "iShares",
+              "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+              "sha256": "a6c12ab1261fa5931c3e6a0aa4f9ce100565d6b69cd11636462998b87cf34f47",
+              "as_of": "2026-10-01",
+              "retrieved_at": "2026-10-04T01:40:44.883369+00:00",
+              "available_at": "2026-10-04T01:40:44.883369+00:00",
+              "warnings": []
+            },
+            "known_unmodeled_weight": 0.0,
+            "weight_rounding_or_unknown_gap": 9.999999999998899e-05,
+            "unknown_weight_count": 0,
+            "residual": 0.00028681196532912186
+          },
+          "errors": [],
+          "attribution": {
+            "status": "approximation",
+            "method": "single-tenor yield proxy; linear duration",
+            "beginning_as_of": "2026-10-01",
+            "beginning_source": {
+              "symbol": "IEF",
+              "provider": "iShares",
+              "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+              "sha256": "a6c12ab1261fa5931c3e6a0aa4f9ce100565d6b69cd11636462998b87cf34f47",
+              "as_of": "2026-10-01",
+              "retrieved_at": "2026-10-04T01:40:44.883369+00:00",
+              "available_at": "2026-10-04T01:40:44.883369+00:00",
+              "warnings": []
+            },
+            "yield_proxy": "^TNX",
+            "yield_delta_bp": 3.9999961853027344,
+            "yield_source": {
+              "schema_version": 1,
+              "symbol": "^TNX",
+              "provider": "Yahoo Finance via yfinance",
+              "source_url": "https://finance.yahoo.com/quote/%5ETNX/history/",
+              "representation": "provider-normalized daily history, not raw HTTP response",
+              "query_start": "2026-09-24",
+              "query_end_exclusive": "2026-10-03",
+              "auto_adjust": false,
+              "retrieved_at": "2026-10-04T01:41:12.091261+00:00",
+              "available_at": "2026-10-04T01:41:12.091261+00:00",
+              "sha256": "2bda9586a0018f9d256460bc6ba4195956073618772e1f278f500cce0c6614a1",
+              "row_count": 7,
+              "first_date": "2026-09-24",
+              "last_date": "2026-10-02",
+              "fields": [
+                "open",
+                "high",
+                "low",
+                "close",
+                "adj close",
+                "volume",
+                "dividends",
+                "stock splits"
+              ],
+              "path": ".review\\p2-live\\m\\%5ETNX\\3b8293c34aa749d4892a4db70eaa098b.parquet",
+              "metadata_path": ".review\\p2-live\\m\\%5ETNX\\3b8293c34aa749d4892a4db70eaa098b.json",
+              "availability_status": "capture time verified; original publication and revision times unverified"
+            },
+            "duration_years": 6.864312,
+            "estimated_price_effect": -0.0027457221814727786,
+            "residual": -5.38297945232389e-05,
+            "causal_status": "not_identified",
+            "limitations": [
+              "not full-curve repricing; carry, nonparallel shifts, convexity and fees remain unmodeled"
+            ]
+          }
+        },
+        {
+          "symbol": "TLT",
+          "returns": {
+            "symbol": "TLT",
+            "kind": "treasury_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.0029596670988124574,
+            "adjusted_return_proxy": -0.0029596670988124574,
+            "adjustment_gap": 0.0
+          },
+          "source": {
+            "symbol": "TLT",
+            "provider": "iShares",
+            "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+            "sha256": "52d189c4580b0fc9d8a795204c7eb8eef3aa2d0c613fc1aaa80ca60367fb20de",
+            "as_of": "2026-10-01",
+            "retrieved_at": "2026-10-04T01:40:45.505049+00:00",
+            "available_at": "2026-10-04T01:40:45.505049+00:00",
+            "warnings": []
+          },
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "TLT",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/TLT/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-24",
+            "query_end_exclusive": "2026-10-03",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-04T01:41:07.073229+00:00",
+            "available_at": "2026-10-04T01:41:07.073229+00:00",
+            "sha256": "eefc64b2b24245ec8af0e142ce60451dc069c153b686f2ef3df8a2a62476cecf",
+            "row_count": 7,
+            "first_date": "2026-09-24",
+            "last_date": "2026-10-02",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits",
+              "capital gains"
+            ],
+            "path": ".review\\p2-live\\m\\TLT\\e9b396d2050e4a6f87fe8a648e28e7ed.parquet",
+            "metadata_path": ".review\\p2-live\\m\\TLT\\e9b396d2050e4a6f87fe8a648e28e7ed.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": {
+            "status": "approximation",
+            "method": "fixed-date cashflow repricing on experimental par-bootstrap curve",
+            "valuation_date": "2026-10-01",
+            "covered_weight": 1.0000999999999998,
+            "weight_gap_from_one": -9.999999999976694e-05,
+            "missing_ids": [],
+            "bonds": [
+              {
+                "id": "912810UK2",
+                "weight": 0.0433,
+                "model_dirty_price_per100": 89.44610285680312,
+                "model_price_change": -0.0029632260239003116,
+                "contribution": -0.00012830768683488349
+              },
+              {
+                "id": "912810UA4",
+                "weight": 0.041299999999999996,
+                "model_dirty_price_per100": 87.84242103164107,
+                "model_price_change": -0.0030705875897348855,
+                "contribution": -0.00012681526745605075
+              },
+              {
+                "id": "912810UU0",
+                "weight": 0.0407,
+                "model_dirty_price_per100": 93.03732588342919,
+                "model_price_change": -0.0028584587605626766,
+                "contribution": -0.00011633927155490093
+              },
+              {
+                "id": "912810TV0",
+                "weight": 0.0403,
+                "model_dirty_price_per100": 89.64705353571145,
+                "model_price_change": -0.0031228751300163005,
+                "contribution": -0.00012585186773965692
+              },
+              {
+                "id": "912810TX6",
+                "weight": 0.0393,
+                "model_dirty_price_per100": 81.34612126475399,
+                "model_price_change": -0.0031367074263155548,
+                "contribution": -0.0001232726018542013
+              },
+              {
+                "id": "912810TT5",
+                "weight": 0.0392,
+                "model_dirty_price_per100": 79.7840687436836,
+                "model_price_change": -0.0031929944857824744,
+                "contribution": -0.000125165383842673
+              },
+              {
+                "id": "912810UP1",
+                "weight": 0.038900000000000004,
+                "model_dirty_price_per100": 87.61364520360988,
+                "model_price_change": -0.002902989527267086,
+                "contribution": -0.00011292629261068965
+              },
+              {
+                "id": "912810UC0",
+                "weight": 0.0388,
+                "model_dirty_price_per100": 81.22626620275153,
+                "model_price_change": -0.003079161819177667,
+                "contribution": -0.00011947147858409348
+              },
+              {
+                "id": "912810UR7",
+                "weight": 0.0387,
+                "model_dirty_price_per100": 88.16668290702023,
+                "model_price_change": -0.002916801230411936,
+                "contribution": -0.00011288020761694193
+              },
+              {
+                "id": "912810UG1",
+                "weight": 0.0384,
+                "model_dirty_price_per100": 86.56713104726241,
+                "model_price_change": -0.0030285575860820035,
+                "contribution": -0.00011629661130554893
+              },
+              {
+                "id": "912810UE6",
+                "weight": 0.0384,
+                "model_dirty_price_per100": 85.87046359518123,
+                "model_price_change": -0.0030143652508525243,
+                "contribution": -0.00011575162563273693
+              },
+              {
+                "id": "912810TB4",
+                "weight": 0.0369,
+                "model_dirty_price_per100": 50.04258276450024,
+                "model_price_change": -0.0034802925812633667,
+                "contribution": -0.00012842279624861823
+              },
+              {
+                "id": "912810UM8",
+                "weight": 0.0345,
+                "model_dirty_price_per100": 88.22724086260595,
+                "model_price_change": -0.002974717060352128,
+                "contribution": -0.00010262773858214842
+              },
+              {
+                "id": "912810SZ2",
+                "weight": 0.031400000000000004,
+                "model_dirty_price_per100": 51.4162991312249,
+                "model_price_change": -0.003540069930346057,
+                "contribution": -0.0001111581958128662
+              },
+              {
+                "id": "912810TR9",
+                "weight": 0.031200000000000002,
+                "model_dirty_price_per100": 73.76359917478052,
+                "model_price_change": -0.003186383946381599,
+                "contribution": -9.94151791271059e-05
+              },
+              {
+                "id": "912810TL2",
+                "weight": 0.0301,
+                "model_dirty_price_per100": 79.19271306225167,
+                "model_price_change": -0.003235827963456006,
+                "contribution": -9.739842170002577e-05
+              },
+              {
+                "id": "912810TN8",
+                "weight": 0.0262,
+                "model_dirty_price_per100": 72.9545921772798,
+                "model_price_change": -0.003255923094877322,
+                "contribution": -8.530518508578585e-05
+              },
+              {
+                "id": "912810UW6",
+                "weight": 0.0254,
+                "model_dirty_price_per100": 93.67382489280845,
+                "model_price_change": -0.0028740101997449807,
+                "contribution": -7.299985907352251e-05
+              },
+              {
+                "id": "912810SU3",
+                "weight": 0.024900000000000002,
+                "model_dirty_price_per100": 50.21822031300285,
+                "model_price_change": -0.0036289050471958184,
+                "contribution": -9.035973567517588e-05
+              },
+              {
+                "id": "912810SD1",
+                "weight": 0.024300000000000002,
+                "model_dirty_price_per100": 66.9422503932428,
+                "model_price_change": -0.0037617981733789607,
+                "contribution": -9.141169561310875e-05
+              },
+              {
+                "id": "912810SC3",
+                "weight": 0.0242,
+                "model_dirty_price_per100": 69.5589800834008,
+                "model_price_change": -0.0037223171504345842,
+                "contribution": -9.008007504051694e-05
+              },
+              {
+                "id": "912810SP4",
+                "weight": 0.0236,
+                "model_dirty_price_per100": 43.98874962458852,
+                "model_price_change": -0.0037868897695672032,
+                "contribution": -8.9370598561786e-05
+              },
+              {
+                "id": "912810SF6",
+                "weight": 0.022799999999999997,
+                "model_dirty_price_per100": 66.59632548794738,
+                "model_price_change": -0.00371930442627344,
+                "contribution": -8.480014091903442e-05
+              },
+              {
+                "id": "912810SS8",
+                "weight": 0.022400000000000003,
+                "model_dirty_price_per100": 47.49376062611493,
+                "model_price_change": -0.003671126904647659,
+                "contribution": -8.223324266410758e-05
+              },
+              {
+                "id": "912810SA7",
+                "weight": 0.021400000000000002,
+                "model_dirty_price_per100": 67.29863095859052,
+                "model_price_change": -0.003800817666972156,
+                "contribution": -8.133749807320415e-05
+              },
+              {
+                "id": "912810SE9",
+                "weight": 0.0194,
+                "model_dirty_price_per100": 72.51081925638033,
+                "model_price_change": -0.0036534060095001486,
+                "contribution": -7.087607658430288e-05
+              },
+              {
+                "id": "912810SJ8",
+                "weight": 0.0191,
+                "model_dirty_price_per100": 56.441202453209385,
+                "model_price_change": -0.0037711163835992823,
+                "contribution": -7.202832292674629e-05
+              },
+              {
+                "id": "912810SL3",
+                "weight": 0.018600000000000002,
+                "model_dirty_price_per100": 52.71087117039229,
+                "model_price_change": -0.003749735116752251,
+                "contribution": -6.974507317159188e-05
+              },
+              {
+                "id": "912810RZ3",
+                "weight": 0.0182,
+                "model_dirty_price_per100": 65.01746329586472,
+                "model_price_change": -0.003815677439908516,
+                "contribution": -6.9445329406335e-05
+              },
+              {
+                "id": "912810TD0",
+                "weight": 0.016200000000000003,
+                "model_dirty_price_per100": 54.438023851769714,
+                "model_price_change": -0.003443471200958559,
+                "contribution": -5.5784233455528665e-05
+              },
+              {
+                "id": "912810TJ7",
+                "weight": 0.0159,
+                "model_dirty_price_per100": 64.4437081845827,
+                "model_price_change": -0.003334548384848257,
+                "contribution": -5.3019319319087294e-05
+              },
+              {
+                "id": "912810TG3",
+                "weight": 0.014499999999999999,
+                "model_dirty_price_per100": 63.65030341758073,
+                "model_price_change": -0.0033339173601726335,
+                "contribution": -4.834180172250318e-05
+              },
+              {
+                "id": "912810SH2",
+                "weight": 0.0141,
+                "model_dirty_price_per100": 65.58422367912537,
+                "model_price_change": -0.0036703086628258053,
+                "contribution": -5.175135214584385e-05
+              },
+              {
+                "id": "912810SN9",
+                "weight": 0.0108,
+                "model_dirty_price_per100": 42.833635436761355,
+                "model_price_change": -0.0038266714318823114,
+                "contribution": -4.132805146432897e-05
+              },
+              {
+                "id": "912810SX7",
+                "weight": 0.0103,
+                "model_dirty_price_per100": 57.363427979463346,
+                "model_price_change": -0.003501839891911329,
+                "contribution": -3.606895088668669e-05
+              },
+              {
+                "id": "912810RV2",
+                "weight": 0.0091,
+                "model_dirty_price_per100": 68.04399089385771,
+                "model_price_change": -0.003867936131746852,
+                "contribution": -3.519821879889636e-05
+              },
+              {
+                "id": "912810RY6",
+                "weight": 0.0077,
+                "model_dirty_price_per100": 64.5332305455071,
+                "model_price_change": -0.003874701611848219,
+                "contribution": -2.9835202411231288e-05
+              },
+              {
+                "id": "912810SK5",
+                "weight": 0.0043,
+                "model_dirty_price_per100": 58.533151053004296,
+                "model_price_change": -0.0036861878641319956,
+                "contribution": -1.585060781576758e-05
+              },
+              {
+                "id": "912810RU4",
+                "weight": 0.0040999999999999995,
+                "model_dirty_price_per100": 67.48107731978897,
+                "model_price_change": -0.003859994957413071,
+                "contribution": -1.5825979325393588e-05
+              },
+              {
+                "id": "912810RS9",
+                "weight": 0.001,
+                "model_dirty_price_per100": 63.377781036966944,
+                "model_price_change": -0.003955274380132545,
+                "contribution": -3.955274380132545e-06
+              },
+              {
+                "id": "912810RQ3",
+                "weight": 0.0002,
+                "model_dirty_price_per100": 63.122890078472004,
+                "model_price_change": -0.004005252399397752,
+                "contribution": -8.010504798795504e-07
+              },
+              {
+                "id": "912810UJ5",
+                "weight": 0.0,
+                "model_dirty_price_per100": 91.02606886509064,
+                "model_price_change": -0.0037099317558833,
+                "contribution": -0.0
+              },
+              {
+                "id": "912810RH3",
+                "weight": 0.0,
+                "model_dirty_price_per100": 72.6823819174322,
+                "model_price_change": -0.003924274096835267,
+                "contribution": -0.0
+              },
+              {
+                "id": "912810UN6",
+                "weight": 0.0,
+                "model_dirty_price_per100": 92.19698970079534,
+                "model_price_change": -0.0036916244246613106,
+                "contribution": -0.0
+              },
+              {
+                "id": "912810RK6",
+                "weight": 0.0,
+                "model_dirty_price_per100": 64.63181246708095,
+                "model_price_change": -0.004033924077214479,
+                "contribution": -0.0
+              },
+              {
+                "id": "912810RG5",
+                "weight": 0.0,
+                "model_dirty_price_per100": 76.72635687892182,
+                "model_price_change": -0.003842193893407786,
+                "contribution": -0.0
+              },
+              {
+                "id": "912810RJ9",
+                "weight": 0.0,
+                "model_dirty_price_per100": 71.58784457890559,
+                "model_price_change": -0.0039029001546975195,
+                "contribution": -0.0
+              }
+            ],
+            "estimated_price_effect": -0.003299853501503641,
+            "key_rate_durations": {
+              "6 Mo": -0.002192090577836341,
+              "1 Yr": -0.007781299401257647,
+              "2 Yr": -0.018076477732697216,
+              "3 Yr": -0.04665213075391098,
+              "5 Yr": -0.09727009332878202,
+              "7 Yr": -0.1893068203578299,
+              "10 Yr": -0.9636651521846731,
+              "20 Yr": 5.815497523769071,
+              "30 Yr": 10.645233208974625
+            },
+            "linear_curve_effect": -0.003311020817084885,
+            "nonlinear_remainder": 1.1167315581244158e-05,
+            "causal_status": "not_identified",
+            "limitations": [
+              "linear par interpolation on semiannual grid; log discount interpolation; not official Treasury zero curve",
+              "issuer displayed coupons are rounded; security terms not independently certified",
+              "fixed date excludes carry/rolldown, cash, fees, distributions, rebalancing and payment-date shifts",
+              "uncovered weights are not renormalized; this is a covered-portfolio sensitivity, not official ETF total return"
+            ],
+            "curve_sources": [
+              {
+                "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/2026/all?_format=csv&field_tdr_date_value=2026&page=&type=daily_treasury_yield_curve",
+                "sha256": "3e21746899096b3d4615672cf9f0cce3049f59df4904437bf70397c633607c2b",
+                "retrieved_at": "2026-10-07T01:41:06.974448+00:00",
+                "available_at": "2026-10-07T01:41:06.974448+00:00",
+                "year": 2026
+              }
+            ],
+            "curve_changes_bp": {
+              "6 Mo": 0.0,
+              "1 Yr": 1.9999999999999574,
+              "2 Yr": 4.999999999999982,
+              "3 Yr": 4.999999999999982,
+              "5 Yr": 4.999999999999982,
+              "7 Yr": 4.999999999999982,
+              "10 Yr": 4.0000000000000036,
+              "20 Yr": 3.000000000000025,
+              "30 Yr": 1.9999999999999574
+            },
+            "beginning_source": {
+              "symbol": "TLT",
+              "provider": "iShares",
+              "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+              "sha256": "52d189c4580b0fc9d8a795204c7eb8eef3aa2d0c613fc1aaa80ca60367fb20de",
+              "as_of": "2026-10-01",
+              "retrieved_at": "2026-10-04T01:40:45.505049+00:00",
+              "available_at": "2026-10-04T01:40:45.505049+00:00",
+              "warnings": []
+            },
+            "known_unmodeled_weight": 0.0,
+            "weight_rounding_or_unknown_gap": -9.999999999998899e-05,
+            "unknown_weight_count": 0,
+            "residual": 0.0003401864026911835
+          },
+          "errors": [],
+          "attribution": {
+            "status": "approximation",
+            "method": "single-tenor yield proxy; linear duration",
+            "beginning_as_of": "2026-10-01",
+            "beginning_source": {
+              "symbol": "TLT",
+              "provider": "iShares",
+              "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+              "sha256": "52d189c4580b0fc9d8a795204c7eb8eef3aa2d0c613fc1aaa80ca60367fb20de",
+              "as_of": "2026-10-01",
+              "retrieved_at": "2026-10-04T01:40:45.505049+00:00",
+              "available_at": "2026-10-04T01:40:45.505049+00:00",
+              "warnings": []
+            },
+            "yield_proxy": "^TYX",
+            "yield_delta_bp": 2.6999950408935547,
+            "yield_source": {
+              "schema_version": 1,
+              "symbol": "^TYX",
+              "provider": "Yahoo Finance via yfinance",
+              "source_url": "https://finance.yahoo.com/quote/%5ETYX/history/",
+              "representation": "provider-normalized daily history, not raw HTTP response",
+              "query_start": "2026-09-24",
+              "query_end_exclusive": "2026-10-03",
+              "auto_adjust": false,
+              "retrieved_at": "2026-10-04T01:41:12.796416+00:00",
+              "available_at": "2026-10-04T01:41:12.796416+00:00",
+              "sha256": "2b4ced9dc5f2c42db3632ee56810ce4a9e9a55ce22396bd0bbba26bd3150103a",
+              "row_count": 7,
+              "first_date": "2026-09-24",
+              "last_date": "2026-10-02",
+              "fields": [
+                "open",
+                "high",
+                "low",
+                "close",
+                "adj close",
+                "volume",
+                "dividends",
+                "stock splits"
+              ],
+              "path": ".review\\p2-live\\m\\%5ETYX\\04152b286c3d4831aeb345e1513c8530.parquet",
+              "metadata_path": ".review\\p2-live\\m\\%5ETYX\\04152b286c3d4831aeb345e1513c8530.json",
+              "availability_status": "capture time verified; original publication and revision times unverified"
+            },
+            "duration_years": 14.691242,
+            "estimated_price_effect": -0.003966628054456711,
+            "residual": 0.0010069609556442533,
+            "causal_status": "not_identified",
+            "limitations": [
+              "not full-curve repricing; carry, nonparallel shifts, convexity and fees remain unmodeled"
+            ]
+          }
+        },
+        {
+          "symbol": "GLD",
+          "returns": {
+            "symbol": "GLD",
+            "kind": "gold_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.006845007446811935,
+            "adjusted_return_proxy": -0.006845007446811935,
+            "adjustment_gap": 0.0
+          },
+          "source": {
+            "symbol": "GLD",
+            "provider": "SPDR",
+            "source_url": "https://api.spdrgoldshares.com/api/v1/historical-archive?product=gld&exchange=NYSE&lang=en",
+            "sha256": "5cff24592bf949c0293556ea4f4feb396526ff2b5b346883a05cccb54a62c2e6",
+            "as_of": "2026-10-01",
+            "retrieved_at": "2026-10-04T01:40:47.412219+00:00",
+            "available_at": "2026-10-04T01:40:47.412219+00:00",
+            "warnings": [
+              "independent licensed LBMA benchmark absent; NAV and close have different pricing times"
+            ]
+          },
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "GLD",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/GLD/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-24",
+            "query_end_exclusive": "2026-10-03",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-04T01:41:07.877431+00:00",
+            "available_at": "2026-10-04T01:41:07.877431+00:00",
+            "sha256": "bd057fb86e683785c30195f9a0e5927589b28278fab0ae85db8e6ae02ba0cf89",
+            "row_count": 7,
+            "first_date": "2026-09-24",
+            "last_date": "2026-10-02",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits",
+              "capital gains"
+            ],
+            "path": ".review\\p2-live\\m\\GLD\\c030ca22a41e4c88b7ef48613f39db3c.parquet",
+            "metadata_path": ".review\\p2-live\\m\\GLD\\c030ca22a41e4c88b7ef48613f39db3c.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": null,
+          "errors": [],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "exact GLD archive dates unavailable; no forward fill",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "QQQ",
+          "returns": {
+            "symbol": "QQQ",
+            "kind": "equity_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": 0.010174773924072733,
+            "adjusted_return_proxy": 0.010174773924072733,
+            "adjustment_gap": 0.0
+          },
+          "source": {
+            "symbol": "QQQ",
+            "provider": "Invesco",
+            "source_url": "https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/46090E103/holdings/fund?idType=cusip&productType=ETF",
+            "sha256": "6f91615adacaf98ecd05e4eeb4b528b4b696308cd9b87373070b32e1566ff787",
+            "as_of": "2026-10-02",
+            "retrieved_at": "2026-10-04T01:40:43.960352+00:00",
+            "available_at": "2026-10-04T01:40:43.960352+00:00",
+            "warnings": [
+              "unknown weight: USDPDV:Currency"
+            ]
+          },
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "QQQ",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/QQQ/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-24",
+            "query_end_exclusive": "2026-10-03",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-04T01:40:52.519464+00:00",
+            "available_at": "2026-10-04T01:40:52.519464+00:00",
+            "sha256": "c91dbac2b23ef6f112d2fa6ef88fc0de5ae14740c092f53f12c39b48dd0f0ac5",
+            "row_count": 7,
+            "first_date": "2026-09-24",
+            "last_date": "2026-10-02",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits",
+              "capital gains"
+            ],
+            "path": ".review\\p2-live\\m\\QQQ\\846fdf01917d49f787cea9e3aa37215f.parquet",
+            "metadata_path": ".review\\p2-live\\m\\QQQ\\846fdf01917d49f787cea9e3aa37215f.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": null,
+          "errors": [],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no eligible beginning holdings/availability; current structure is not historical attribution",
+            "causal_status": "not_identified"
+          },
+          "daily_summary": {
+            "status": "unavailable",
+            "method": "exact-day beginning fund weights; wealth-linked price contributions",
+            "mode": "retrospective",
+            "missing_weight_dates": [
+              "2026-10-01"
+            ],
+            "missing_market_dates": [],
+            "linked_contribution": null,
+            "linked_residual": null,
+            "etf_price_return": 0.010174773924072733,
+            "causal_status": "not_identified",
+            "historical_trade_backtest_ready": false,
+            "limitations": [
+              "QQQ fund weights are not official Nasdaq index weights",
+              "uncovered holdings, cash, derivatives, dividends, fees and trading remain in residual",
+              "capture availability does not certify tradable historical execution or original market publication"
+            ],
+            "reason": "one or more exact-day holdings snapshots missing; no complete period attribution",
+            "covered_weights": [
+              null
+            ],
+            "missing_ticker_counts": [
+              0
+            ]
+          },
+          "constituent_market_hashes": {}
+        },
+        {
+          "symbol": "^NDX",
+          "returns": {
+            "symbol": "^NDX",
+            "kind": "price_index",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "price index change excludes reinvested dividends; QQQ weights are not index weights"
+            ],
+            "price_return": 0.010044375931328897,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "source": null,
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "^NDX",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/%5ENDX/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-24",
+            "query_end_exclusive": "2026-10-03",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-04T01:41:09.975454+00:00",
+            "available_at": "2026-10-04T01:41:09.975454+00:00",
+            "sha256": "81191e2d0e1f9347ef14d2a8d01d3dbb04c497533ed378525b086c02fcc5d6ef",
+            "row_count": 7,
+            "first_date": "2026-09-24",
+            "last_date": "2026-10-02",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits"
+            ],
+            "path": ".review\\p2-live\\m\\%5ENDX\\f591bac640dc446c96abe09503605331.parquet",
+            "metadata_path": ".review\\p2-live\\m\\%5ENDX\\f591bac640dc446c96abe09503605331.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": null,
+          "errors": [],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "^IXIC",
+          "returns": {
+            "symbol": "^IXIC",
+            "kind": "price_index",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "price index change excludes reinvested dividends; QQQ weights are not index weights"
+            ],
+            "price_return": 0.01188093638882659,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "source": null,
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "^IXIC",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/%5EIXIC/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-24",
+            "query_end_exclusive": "2026-10-03",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-04T01:41:09.260129+00:00",
+            "available_at": "2026-10-04T01:41:09.260129+00:00",
+            "sha256": "dc4bfa487ce4295ee1073b97923986b1a098b813bc595e1c676b9c6814c2d43c",
+            "row_count": 7,
+            "first_date": "2026-09-24",
+            "last_date": "2026-10-02",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits"
+            ],
+            "path": ".review\\p2-live\\m\\%5EIXIC\\343c27f800a54081ba8d7556a866d1c1.parquet",
+            "metadata_path": ".review\\p2-live\\m\\%5EIXIC\\343c27f800a54081ba8d7556a866d1c1.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": null,
+          "errors": [],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "GC=F",
+          "returns": {
+            "symbol": "GC=F",
+            "kind": "continuous_futures_quote",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "continuous futures quote change excludes roll, collateral and margin effects"
+            ],
+            "price_return": -0.009518597401209083,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "source": null,
+          "market_source": {
+            "schema_version": 1,
+            "symbol": "GC=F",
+            "provider": "Yahoo Finance via yfinance",
+            "source_url": "https://finance.yahoo.com/quote/GC%3DF/history/",
+            "representation": "provider-normalized daily history, not raw HTTP response",
+            "query_start": "2026-09-24",
+            "query_end_exclusive": "2026-10-03",
+            "auto_adjust": false,
+            "retrieved_at": "2026-10-04T01:41:08.595174+00:00",
+            "available_at": "2026-10-04T01:41:08.595174+00:00",
+            "sha256": "c4d7c1a554c1c43ab1599ad1fb41e4d7f462221a9451105b7372d29a4a07248b",
+            "row_count": 7,
+            "first_date": "2026-09-24",
+            "last_date": "2026-10-02",
+            "fields": [
+              "open",
+              "high",
+              "low",
+              "close",
+              "adj close",
+              "volume",
+              "dividends",
+              "stock splits"
+            ],
+            "path": ".review\\p2-live\\m\\GC%3DF\\08b7bd56db6c407f9bc1e25550948aee.parquet",
+            "metadata_path": ".review\\p2-live\\m\\GC%3DF\\08b7bd56db6c407f9bc1e25550948aee.json",
+            "availability_status": "capture time verified; original publication and revision times unverified"
+          },
+          "curve_model": null,
+          "errors": [],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          }
+        }
+      ]
+    },
+    "strict": {
+      "start": "2026-10-05",
+      "end": "2026-10-06",
+      "mode": "point_in_time",
+      "historical_trade_backtest_ready": false,
+      "assets": [
+        {
+          "symbol": "IEF",
+          "returns": null,
+          "source": null,
+          "market_source": null,
+          "curve_model": {
+            "status": "unavailable",
+            "reason": "eligible beginning holdings, price endpoints and official curve required",
+            "causal_status": "not_identified"
+          },
+          "errors": [
+            "no eligible market snapshot with exact endpoints: IEF"
+          ],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official source meeting analysis date/availability cutoff",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "TLT",
+          "returns": null,
+          "source": null,
+          "market_source": null,
+          "curve_model": {
+            "status": "unavailable",
+            "reason": "eligible beginning holdings, price endpoints and official curve required",
+            "causal_status": "not_identified"
+          },
+          "errors": [
+            "no eligible market snapshot with exact endpoints: TLT"
+          ],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official source meeting analysis date/availability cutoff",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "GLD",
+          "returns": null,
+          "source": null,
+          "market_source": null,
+          "curve_model": null,
+          "errors": [
+            "no eligible market snapshot with exact endpoints: GLD"
+          ],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official source meeting analysis date/availability cutoff",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "QQQ",
+          "returns": null,
+          "source": null,
+          "market_source": null,
+          "curve_model": null,
+          "errors": [
+            "no eligible market snapshot with exact endpoints: QQQ"
+          ],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official source meeting analysis date/availability cutoff",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "^NDX",
+          "returns": null,
+          "source": null,
+          "market_source": null,
+          "curve_model": null,
+          "errors": [
+            "no eligible market snapshot with exact endpoints: ^NDX"
+          ],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "^IXIC",
+          "returns": null,
+          "source": null,
+          "market_source": null,
+          "curve_model": null,
+          "errors": [
+            "no eligible market snapshot with exact endpoints: ^IXIC"
+          ],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          }
+        },
+        {
+          "symbol": "GC=F",
+          "returns": null,
+          "source": null,
+          "market_source": null,
+          "curve_model": null,
+          "errors": [
+            "no eligible market snapshot with exact endpoints: GC=F"
+          ],
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          }
+        }
+      ]
+    }
+  },
+  "gold_latest": "2026-10-05",
+  "causal_status": "not_identified",
+  "historical_trade_backtest_ready": false
+}
