@@ -80,7 +80,7 @@ def render_html_report(
         kline_section = (
             '<hr class="section-divider">\n'
             '<section id="kline-section">\n'
-            '<h2>📈 K 线图 (5 SMA + 4 事件线, SVG 矢量)</h2>\n'
+            '<h2>📈 价格走势与均线（SVG矢量，收盘价日期及单位见图）</h2>\n'
             + "\n".join(svg_html_blocks)
             + "\n</section>"
         )

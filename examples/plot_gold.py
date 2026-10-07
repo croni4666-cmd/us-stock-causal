@@ -97,8 +97,8 @@ def main() -> int:
     for w in written:
         kb = w.stat().st_size / 1024
         print(f"  {w}  ({kb:.0f} KB)")
-    print(f"  Period: 1y (252 trading days, ~2025-07-23 -> 2026-07-22)")
-    print(f"  Annotations: 5 SMA (20/50/100/150/200) + R1/S1 + FOMC/CPI/NFP event lines")
+    print("  Period: actual observed dates shown below each price chart")
+    print("  Annotations: latest close with quote date/unit; SMA + R1/S1; no macro event overlays")
     print(f"  Y-axis: 52w high+20% / 52w low-20% (User 建议, v0.6.8h fix)")
     print("=" * 72)
     print()

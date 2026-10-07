@@ -26,6 +26,9 @@ v0.6.2 quality boost:
   改用 matplotlib 手画蜡烛 + plot,代码多 ~50 行但完全可控。
 
 输出: output/kline_<date>.{png,svg} (PNG 200-400KB@300dpi, SVG 20-60KB)
+
+2026-10-07: 行情图移除所有宏观事件叠线；收盘价/标的/单位/日期独立标识。
+实际显示窗口控制纵轴；候选事件关系不作为图上的因果解释。
 """
 from __future__ import annotations
 
@@ -50,7 +53,8 @@ mpl.rcParams['text.antialiased'] = True
 mpl.rcParams['patch.antialiased'] = True
 
 
-def _set_ylim_52w_padding(ax: plt.Axes, df_visible: pd.DataFrame, padding: float = 0.20) -> None:
+def _set_ylim_52w_padding(ax: plt.Axes, df_visible: pd.DataFrame, padding: float = 0.20,
+                         window: Optional[int] = 252) -> None:
     """v0.6.8h: 设置 ylim 为 52w high+20% / 52w low-20% (User 建议)
 
     User 反馈: 默认 ylim 范围太大 (黄金图 2000-5800), 价格离 y 轴太远。
@@ -60,7 +64,7 @@ def _set_ylim_52w_padding(ax: plt.Axes, df_visible: pd.DataFrame, padding: float
     """
     if len(df_visible) < 2:
         return
-    window = min(len(df_visible), 252)
+    window = len(df_visible) if window is None else min(len(df_visible), window)
     high_52w = float(df_visible["high"].iloc[-window:].max())
     low_52w = float(df_visible["low"].iloc[-window:].min())
     if high_52w <= 0 or low_52w <= 0 or high_52w <= low_52w:
@@ -225,7 +229,7 @@ def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bo
         ax.plot(
             df.index, sma_series,
             color=color, linewidth=lw, linestyle=ls, alpha=alpha,
-            label=f"{w} SMA ${last_val:.2f}",
+            label=f"{w} SMA",
             zorder=zorder,
         )
 
@@ -278,17 +282,12 @@ def plot_single(
     _draw_candles(ax, df)
     # 阈值线
     _draw_thresholds(ax, df, symbol, show_50sma=show_50sma, layer=layer)
-    # v0.6.4 (P6-1) 事件线: FOMC / CPI / NFP 垂直线
-    _draw_events(ax, df)
-    # v0.6.8h (P6-7.5): ylim 用 52w high/low ±20% (User 反馈默认 ylim 离价格太远)
+    # Price charts intentionally contain no macro/Federal Reserve event overlays.
+    # Use the actual displayed window so earlier prices cannot be cropped away.
     if len(df) >= 2:
-        _set_ylim_52w_padding(ax, df)
+        _set_ylim_52w_padding(ax, df.iloc[-lookback_days:], window=None)
 
-    # 标题 — 5 SMA 全显示 (v0.6.0) + 实际 lookback period (v0.6.3 fix)
-    t = get_thresholds(symbol, layer=layer)
-    smas = t["smas"]
-    vs = t["vs_sma"]
-    pos52w = t["range_52w"]["position_pct"]
+    # Keep price/date separate from moving-average legend and window title.
     # period 字符串: 252d → 1y, 500d → 2y, 126d → 6m (v0.6.3 用 round 不用 //)
     if lookback_days >= 252:
         period = f"{round(lookback_days / 252)}y"
@@ -296,34 +295,28 @@ def plot_single(
         period = f"{round(lookback_days / 21)}mo"
     else:
         period = f"{lookback_days}d"
-    # 拼标题
-    # - compact_title (4-subplot 模式): 只显示 close + SMA200 + 52w
-    # - 全显示模式 (单 subplot): close + 5 SMA + 52w
-    if compact_title:
-        s200_pct = vs.get("sma_200", {}).get("pct")
-        if s200_pct is not None and not pd.isna(s200_pct):
-            title = f"{symbol}  {period}  |  USD {t['last_close']:.2f}  |  SMA200 {s200_pct:+.1f}%  |  52w {pos52w}%"
-        else:
-            title = f"{symbol}  {period}  |  USD {t['last_close']:.2f}  |  52w {pos52w}%"
-        # v0.6.3 fix: matplotlib 3.11.0 + loc="left" 让 title 消失, 改默认 (center)
-        ax.set_title(title, fontsize=10, fontweight="bold", pad=8)
-    else:
-        parts = [f"close USD {t['last_close']:.2f}"]
-        for w in [20, 50, 100, 150, 200]:
-            v = smas.get(f"sma_{w}")
-            p = vs.get(f"sma_{w}", {}).get("pct")
-            if v is not None and p is not None and not pd.isna(v):
-                parts.append(f"SMA{w} {p:+.1f}%")
-        parts.append(f"52w {pos52w}%")
-        title = f"{symbol}  {period}  |  " + "  ".join(parts)
-        ax.set_title(title, fontsize=10, fontweight="bold", pad=8)
-    ax.set_ylabel("Price (USD)", fontsize=8)
+    # Separate instrument/window from the latest observed price and indicator key.
+    unit = 'USD/oz' if symbol == 'GC=F' else 'USD/share' if layer in ('indices','commodities_spot_etf') else 'USD'
+    name = 'Gold COMEX futures' if symbol == 'GC=F' else 'SPDR Gold Shares ETF' if symbol == 'GLD' else symbol
+    ax.set_title(f"{name} ({symbol}) | {period}" if symbol in ('GC=F','GLD') else f"{symbol} | {period}",
+                 fontsize=10, fontweight='bold', pad=8)
+    ax.set_ylabel(f"Price ({unit})", fontsize=8)
+    latest_date=df.index[-1]
+    latest_close=float(df['close'].iloc[-1])
+    ax.plot([latest_date],[latest_close],marker='o',color='#174a7e',markersize=4,zorder=7)
+    price=ax.annotate(f"Last close {latest_close:,.2f} {unit}\n{symbol} | {latest_date.date()}",
+                     xy=(.985,.965),xycoords='axes fraction',ha='right',va='top',
+                     fontsize=9,fontweight='bold',color='#174a7e',zorder=10,
+                     bbox={'boxstyle':'round,pad=0.45','facecolor':'white','edgecolor':'#174a7e','alpha':.95})
+    price.set_gid(f'latest-close-label-{symbol.replace("=", "_").replace("^", "_")}')
     ax.legend(loc="upper left", fontsize=7, framealpha=0.85, ncol=2)
     ax.grid(True, alpha=0.3, linestyle="-", linewidth=0.5)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
     ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
     plt.setp(ax.xaxis.get_majorticklabels(), rotation=0, fontsize=7)
     plt.setp(ax.yaxis.get_majorticklabels(), fontsize=7)
+    start=df.index[-min(len(df),lookback_days)].date()
+    ax.set_xlabel(f"Observed dates: {start} to {latest_date.date()}",fontsize=8)
 
     # Y 轴留点 margin,让标签不全贴边
     y_min, y_max = ax.get_ylim()

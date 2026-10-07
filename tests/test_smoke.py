@@ -310,7 +310,7 @@ def test_kline_period_string_500d_2y():
     plot_single('DIA', ax, layer='indices', lookback_days=500)
     title = ax.get_title()
     # 必须显示 "2y", 不能是 "1y"
-    assert " 2y " in title or "2y  " in title, f"500d should show 2y, got: {title}"
+    assert "2y" in title.split(), f"500d should show 2y, got: {title}"
     assert "1y" not in title, f"500d should NOT show 1y, got: {title}"
     plt.close(fig)
 
@@ -491,21 +491,13 @@ def test_performance_table_renders_v068h():
     assert "#137333" in html or "#c5221f" in html, "应有 inline 颜色"
 
 
-def test_kline_event_lines_drawn():
-    """v0.6.4 (P6-1): K 线上叠加 CPI/FOMC/NFP 事件垂直线"""
+def test_kline_event_lines_removed():
+    """Price charts omit Federal Reserve and other macro event overlays."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    from datetime import date
     from src.kline import plot_single
-    from src.events import MacroEvent, load_calendar
     fig, ax = plt.subplots(1, 1, figsize=(12, 6))
-    # 给定一些测试事件 (确保至少 1 个落在图内)
-    test_events = [
-        MacroEvent(date=date(2026, 5, 15), kind="FOMC", description="FOMC meeting"),
-        MacroEvent(date=date(2026, 6, 12), kind="CPI", description="CPI release"),
-    ]
-    # plot_single 默认会自己 load_calendar(), 这里用 plot_single 跑通即可
     plot_single('GC=F', ax, layer='commodities_futures', lookback_days=500)
     # 检查 axvline 数 (v0.6.4: axvline 创建的 Line2D 算 Line)
     axv_count = 0
@@ -513,7 +505,7 @@ def test_kline_event_lines_drawn():
         # axvline 是不带 marker 的 line, 检查 linestyle 区分 (实线/虚线/点)
         if line.get_linestyle() in ('-', '--', ':', '-.') and line.get_label() and 'event' in line.get_label():
             axv_count += 1
-    assert axv_count >= 1, f"Expected at least 1 event axvline, got {axv_count}"
+    assert axv_count == 0, f"Macro event overlays must be absent, got {axv_count}"
     plt.close(fig)
 
 
