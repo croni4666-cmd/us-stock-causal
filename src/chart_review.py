@@ -16,15 +16,19 @@ def _event(previous,current):
     return 'none'
 
 
-def analyze_ma_crossings(data,symbol,unit,windows=(50,100,200),recent_observations=5,as_of=None):
+def analyze_ma_crossings(data,symbol,unit,windows=(50,100,200),recent_observations=5,as_of=None,
+                         history_search_observations=None):
     result={'symbol':symbol,'unit':unit,'status':'unavailable','moving_averages':[],
             'basis':'available daily closes; exchange-session coverage not authenticated',
-            'recent_observations':recent_observations,'cross_scope':'strict opposite sides at adjacent observed closes'}
+            'recent_observations':recent_observations,'history_search_observations':history_search_observations,
+            'cross_scope':'strict opposite sides at adjacent observed closes'}
     try:
         if any(type(w) is not int or w<2 for w in windows) or not windows or len(set(windows))!=len(windows):
             raise ValueError('unique moving-average windows of at least two observations required')
         if type(recent_observations) is not int or not 1<=recent_observations<=100:
             raise ValueError('recent observation count must be1..100')
+        if history_search_observations is not None and (type(history_search_observations) is not int or history_search_observations<1):
+            raise ValueError('historical search needs a positive observation count or all loaded history')
         frame=data.loc[:as_of] if as_of is not None else data
         index=frame.index
         if (not isinstance(index,pd.DatetimeIndex) or index.tz is not None or index.hasnans or
@@ -35,7 +39,7 @@ def analyze_ma_crossings(data,symbol,unit,windows=(50,100,200),recent_observatio
         close=frame['close'].astype(float)
         if np.isinf(close.to_numpy()).any() or (close.dropna()<=0).any() or not math.isfinite(close.iloc[-1]):
             raise ValueError('finite positive prices and an available latest close required')
-        result.update(status='evaluated',date=str(index[-1].date()),previous_date=str(index[-2].date()),
+        result.update(status='evaluated',date=str(index[-1].date()),source_start=str(index[0].date()),previous_date=str(index[-2].date()),
                       close=float(close.iloc[-1]),previous_close=float(close.iloc[-2]) if pd.notna(close.iloc[-2]) else None,
                       input_sha256=hashlib.sha256(pd.util.hash_pandas_object(close,index=True).values.tobytes()).hexdigest())
         for window in windows:
@@ -44,7 +48,13 @@ def analyze_ma_crossings(data,symbol,unit,windows=(50,100,200),recent_observatio
             row={'window':window,'sma':current if math.isfinite(current) else None,
                  'previous_sma':previous if math.isfinite(previous) else None,'position':'unavailable',
                  'distance_pct':None,'latest_event':'unavailable','recent_crossings':[],
-                 'recent_pairs_evaluated':0,'recent_pairs_requested':min(recent_observations,len(close)-1)}
+                 'recent_pairs_evaluated':0,'recent_pairs_requested':min(recent_observations,len(close)-1),
+                 'last_crossing':None,'last_crossed_above':None,'last_crossed_below':None,
+                 'history_pairs_evaluated':0}
+            recent_start=max(1,len(close)-recent_observations)
+            history_start=max(window,len(close)-history_search_observations) if history_search_observations is not None else window
+            row['history_pairs_requested']=max(0,len(close)-history_start)
+            row['history_search_start']=str(index[history_start].date()) if history_start<len(close) else None
             if math.isfinite(current):
                 diff=float(close.iloc[-1]-current)
                 row.update(position='above' if diff>0 else 'below' if diff<0 else 'on',
@@ -53,15 +63,21 @@ def analyze_ma_crossings(data,symbol,unit,windows=(50,100,200),recent_observatio
                     row['latest_event']=_event(float(close.iloc[-2]-previous),diff)
             if row['latest_event']=='unavailable':
                 row['reason']='current/previous rolling window lacks enough complete closes; missing values not filled'
-            for i in range(max(1,len(close)-recent_observations),len(close)):
+            for i in range(min(recent_start,history_start),len(close)):
                 values=[close.iloc[i-1],close.iloc[i],means.iloc[i-1],means.iloc[i]]
                 if not all(math.isfinite(float(v)) for v in values): continue
-                row['recent_pairs_evaluated']+=1
+                if i>=recent_start: row['recent_pairs_evaluated']+=1
+                if i>=history_start: row['history_pairs_evaluated']+=1
                 event=_event(float(values[0]-values[2]),float(values[1]-values[3]))
                 if event in ('crossed_above','crossed_below'):
-                    row['recent_crossings'].append({'date':str(index[i].date()),
+                    record={'date':str(index[i].date()),
                         'previous_date':str(index[i-1].date()),'calendar_gap_days':(index[i]-index[i-1]).days,
-                        'event':event,'close':float(close.iloc[i]),'sma':float(means.iloc[i])})
+                        'event':event,'close':float(close.iloc[i]),'sma':float(means.iloc[i]),
+                        'observations_since':len(close)-1-i,'calendar_days_since':(index[-1]-index[i]).days}
+                    if i>=recent_start: row['recent_crossings'].append(record)
+                    if i>=history_start:
+                        row['last_crossing']=record
+                        row['last_'+event]=record
             result['moving_averages'].append(row)
     except (ValueError,TypeError,KeyError,AttributeError) as exc:
         result.update(status='unavailable',reason=str(exc))
@@ -81,12 +97,22 @@ def render_ma_review(reviews):
         if result['status']!='evaluated':
             lines.extend(['无法检查：'+result.get('reason','数据不足'),'']); continue
         lines.extend([f"行情截至 {result['date']}；收盘价 {result['close']:,.2f} {result['unit']}；上一可用日期 {result['previous_date']}。",'',
-            '| 均线 | 均线值 | 收盘位置 | 偏离 | 最新收盘事件 |',
-            '|---|---:|---|---:|---|'])
+            '| 均线 | 均线值 | 收盘位置 | 偏离 | 最新收盘事件 | 上次记录上穿 | 上次记录下穿 |',
+            '|---|---:|---|---:|---|---|---|'])
         for row in result['moving_averages']:
             mean='缺数据' if row['sma'] is None else f"{row['sma']:,.2f}"
             distance='无法判定' if row['distance_pct'] is None else f"{row['distance_pct']:+.2f}%"
-            lines.append(f"| SMA{row['window']} | {mean} | {positions[row['position']]} | {distance} | {events[row['latest_event']]} |")
+            up=row.get('last_crossed_above'); down=row.get('last_crossed_below')
+            lines.append(f"| SMA{row['window']} | {mean} | {positions[row['position']]} | {distance} | {events[row['latest_event']]} | {up['date'] if up else '范围内未记录'} | {down['date'] if down else '范围内未记录'} |")
+        lines.extend(['','历史搜索范围：已加载数据从'+result['source_start']+'至'+result['date']+
+                      ('，搜索全部可计算观察。' if result['history_search_observations'] is None else f"，仅搜索最后{result['history_search_observations']}组观察。")])
+        for row in result['moving_averages']:
+            last=row.get('last_crossing')
+            detail=(f"最近一次记录：{last['previous_date']} → {last['date']} {events[last['event']]}，距截至日{last['observations_since']}个可用日线。"
+                    if last else '搜索范围内未记录确认穿越，不表示完整市场历史从未穿越。')
+            lines.append(f"- SMA{row['window']}：{detail} 历史有效检查{row['history_pairs_evaluated']}/{row['history_pairs_requested']}组。")
+            if row['history_pairs_evaluated']<row['history_pairs_requested']:
+                lines.append('  历史有数据缺口，不能排除未观察到的穿越。')
         lines.extend(['',f"最近{result['recent_observations']}个可用日线的确认穿越："])
         for row in result['moving_averages']:
             lines.append(f"- SMA{row['window']}：有效检查{row['recent_pairs_evaluated']}/{row['recent_pairs_requested']}组相邻观察。")

@@ -42,7 +42,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from loguru import logger
 
-from src.thresholds import get_thresholds, load_prices
+from src.thresholds import load_prices, compute_pivots
 from matplotlib.ticker import MaxNLocator, FuncFormatter
 
 
@@ -192,7 +192,8 @@ def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
                 rect.set_gid(f"candle-body-{date_str}")
 
 
-def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bool = True, layer: str = "indices") -> None:
+def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bool = True, layer: str = "indices",
+                     sma_windows=None,show_pivots=True) -> None:
     """在 ax 上画 5 SMA (滑动平均曲线) + R1/S1 (v0.6.1 P6-6 bug fix)
 
     v0.6.0 错误: 用 ax.hlines 画 SMA → 画成 1 根水平线,不是真滑动平均
@@ -200,9 +201,6 @@ def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bo
 
     R1/S1 仍是 hlines (pivot 是不变的常数,不是时间序列)
     """
-    t = get_thresholds(symbol, layer=layer)
-
-    smas_last = t["smas"]  # {sma_20: float, sma_50: float, ...} 最近值
     first_date = df.index[0]
     last_date = df.index[-1]
 
@@ -216,15 +214,15 @@ def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bo
     ]
 
     close = df["close"]
-    for key, color, lw, ls, alpha, zorder in sma_styles:
-        last_val = smas_last.get(key)
-        if last_val is None or pd.isna(last_val):
-            continue
+    styles={int(key.split('_')[1]):(color,lw,ls,alpha,zorder) for key,color,lw,ls,alpha,zorder in sma_styles}
+    selected=tuple(styles) if sma_windows is None else sma_windows
+    for w in selected:
+        color,lw,ls,alpha,zorder=styles.get(w,('#546e7a',1.2,'-',.75,3))
         # 跳过 50 SMA 如果 show_50sma=False
-        if key == "sma_50" and not show_50sma:
+        if w == 50 and not show_50sma:
             continue
-        w = int(key.split("_")[1])
         sma_series = close.rolling(w).mean()
+        if pd.isna(sma_series.iloc[-1]): continue
         # 滑动平均曲线 — 每天的均值,不是单值
         ax.plot(
             df.index, sma_series,
@@ -234,8 +232,10 @@ def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bo
         )
 
     # R1 / S1 仍是 hlines (pivot 是常数)
-    r1 = t["pivots"]["r1"]
-    s1 = t["pivots"]["s1"]
+    if not show_pivots: return
+    pivots=compute_pivots(df)
+    r1 = pivots["r1"]
+    s1 = pivots["s1"]
     ax.hlines(
         r1, first_date, last_date,
         colors=COLOR_R1, linestyles="--", linewidth=1.2,
@@ -255,6 +255,16 @@ def plot_single(
     lookback_days: int = 252,
     show_50sma: bool = True,
     compact_title: bool = False,
+    *,
+    data: Optional[pd.DataFrame] = None,
+    as_of: Optional[str] = None,
+    sma_windows=None,
+    show_pivots: bool = True,
+    ma_review: bool = True,
+    review_windows=(50,100,200),
+    recent_observations: int = 5,
+    history_search_observations=None,
+    price_unit: Optional[str] = None,
 ) -> plt.Axes:
     """Plot single symbol K-line on given axes
 
@@ -265,7 +275,9 @@ def plot_single(
     fix: 用 cache 全量数据画, xlim 限定最后 lookback_days, 让 SMA 从图一开始就连续。
     要求: cache 至少 lookback_days + 200 (2y 缓存能保证 1y 图 200 SMA 全程有效)。
     """
-    df = load_prices(symbol, layer)
+    df = load_prices(symbol, layer) if data is None else data.copy()
+    if as_of is not None: df=df.loc[:as_of]
+    if len(df)<2: raise ValueError('price chart needs at least two observations through requested date')
 
     # v0.6.8g: 不再切片! 画全量数据, xlim 限定显示窗口
     # 这样 200 SMA 滚动 200 天有 warmup, 1y 图全程有效
@@ -281,7 +293,8 @@ def plot_single(
     # 蜡烛
     _draw_candles(ax, df)
     # 阈值线
-    _draw_thresholds(ax, df, symbol, show_50sma=show_50sma, layer=layer)
+    _draw_thresholds(ax, df, symbol, show_50sma=show_50sma, layer=layer,
+                     sma_windows=sma_windows,show_pivots=show_pivots)
     # Price charts intentionally contain no macro/Federal Reserve event overlays.
     # Use the actual displayed window so earlier prices cannot be cropped away.
     if len(df) >= 2:
@@ -296,9 +309,12 @@ def plot_single(
     else:
         period = f"{lookback_days}d"
     # Separate instrument/window from the latest observed price and indicator key.
-    unit = 'USD/oz' if symbol == 'GC=F' else 'USD/share' if layer in ('indices','commodities_spot_etf') else 'USD'
-    from src.chart_review import analyze_ma_crossings
-    ax._ma_review = analyze_ma_crossings(df,symbol,unit)
+    unit = price_unit or ('USD/oz' if symbol == 'GC=F' else 'USD/share' if layer in ('indices','commodities_spot_etf') else 'USD')
+    if ma_review:
+        from src.chart_review import analyze_ma_crossings
+        ax._ma_review = analyze_ma_crossings(df,symbol,unit,windows=review_windows,
+            recent_observations=recent_observations,history_search_observations=history_search_observations)
+    elif hasattr(ax,'_ma_review'): del ax._ma_review
     name = 'Gold COMEX futures' if symbol == 'GC=F' else 'SPDR Gold Shares ETF' if symbol == 'GLD' else symbol
     ax.set_title(f"{name} ({symbol}) | {period}" if symbol in ('GC=F','GLD') else f"{symbol} | {period}",
                  fontsize=10, fontweight='bold', pad=8)
@@ -311,7 +327,8 @@ def plot_single(
                      fontsize=9,fontweight='bold',color='#174a7e',zorder=10,
                      bbox={'boxstyle':'round,pad=0.45','facecolor':'white','edgecolor':'#174a7e','alpha':.95})
     price.set_gid(f'latest-close-label-{symbol.replace("=", "_").replace("^", "_")}')
-    ax.legend(loc="upper left", fontsize=7, framealpha=0.85, ncol=2)
+    if ax.get_legend_handles_labels()[0]:
+        ax.legend(loc="upper left", fontsize=7, framealpha=0.85, ncol=2)
     ax.grid(True, alpha=0.3, linestyle="-", linewidth=0.5)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
     ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))

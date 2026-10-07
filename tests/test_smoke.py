@@ -136,26 +136,20 @@ def test_data_snapshot():
         assert ticker in r
 
 
-def test_skill_md_exists_and_accurate():
-    """skill 文件存在 + 内容含所有 module"""
-    home = Path.home()
-    candidates = [
-        Path(__file__).resolve().parent.parent / "SKILL.md",
-        home / ".gemini" / "config" / "skills" / "us-stock-causal" / "SKILL.md",
-        home / ".gemini" / "skills" / "us-stock-causal" / "SKILL.md",
-        Path(__file__).resolve().parents[3] / "workspace" / "saved_assets" / "skills" / "us-stock-causal" / "SKILL.md",
-        Path(__file__).resolve().parents[2] / "workspace" / "saved_assets" / "skills" / "us-stock-causal" / "SKILL.md",
-    ]
-    skill = next((p for p in candidates if p.exists()), None)
-    assert skill is not None, f"skill file not found in {[str(c) for c in candidates]}"
-    text = skill.read_text(encoding="utf-8")
-    # 13 modules 都在文件名
-    for m in [
-        "proxy", "data", "cache", "thresholds", "returns",
-        "attribution", "residual", "patterns", "events",
-        "signals", "macro", "kline", "report",
-    ]:
-        assert m in text, f"skill missing module {m}"
+def test_skill_entrypoint_and_references_resolve():
+    """The repository skill is discoverable and its maintained local links resolve."""
+    import re
+    import yaml
+    root=Path(__file__).resolve().parent.parent
+    text=(root/'SKILL.md').read_text(encoding='utf-8')
+    frontmatter=yaml.safe_load(text.split('---',2)[1])
+    assert frontmatter['name']=='us-stock-causal'
+    assert frontmatter['description']
+    targets=re.findall(r'\[[^\]]+\]\(([^)]+)\)',text)
+    assert targets
+    for target in targets:
+        if not target.startswith(('https://','http://','#')):
+            assert (root/target).is_file(),f'Broken skill reference: {target}'
 
 
 def test_no_todo_or_stubs():

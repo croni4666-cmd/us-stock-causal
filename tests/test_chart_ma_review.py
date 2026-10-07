@@ -97,3 +97,26 @@ def test_saving_chart_writes_separate_report_without_added_image_annotations(tmp
         assert len(ax.texts)==before
     finally:
         plt.close(fig)
+
+
+def test_last_crossing_searches_beyond_recent_window_and_keeps_direction():
+    from src.chart_review import analyze_ma_crossings
+    data=prices(n=230)
+    data.iloc[-15,0]=90
+    data.iloc[-14:,0]=110
+    result=analyze_ma_crossings(data,'GC=F','USD/oz')
+    for row in result['moving_averages']:
+        assert not row['recent_crossings']
+        assert row['last_crossing']['date']==str(data.index[-14].date())
+        assert row['last_crossing']['event']=='crossed_above'
+        assert row['last_crossing']['observations_since']==13
+        assert row['last_crossed_above']==row['last_crossing']
+        assert row['last_crossed_below'] is None
+
+
+def test_last_crossing_scope_can_be_bounded_without_claiming_lifetime_absence():
+    from src.chart_review import analyze_ma_crossings,render_ma_review
+    data=prices(n=230); data.iloc[-15,0]=90; data.iloc[-14:,0]=110
+    result=analyze_ma_crossings(data,'GLD','USD/share',history_search_observations=5)
+    assert all(r['last_crossing'] is None and r['history_pairs_requested']==5 for r in result['moving_averages'])
+    assert '搜索范围' in render_ma_review([result])

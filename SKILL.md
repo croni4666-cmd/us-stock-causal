@@ -1,184 +1,56 @@
 ---
 name: us-stock-causal
-description: "美股因果分析工具 (v3 重设计) — 4 指数 + 11 行业 + 6 宏观 + 28 商品的 49 ticker 数据集 + Phase 2 因果分析 (归因/阈值/模式/事件/信号) + Phase 3 简洁呈现 (5 段报告/K线/顶部情绪) + Phase 4 自分析 (export/jupyter/notebooks)。**不输出'看多/看空'结论**,只输出'驱动因子 + 阈值 + 历史 + 风险'。位于 G:\\Gemini - workspace\\trade market\\us-stock-causal\\,Phase 0-4 全部完成,Phase 5 调度待用户配 webhook 后开启。."
+description: Use when working in us-stock-causal to generate market charts, choose chart profiles/options, inspect moving-average crossings, or review asset attribution and candidate causal models.
 license: internal
-version: 2.0
+metadata:
+  skill_version: "2.1"
 ---
 
+# us-stock-causal
 
-# us-stock-causal — 美股因果分析工具
+项目根目录是包含本文件、`src/`和`examples/`的目录。先确认实际运行环境与数据位置，不使用旧机器上的绝对路径、旧行情快照或旧阶段状态作为当前事实。
 
-## Overview
+## 图表类型与选项
 
-你是 us-stock-causal 项目的助手。这是一套让用户能"看到涨跌因果关系"的美股分析工具,目标是:
-- **不输出"看多/看空"结论** — 输出"为什么涨/为什么跌"的因果链
-- **给用户一手数据 + 模型** — 47 个 ticker 干净 parquet,可在 Jupyter 自己跑
-- **简洁呈现** — 5 段报告 + K 线 + 顶部情绪
+用户要求生成图片或选择图表类型时，使用统一入口 `python -m examples.chart`。读取[图表profile和option参考](references/chart-profiles.md)，让用户的显式要求覆盖预设；没有指定时，默认`ma-review`。
 
-**项目位置**: `G:\Gemini - workspace\trade market\us-stock-causal\`
-**当前版本**: 0.5.0 (Phase 0-4 done, Phase 5 待用户确认)
-
----
-
-## 🎯 三档阅读 (Phase 3 完成)
-
-| 时间 | 入口 | 看什么 |
+| 用户表达 | profile | 主要输出 |
 |---|---|---|
-| **30 秒** | `src/macro.py` `topline()` | VIX / 10Y / DXY + 4 指数 1d |
-| **5 分钟** | `src/kline.py` `plot_4_indices()` | 4 指数 1y K 线 + 4 阈值线 (200 SMA / 50 SMA / R1 / S1) |
-| **15 分钟** | `src/report.py` `render_full_report()` | 4 指数 × 5 段 (行情/归因/阈值/相似/风险) |
+| 只看价格、清爽纯图 | `price` | K线及独立收盘标识，不默认画均线或写检查 |
+| 看均线与穿线，附额外检查 | `ma-review` | 50/100/200日均线；图片外单独检查，推荐默认 |
+| 比较黄金、ETF、纳斯达克、美债ETF | `comparison` | 多资产网格图，各标的独立检查 |
+| 完整技术图、全部均线和参考价 | `technical` | 20/50/100/150/200日均线与R1/S1，独立检查 |
 
----
+用`--list-profiles`核对当前可用预设。画哪些均线由`--smas`决定；检查哪些均线由`--review-windows`决定。它们可以不同。例如“纯图但仍要额外均线检查”使用`price --review`，不需要把检查挤进图里。
 
-## 🗂️ 项目结构
+执行前确认标的、实际缓存目录和行情截至日；缺数据时说明缺口，不用合成数据冒充市场数据。生成后读取`.manifest.json`，确认实际profile、显式覆盖项、标的、报价日期、单位、输入哈希和本次产物。优先按manifest打开本次文件，不沿用旧输出。
 
-```
-G:\Gemini - workspace\trade market\us-stock-causal\
-├── src/                     # 11 个核心模块
-│   ├── proxy.py             # Clash 代理 (8 端口 auto-detect)
-│   ├── data.py              # yfinance 统一封装 (DXY→DX-Y.NYB alias)
-│   ├── cache.py             # parquet 增量缓存
-│   ├── thresholds.py        # SMA + pivot + 52w
-│   ├── returns.py           # log/simple return
-│   ├── attribution.py       # sector weight × sector return 归因
-│   ├── residual.py          # 60d t-test weight 健康度
-│   ├── patterns.py          # Pearson correlation 历史匹配
-│   ├── events.py            # FOMC/CPI/NFP/PCE 事件日历
-│   ├── signals.py           # 3 源信号 + 矛盾 score
-│   ├── macro.py             # 顶部情绪 1 行
-│   ├── kline.py             # 4 subplot K 线
-│   └── report.py            # 5 段制报告
-├── config/
-│   ├── tickers.yaml         # 49 ticker 4 层
-│   ├── sector_weights.json  # 4 指数 × 11 GICS (2026-Q2 近似)
-│   └── events_2026.yaml     # 44 硬编码事件
-├── examples/                # 9 个 runnable 脚本
-│   ├── fetch_all.py         # 49 ticker 批量拉
-│   ├── data_quality.py      # 47/47 PASS
-│   ├── attribute.py         # Phase 2 归因 demo
-│   ├── thresholds.py        # Phase 2.1 阈值 + 残差
-│   ├── patterns.py          # Phase 2.2 模式匹配
-│   ├── events.py            # Phase 2.2 事件日历
-│   ├── report.py            # 5 段报告生成
-│   ├── kline.py             # 4 指数 K 线
-│   ├── export.py            # 数据集导出 CLI
-│   ├── notebook.py          # Jupyter Lab 启动器
-│   └── generate_sample_notebooks.py
-├── notebooks/               # 3 个 sample notebook
-│   ├── 01_load_and_explore.ipynb
-│   ├── 02_attribution_custom.ipynb
-│   └── 03_pattern_match.ipynb
-├── data/raw/<layer>/*.parquet   # 47 个 ticker 数据 (gitignore)
-├── output/                       # 报告 + K 线 PNG
-├── CHANGELOG.md                  # Keep a Changelog 格式
-├── VERSION                       # 0.5.0
-└── ROADMAP.md (workspace level)  # 5 phase single source of truth
-```
+## 图片与独立数值检查
 
----
+- 行情图不叠加联储或其他宏观事件；profile与option都不恢复这些叠线。
+- 收盘价、标的、单位和报价日期独立标识。GC=F是连续黄金期货美元/盎司，GLD是ETF美元/份；不能称作同一价格或自动取得的实时现货金价。
+- 图片描述之外另读`.ma-review.md`及`.ma-review.json`。默认关注50/100/200日SMA，列当前位置、偏离、最新收盘事件、最近观察窗口以及历史最后一次确认记录。
+- 使用每个日期自己的未经四舍五入的均线。上方/下方不等于当天刚穿越；贴线、从贴线离开、数据不足分别展示。该检查不是盘中触线，也不是均线之间的金叉/死叉。
+- 默认“上次穿线”搜索全部已加载、可计算历史，分别给出最后上穿/下穿、最近一次方向、前后观察日期与距截至日的观察数。限定`--cross-history`时同时告知范围；未找到只能称范围内未记录，不能说市场历史从未发生。
+- `--as-of`先截断数据再计算与绘图。缺失不填补；均线按可用日线数量计算，交易日覆盖未认证。历史缺口和实际检查数量保持可见。
 
-## 🚀 常用命令 (一次记,长期用)
+## 生成后审查
 
-```bash
-# 跑全套报告 (topline + 5 段 × 4 指数)
-python examples/report.py
+数值检查与机器视觉分开：穿越日期来自行情计算，不能凭截图猜。核对数值、日期、单位、纵轴覆盖和产物后，再查看实际导出图片的标题、标识、叠层及可读性。明确哪些是程序检查、哪些是AI视觉观察；人工舒适度、色觉和阅读效率由用户实际看图验收。
 
-# 4 指数 K 线图
-python examples/kline.py
+PNG是默认视觉产物。既有SVG蜡烛悬停元数据问题未修复时，不用悬停确认价格；读取PNG标识或独立数值文件，不宣称SVG交互已验收。
 
-# 数据集导出
-python examples/export.py --tickers DIA,QQQ,RSP,QQQE --format csv
-python examples/export.py --tickers XLK,XLF --start 2025-01-01 --format excel
+## 分析边界与其他入口
 
-# Jupyter Lab 启动
-python examples/notebook.py              # 默认 8888
-python examples/notebook.py --port 8889 --no-browser   # SSH 场景
-```
+DAG是低可信候选假设；图内形式识别、统计显著、PC重叠和扰动稳定不认证现实因果效应。只处理有可执行观察约束的登记命题，保留反例、探索记录和不可检验依赖，不制造命题成立概率。该skill负责路由和记录，不承担完整因果认证，也不把均线形态变成未来收益保证。
 
----
+按任务读取对应文档，不把全部流程强制套在简单绘图上：
 
-## 🔍 模块快速参考 (按用途)
+- 原有数据、阈值、形态、事件、报告和导出导航：[references/analysis-entrypoints.md](references/analysis-entrypoints.md)。
+- 资产专用归因：[docs/asset-specific-attribution.md](docs/asset-specific-attribution.md)。
+- 官方权重与市场快照：[docs/asset-data-pipeline.md](docs/asset-data-pipeline.md)。
+- 美债曲线与现金流模型：[docs/treasury-curve-model.md](docs/treasury-curve-model.md)。
+- 可证伪命题与支持程度：[docs/dag-hypothesis-review.md](docs/dag-hypothesis-review.md)。
+- 图像审查与均线数值边界：[docs/chart-price-readability.md](docs/chart-price-readability.md)。
 
-### 想知道"今天怎么样"
-- `src.macro.topline()` → 1 行情绪
-- `src.report.render_full_report(['DIA','QQQ','RSP','QQQE'])` → 5 段制
-- `src.kline.plot_4_indices()` → K 线图
-
-### 想知道"为什么涨/跌"
-- `src.attribution.attribute_index('QQQ', lookback_days=5)` → sector 贡献
-- `src.residual.assess_weight_health('QQQ')` → weights 准不准
-
-### 想知道"历史上类似形态后续如何"
-- `src.patterns.find_similar_patterns('QQQ', pattern_length=20, n_matches=10, forecast_horizon=5)`
-
-### 想知道"下一个事件"
-- `src.events.next_event()` → 下个 FOMC/CPI/NFP/PCE
-- `src.events.upcoming_events(lookahead_days=30)` → 未来 30 天
-
-### 想知道"信号矛盾不矛盾"
-- `src.signals.aggregate_signals('QQQ')` → 3 源信号 + 矛盾 score
-
----
-
-## 📊 当前数据快照 (2026-07-13)
-
-**4 指数 5 日累计**:
-- DIA: -0.40% / 信号矛盾 0.67 (mixed)
-- QQQ: +1.81% / pattern win 80% / SMA200 +13.7% 距超买
-- RSP: -0.28%
-- QQQE: +0.38% / pattern win 70% / SMA200 +13.5% 距超买
-
-**关键阈值**:
-- 4 指数全 above 200 SMA (+8~+14%),**late cycle bull market**
-- R1/S1 贴 52w 高 (突破 R1 才开新一轮)
-- 明天 7/14 CPI 是 universal 风险
-
-**信号分歧**:
-- VIX 16.40 (+9.12%) **panic 急升** vs 4 指数都小涨
-- 报告列事实不解读 — 用户自己判断
-
----
-
-## ⚠️ 重要约束 (来自 ROADMAP)
-
-1. **跑起来不花钱** (免费 tier,数据源 yfinance)
-2. **不维护 hosted 服务**
-3. **单人维护 ≤ 几小时/月**
-4. **无"必须发布"义务**
-5. **第三方免费 API 挂掉要优雅降级** (单 ticker 失败不阻塞)
-
----
-
-## 🔄 工作流 (用户操作)
-
-```bash
-# 1. 拉新数据 (每天 1 次)
-python examples/fetch_all.py
-
-# 2. 数据质量验证 (Phase 2 之前必跑)
-python examples/data_quality.py
-
-# 3. 看 5 段报告
-python examples/report.py
-
-# 4. 看 K 线
-python examples/kline.py
-
-# 5. 自分析 (Jupyter)
-python examples/notebook.py
-```
-
----
-
-## 🪦 历史 (不要重复)
-
-### v1 (us-stock-daily 单 session 写, 2026-07-03)
-**已删**。12 模块单 session 写,"完成"是 byte-level 不是 corpus-level。
-**Learn**: 必须配真实数据 + 真实日志证据。
-
-### 0.2 (us-stock-daily 三源投票, 2026-07-13)
-**已删**。**产品方向错位** — 输出"看多/看空"投票,跟大 V 喊单没区别。
-**Learn**: 目标错位比 bug 严重 100 倍。
-
-### v3 (本项目, 2026-07-13)
-因果分析 + 简洁呈现 + 自分析,完成 Phase 0-4。Phase 5 调度待用户配 webhook。
+不将当期持仓倒填历史，不把ETF收益、指数点数、收益率报价与期货价格混为同一口径。沿用用户已经授权的任务范围；绘图和分析不构成合并、发布、发送消息或交易授权。

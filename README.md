@@ -146,3 +146,4 @@ DAG、SCM和CATE默认只是候选假设及条件模型结果。统计显著、P
 
 行情图已移除联储等宏观事件叠线，收盘价、单位和报价日期独立展示；边界见 [图表价格标识](docs/chart-price-readability.md)。
 生成图片后另存50/100/200日均线穿越检查，区分当前位置、最新收盘穿越及最近5个可用日线记录；结果放在同名 `.ma-review.md` / `.ma-review.json`，图片不新增叠层。
+现另告知历史最后上穿/下穿日期、最近一次方向及搜索范围。用 `python -m examples.chart --list-profiles` 选择纯价格、均线检查、多资产对比或完整技术图；可选项及可重复流程记录于 [项目skill](SKILL.md) 和 [profile参考](references/chart-profiles.md)。

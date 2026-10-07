@@ -32,6 +32,7 @@ output/hypothesis_report.md
 output/hypothesis_report.json
 output/*.ma-review.md
 output/*.ma-review.json
+output/*.manifest.json
 *.parquet
 *.csv
 
