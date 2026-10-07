@@ -48,8 +48,8 @@ def main() -> int:
 
     # 3 subplot: 2 K-line + 1 performance dashboard
     # 比例: 上 3:3, 下 4 (performance dashboard 高一点, 因为 20 标的 + 2 行 label)
-    fig = plt.figure(figsize=(15, 15))
-    gs = fig.add_gridspec(3, 1, height_ratios=[3, 3, 4.5], hspace=0.40)
+    fig = plt.figure(figsize=(15, 18))
+    gs = fig.add_gridspec(3, 1, height_ratios=[3, 3, 6], hspace=0.40)
     axes = [fig.add_subplot(gs[0]), fig.add_subplot(gs[1]), fig.add_subplot(gs[2])]
 
     fig.suptitle(
@@ -66,7 +66,7 @@ def main() -> int:
         show_50sma=True,
         compact_title=False,
     )
-    axes[0].set_title("GC=F  Gold COMEX Futures (USD/oz) — 1y K-line", fontsize=11, fontweight="bold")
+    axes[0].set_title("GC=F  Gold COMEX Futures（COMEX黄金期货） — 1y K-line（1年K线）", fontsize=11, fontweight="bold")
 
     # 中: GLD ETF (1y K-line, 5 SMA + R1/S1)
     plot_single(
@@ -77,7 +77,7 @@ def main() -> int:
         show_50sma=True,
         compact_title=False,
     )
-    axes[1].set_title("GLD  SPDR Gold Shares ETF (USD/share) — 1y K-line", fontsize=11, fontweight="bold")
+    axes[1].set_title("GLD  SPDR Gold Shares ETF（SPDR黄金ETF） — 1y K-line（1年K线）", fontsize=11, fontweight="bold")
 
     # 下: 报价变化总览（价格与宏观单位分开） (Google Finance 风格)
     plot_performance_dashboard(axes[2])

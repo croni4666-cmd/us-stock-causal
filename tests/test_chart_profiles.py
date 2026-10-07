@@ -58,7 +58,7 @@ def test_selected_ma_and_historical_cutoff_use_only_supplied_data():
         plot_single('GC=F',ax,layer='commodities_futures',data=data,as_of=cutoff,
                     sma_windows=(50,200),show_pivots=False,ma_review=True)
         labels=ax.get_legend_handles_labels()[1]
-        assert labels==['50 SMA','200 SMA']
+        assert labels==['50 SMA（50日简单均线）','200 SMA（200日简单均线）']
         assert ax._ma_review['date']==cutoff and ax._ma_review['close']==100
     finally: plt.close(fig)
 
@@ -100,7 +100,7 @@ def test_historical_pivot_does_not_use_later_quotes():
     try:
         plot_single('GC=F',ax,layer='commodities_futures',data=data,
                     as_of=str(data.index[-3].date()),sma_windows=(),show_pivots=True)
-        assert ax.get_legend_handles_labels()[1]==['R1 $101.00','S1 $99.00']
+        assert ax.get_legend_handles_labels()[1]==['R1（一级阻力） 101.00','S1（一级支撑） 99.00']
     finally: plt.close(fig)
 
 

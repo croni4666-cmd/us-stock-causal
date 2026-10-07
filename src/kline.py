@@ -46,6 +46,7 @@ import matplotlib.dates as mdates
 from loguru import logger
 
 from src.thresholds import load_prices, compute_pivots
+from src.chart_labels import configure_chart_font,unit_label,instrument_label
 from matplotlib.ticker import MaxNLocator, FuncFormatter
 
 
@@ -246,7 +247,7 @@ def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bo
         ax.plot(
             df.index, sma_series,
             color=color, linewidth=lw, linestyle=ls, alpha=alpha,
-            label=f"{w} SMA",
+            label=f"{w} SMA（{w}日简单均线）",
             zorder=zorder,
         )
 
@@ -258,12 +259,12 @@ def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bo
     ax.hlines(
         r1, first_date, last_date,
         colors=COLOR_R1, linestyles="--", linewidth=1.2,
-        label=f"R1 ${r1:.2f}",
+        label=f"R1（一级阻力） {r1:.2f}",
     )
     ax.hlines(
         s1, first_date, last_date,
         colors=COLOR_S1, linestyles="--", linewidth=1.2,
-        label=f"S1 ${s1:.2f}",
+        label=f"S1（一级支撑） {s1:.2f}",
     )
 
 
@@ -294,6 +295,7 @@ def plot_single(
     fix: 用 cache 全量数据画, xlim 限定最后 lookback_days, 让 SMA 从图一开始就连续。
     要求: cache 至少 lookback_days + 200 (2y 缓存能保证 1y 图 200 SMA 全程有效)。
     """
+    configure_chart_font()
     df = load_prices(symbol, layer) if data is None else data.copy()
     if as_of is not None: df=df.loc[:as_of]
     if len(df)<2: raise ValueError('price chart needs at least two observations through requested date')
@@ -334,14 +336,14 @@ def plot_single(
         ax._ma_review = analyze_ma_crossings(df,symbol,unit,windows=review_windows,
             recent_observations=recent_observations,history_search_observations=history_search_observations)
     elif hasattr(ax,'_ma_review'): del ax._ma_review
-    name = 'Gold COMEX futures' if symbol == 'GC=F' else 'SPDR Gold Shares ETF' if symbol == 'GLD' else symbol
-    ax.set_title(f"{name} ({symbol}) | {period}" if symbol in ('GC=F','GLD') else f"{symbol} | {period}",
+    name = 'Gold COMEX futures（COMEX黄金期货）' if symbol == 'GC=F' else 'SPDR Gold Shares ETF（SPDR黄金ETF）' if symbol == 'GLD' else instrument_label(symbol)
+    ax.set_title(f"{name} ({symbol}) | {period}" if symbol in ('GC=F','GLD') else f"{name} | {period}",
                  fontsize=10, fontweight='bold', pad=8)
-    ax.set_ylabel(f"Price ({unit})", fontsize=8)
+    ax.set_ylabel(f"Price（价格） | {unit_label(unit)}", fontsize=8)
     latest_date=df.index[-1]
     latest_close=float(df['close'].iloc[-1])
     ax.plot([latest_date],[latest_close],marker='o',color='#174a7e',markersize=4,zorder=7)
-    price=ax.annotate(f"Last close {latest_close:,.2f} {unit}\n{symbol} | {latest_date.date()}",
+    price=ax.annotate(f"Last close（最新收盘价） {latest_close:,.2f}\n{unit_label(unit)} | {symbol}\n{latest_date.date()}",
                      xy=(.985,.965),xycoords='axes fraction',ha='right',va='top',
                      fontsize=9,fontweight='bold',color='#174a7e',zorder=10,
                      bbox={'boxstyle':'round,pad=0.45','facecolor':'white','edgecolor':'#174a7e','alpha':.95})
@@ -354,7 +356,7 @@ def plot_single(
     plt.setp(ax.xaxis.get_majorticklabels(), rotation=0, fontsize=7)
     plt.setp(ax.yaxis.get_majorticklabels(), fontsize=7)
     start=df.index[-min(len(df),lookback_days)].date()
-    ax.set_xlabel(f"Observed dates: {start} to {latest_date.date()}",fontsize=8)
+    ax.set_xlabel(f"Observed dates（观察日期）: {start} → {latest_date.date()}",fontsize=8)
 
     # Y 轴留点 margin,让标签不全贴边
     y_min, y_max = ax.get_ylim()
@@ -445,9 +447,9 @@ def _inject_ohlcv_hover(svg_path: Path, fig: plt.Figure) -> int:
         def price(v): return 'unavailable' if v is None else f'{v:,.{digits}f}'
         volume=observation['volume']
         volume_text='unavailable' if volume is None else f'{volume:,.4f}'.rstrip('0').rstrip('.')
-        title_el.text=(f"{observation['symbol']} | {observation['date']} | {observation['unit']}\n"
-            f"Open {price(o)}; High {price(observation['high'])}; Low {price(observation['low'])}; Close {price(c)}\n"
-            f"Provider volume {volume_text} (provider units)")
+        title_el.text=(f"{instrument_label(observation['symbol'])} | {observation['date']} | {unit_label(observation['unit'])}\n"
+            f"Open（开盘） {price(o)}; High（最高） {price(observation['high'])}; Low（最低） {price(observation['low'])}; Close（收盘） {price(c)}\n"
+            f"Provider volume（数据源成交量） {volume_text} (provider units（数据源单位）)")
         el.insert(0,title_el)
         el.set('data-source-gid',key)
         el.set('data-ohlcv',json.dumps(observation,ensure_ascii=False,allow_nan=False))

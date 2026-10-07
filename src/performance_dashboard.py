@@ -16,6 +16,7 @@ from matplotlib.ticker import FuncFormatter, MaxNLocator
 from loguru import logger
 
 from src.thresholds import load_prices, YIELD_SYMBOLS
+from src.chart_labels import configure_chart_font,unit_label,instrument_label
 
 
 # 中英文对照表 (用于表格显示)
@@ -142,6 +143,7 @@ def _change_text(row):
 
 def plot_performance_dashboard(ax,symbols=None,top_n=None,as_of=None):
     """Price-quote percentage bars plus separate, unranked macro quote cards."""
+    configure_chart_font()
     if top_n is not None and (type(top_n) is not int or top_n<1):
         raise ValueError('top_n must be a positive integer')
     results=collect_performance(symbols,as_of)
@@ -162,15 +164,15 @@ def plot_performance_dashboard(ax,symbols=None,top_n=None,as_of=None):
     card_region=min(.55,.25*card_rows) if prices else .9
     quote_dates=sorted({r['date'] for r in results})
     date_text=quote_dates[0] if len(quote_dates)==1 else quote_dates[0]+' to '+quote_dates[-1]
-    ax.set_title('Quote summary | '+date_text,fontsize=11,fontweight='bold',pad=8)
+    ax.set_title('Quote summary（报价总览） | '+date_text,fontsize=11,fontweight='bold',pad=8)
     if prices:
-        chart=ax.inset_axes([.07,card_region+.08,.9,.84-card_region])
+        chart=ax.inset_axes([.20,card_region+.12,.77,.80-card_region])
         panels['prices']=chart
         values=[r['change_value'] for r in prices]
         colors=[COLOR_UP if v>0 else COLOR_DOWN if v<0 else COLOR_NEUTRAL for v in values]
         bars=chart.barh(range(len(prices)),values,color=colors,alpha=.85)
         chart.set_yticks(range(len(prices)))
-        chart.set_yticklabels([r['symbol'] for r in prices],fontsize=9)
+        chart.set_yticklabels([instrument_label(r['symbol']) for r in prices],fontsize=9)
         chart.invert_yaxis()
         scale=max(max(abs(v) for v in values),.1)
         for i,(row,value) in enumerate(zip(prices,values)):
@@ -181,8 +183,8 @@ def plot_performance_dashboard(ax,symbols=None,top_n=None,as_of=None):
         chart.xaxis.set_major_formatter(FuncFormatter(lambda value,_:f'{value:+.1f}%'))
         chart.xaxis.set_major_locator(MaxNLocator(nbins=6,steps=[1,2,5,10]))
         chart.tick_params(axis='x',labelsize=8)
-        chart.set_title(f'Price quote changes (%) | {len(prices)} instruments',fontsize=10,pad=5)
-        chart.set_xlabel('Previous to latest available quote; excludes distributions and roll costs',fontsize=8)
+        chart.set_title(f'Price quote changes（价格报价变化） (%) | {len(prices)} instruments（标的）',fontsize=10,pad=5)
+        chart.set_xlabel('Adjacent quotes（相邻报价）; excludes distributions and roll costs\n不含分红与展期成本；各标的观察日期见表格',fontsize=8)
         chart.grid(axis='x',alpha=.25,linestyle=':'); chart.set_axisbelow(True)
     for i,row in enumerate(macro):
         column=i%card_columns; line=i//card_columns
@@ -192,9 +194,10 @@ def plot_performance_dashboard(ax,symbols=None,top_n=None,as_of=None):
         card.set_axis_off()
         card.add_patch(mpl.patches.Rectangle((0,0),1,1,transform=card.transAxes,
             facecolor='#f3f6fa',edgecolor='#b8c6d7',linewidth=.8))
-        card.text(.04,.79,row['symbol']+' | '+row['level_unit'],fontsize=9,transform=card.transAxes)
-        card.text(.04,.52,f"Level {row['last_close']:,.3f}",fontsize=10,fontweight='bold',transform=card.transAxes)
-        card.text(.04,.27,'Change '+_change_text(row),fontsize=10,color='#174a7e',transform=card.transAxes)
+        card.text(.04,.79,instrument_label(row['symbol']),fontsize=9,transform=card.transAxes)
+        card.text(.04,.52,f"Level（最新数值） {row['last_close']:,.3f} {row['level_unit']}",fontsize=10,fontweight='bold',transform=card.transAxes)
+        suffix='（基点）' if row['change_unit']=='bp' else '（点）' if row['change_unit'] in ('VIX points','index points') else ''
+        card.text(.04,.27,'Change（变化） '+_change_text(row)+suffix,fontsize=9,color='#174a7e',transform=card.transAxes)
         card.text(.04,.06,row['previous_date']+' to '+row['date'],fontsize=7,transform=card.transAxes)
         card._performance_row=row; panels['macro'].append(card)
     return ax
