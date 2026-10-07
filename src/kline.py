@@ -297,6 +297,8 @@ def plot_single(
         period = f"{lookback_days}d"
     # Separate instrument/window from the latest observed price and indicator key.
     unit = 'USD/oz' if symbol == 'GC=F' else 'USD/share' if layer in ('indices','commodities_spot_etf') else 'USD'
+    from src.chart_review import analyze_ma_crossings
+    ax._ma_review = analyze_ma_crossings(df,symbol,unit)
     name = 'Gold COMEX futures' if symbol == 'GC=F' else 'SPDR Gold Shares ETF' if symbol == 'GLD' else symbol
     ax.set_title(f"{name} ({symbol}) | {period}" if symbol in ('GC=F','GLD') else f"{symbol} | {period}",
                  fontsize=10, fontweight='bold', pad=8)
@@ -472,6 +474,12 @@ def savefig_multi_format(
         else:
             logger.warning(f"[kline] unknown format: {fmt}, skipped")
 
+    if written:
+        reviews=[ax._ma_review for ax in fig.axes if hasattr(ax,'_ma_review')]
+        if reviews:
+            from src.chart_review import write_ma_review
+            review_paths=write_ma_review(output_path,reviews)
+            logger.info(f"[kline] separate moving-average review: {review_paths[0]}")
     return written
 
 

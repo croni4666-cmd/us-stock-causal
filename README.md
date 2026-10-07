@@ -145,3 +145,4 @@ DAG、SCM和CATE默认只是候选假设及条件模型结果。统计显著、P
 协议、边界、真实历史示例及使用方法见 [低可信DAG与可证伪命题](docs/dag-hypothesis-review.md)。
 
 行情图已移除联储等宏观事件叠线，收盘价、单位和报价日期独立展示；边界见 [图表价格标识](docs/chart-price-readability.md)。
+生成图片后另存50/100/200日均线穿越检查，区分当前位置、最新收盘穿越及最近5个可用日线记录；结果放在同名 `.ma-review.md` / `.ma-review.json`，图片不新增叠层。
