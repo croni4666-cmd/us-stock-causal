@@ -4,6 +4,9 @@
 
 name: test
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [master, main]
@@ -71,6 +74,22 @@ jobs:
             exit 1
           fi
           echo "R6 pre-push hygiene OK"
+
+  merge-gate:
+    name: merge-gate
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    if: always()
+    steps:
+      - name: Require every runtime and quality gate to pass
+        env:
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: |
+          if [ "$SMOKE_RESULT" != "success" ]; then
+            echo "::error::Required runtime/quality checks failed, were skipped, or were cancelled."
+            exit 1
+          fi
+          echo "Merge gate passed: both runtimes, privacy/syntax, critical defects, wheel resources, and hygiene."
 
   integration:
     if: github.event_name == 'workflow_dispatch' && inputs.live_data
