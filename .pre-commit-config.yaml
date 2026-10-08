@@ -9,7 +9,7 @@ repos:
       - id: r1-privacy-grep
         name: R1 privacy & credentials grep
         description: R1 audit standard — check for accidental private key and sensitive credential leaks
-        entry: bash -c '! grep -rE "BEGIN PRIVATE KEY|sk-[a-zA-Z0-9]{20,}" --include="*.py" --include="*.md" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.cmd" --include="*.ps1" src/ examples/ tests/ docs/ .github/ README.md USER_GUIDE.md ARCHITECTURE.md CHANGELOG.md V1.0-ROADMAP.md 2>/dev/null'
+        entry: python tools/quality_gate.py
         language: system
         pass_filenames: false
         types: [text]

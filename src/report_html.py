@@ -19,6 +19,8 @@ Markdown → HTML:
 from __future__ import annotations
 
 import re
+from html import escape
+from urllib.parse import urlsplit
 from pathlib import Path
 from typing import Optional
 
@@ -29,18 +31,72 @@ def _md_to_html(md: str) -> str:
     """Markdown → HTML 转换"""
     # 用 markdown lib (轻量, PyPI 标准)
     md_lib = markdown.Markdown(extensions=["extra", "sane_lists"])
-    return md_lib.convert(md)
+    return _sanitize_html(md_lib.convert(md))
+
+
+def _sanitize_html(content: str) -> str:
+    """Rebuild a passive report fragment with a small Markdown tag allowlist."""
+    from lxml import etree, html
+    allowed = set('p br hr h1 h2 h3 h4 h5 h6 strong em b i del s blockquote pre code '
+                  'ul ol li dl dt dd table thead tbody tfoot tr th td a div span sup sub'.split())
+    source = html.fragment_fromstring(content, create_parent='div')
+    def clean(node):
+        if not isinstance(node.tag, str) or node.tag not in allowed:
+            return None
+        out = etree.Element(node.tag)
+        out.text = node.text
+        for key in ('id', 'class', 'title'):
+            if key in node.attrib:
+                out.set(key, node.get(key))
+        if node.tag == 'a' and node.get('href'):
+            href = node.get('href').strip()
+            try:
+                safe_scheme = urlsplit(href).scheme.lower() in ('', 'http', 'https', 'mailto')
+            except ValueError:
+                safe_scheme = False
+            if (not any(ord(c) < 32 or c == '\\' for c in href)
+                    and not href.startswith('//')
+                    and safe_scheme):
+                out.set('href', href)
+                out.set('rel', 'noopener noreferrer')
+        if node.tag in ('td', 'th'):
+            for key in ('colspan', 'rowspan'):
+                value = node.get(key, '')
+                if value.isdigit() and 0 < int(value) <= 100:
+                    out.set(key, value)
+        for child in node:
+            item = clean(child)
+            if item is not None:
+                out.append(item)
+                item.tail = child.tail
+            elif child.tail:
+                if len(out):
+                    out[-1].tail = (out[-1].tail or '') + child.tail
+                else:
+                    out.text = (out.text or '') + child.tail
+        return out
+    wrapper = clean(source)
+    return (escape(wrapper.text or '') + ''.join(
+        etree.tostring(child, encoding='unicode', method='html') for child in wrapper))
 
 
 def _read_svg_inline(svg_path: Path) -> str:
     """读 SVG 文件, 返回去 XML decl 的内容 (适合 inline)"""
-    text = svg_path.read_text(encoding="utf-8")
-    # 去 XML decl (<?xml ...?>) 和 DOCTYPE, 浏览器 inline SVG 不需要
-    text = re.sub(r"<\?xml[^?]*\?>", "", text, count=1)
-    text = re.sub(r"<!DOCTYPE[^>]*>", "", text, count=1)
+    with svg_path.open('rb') as source:
+        raw = source.read(20 * 1024 * 1024 + 1)
+    if len(raw) > 20 * 1024 * 1024:
+        raise ValueError('oversized SVG XML')
+    text = raw.decode('utf-8')
     from lxml import etree
-    from src.svg_metadata import namespace_svg_ids
-    root=etree.fromstring(text.encode('utf-8'))
+    from src.svg_metadata import namespace_svg_ids, sanitize_svg
+    if re.search(r'<!ENTITY\b', text, re.I):
+        raise ValueError('unsafe or oversized SVG XML')
+    try:
+        root = etree.fromstring(text.encode('utf-8'), parser=etree.XMLParser(
+            resolve_entities=False, load_dtd=False, no_network=True))
+    except etree.XMLSyntaxError as exc:
+        raise ValueError('invalid SVG XML') from exc
+    sanitize_svg(root)
     namespace_svg_ids(root)
     return etree.tostring(root,encoding='unicode')
 
@@ -64,6 +120,7 @@ def render_html_report(
         完整 HTML 字符串
     """
     md_html = _md_to_html(md_content)
+    title = escape(title)
 
     # 把 K 线 SVG 嵌入对应位置 — 简化方案: 全部放报告底部
     # 高级方案: 按日期或 symbol 对应到 ## NNN 段 (留 v0.6.6 做)
@@ -74,7 +131,7 @@ def render_html_report(
                 svg_content = _read_svg_inline(svg_path)
                 svg_html_blocks.append(
                     f'<div class="kline-block">\n'
-                    f'  <h3 class="kline-title">{svg_path.stem}</h3>\n'
+                    f'  <h3 class="kline-title">{escape(svg_path.stem)}</h3>\n'
                     f'  <div class="kline-svg">{svg_content}</div>\n'
                     f'</div>'
                 )

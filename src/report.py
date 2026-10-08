@@ -47,7 +47,9 @@ def _segment_1_market(symbol: str, layer: str, lookback_days: int, as_of: Option
     if as_of:
         df = df.loc[:as_of]
     if symbol in YIELD_SYMBOLS:
-        daily = df["close"].diff().dropna().iloc[-lookback_days:] * 100
+        daily = df["close"].diff().iloc[-lookback_days:] * 100
+        if len(daily)!=lookback_days or not np.isfinite(daily).all():
+            return f'报价窗口不足或存在缺失，无法完整计算{lookback_days}日收益率变化。'
         return (
             f"收益率 {df['close'].iloc[-1]:.2f}%，{lookback_days} 日累计变化 {daily.sum():+.2f}bp，"
             f"最大上行 {daily.max():+.2f}bp / 最大下行 {daily.min():+.2f}bp；"
@@ -55,6 +57,8 @@ def _segment_1_market(symbol: str, layer: str, lookback_days: int, as_of: Option
         )
     rets = compute_returns(df["close"], method="simple")
     daily = rets.iloc[-lookback_days:]
+    if len(daily)!=lookback_days or not np.isfinite(daily).all():
+        return f'报价窗口不足或存在缺失，无法完整计算{lookback_days}日价格变化。'
 
     cum = cumulative_return(daily, method="simple")
     best_idx = daily.idxmax()

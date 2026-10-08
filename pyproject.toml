@@ -37,6 +37,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "markdown>=3.4.0",
     "lxml>=4.9.0",
+    "defusedxml>=0.7.1",
     "plyer>=2.1.0",
     "openbb[ta]>=4.4.0",
 ]
@@ -44,8 +45,12 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
+    "ruff>=0.15.22",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*", "tools*", "examples*"]
+include = ["src*", "tools*", "examples*", "data.static*"]
+
+[tool.setuptools.package-data]
+"src.resources" = ["config/*.json", "config/*.yaml", "data/baseline/*.json"]

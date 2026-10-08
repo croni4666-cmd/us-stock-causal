@@ -51,6 +51,15 @@ jobs:
         run: |
           pytest tests -v --tb=short -W 'error:Glyph .* missing from font:UserWarning'
 
+      - name: Check tracked privacy, artifacts and syntax
+        run: python tools/quality_gate.py --output quality-gate.json
+
+      - name: Check critical Python defects
+        run: python -m ruff check src examples tools scripts tests archive setup.py --select E9,F63,F7,F82
+
+      - name: Verify wheel sources and runtime defaults
+        run: python tools/verify_package.py
+
       - name: Check pre-push hygiene (R6)
         run: |
           # Check for forbidden patterns (unresolved placeholders, private keys, local user profiles)

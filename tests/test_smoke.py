@@ -123,14 +123,17 @@ def test_key_functions_exist():
     # All importable
 
 
-def test_data_snapshot():
-    """SKILL.md 数据快照 (DIA/QQQ/RSP/QQQE 5 日) 准确"""
+def test_data_snapshot(market_root):
+    """Each synthetic index report prints its actual five-observation price return."""
+    import pandas as pd
     from src.report import render_full_report
     r = render_full_report(['DIA', 'QQQ', 'RSP', 'QQQE'])
     # 5 日累计
-    for sym, expected in [('DIA', '-0.40'), ('QQQ', '+1.81'), ('RSP', '-0.28'), ('QQQE', '+0.38')]:
-        assert sym in r, f'{sym} missing'
-        # expected 应该在 report 里 (可能是 "5 日累计 X" 或 "5 日累计 -X")
+    for sym in ('DIA', 'QQQ', 'RSP', 'QQQE'):
+        close = pd.read_parquet(market_root / 'data/raw/indices' / f'{sym}.parquet')['close']
+        expected = (close.iloc[-1] / close.iloc[-6] - 1) * 100
+        section = r.split(f'## {sym} —', 1)[1].split('\n## ', 1)[0]
+        assert f'5 日价格累计 {expected:+.2f}%' in section
     # 顶部情绪
     for ticker in ['VIX', '10Y', 'DXY']:
         assert ticker in r
@@ -961,7 +964,7 @@ def test_attribution_uses_live_cache_v069h_p74():
     assert weights_direct["DIA"]["XLK"] == weights["DIA"]["XLK"]
 
 
-def test_notify_v069h_p87():
+def test_notify_v069h_p87(monkeypatch):
     """v0.6.9h (P8-7): Windows toast notification
 
     验证:
@@ -972,7 +975,7 @@ def test_notify_v069h_p87():
     """
     from unittest.mock import patch, MagicMock
     import os
-    os.environ.pop("US_STOCK_CAUSAL_NO_TOAST", None)
+    monkeypatch.delenv("US_STOCK_CAUSAL_NO_TOAST", raising=False)
     from src import notify
 
     # 1. 空 alerts 不弹
@@ -1132,7 +1135,7 @@ def test_yfinance_rate_limit_v068j_p76():
     assert clear_rate_limit() is False
 
 
-def test_daily_report_v068l_p52():
+def test_daily_report_v068l_p52(monkeypatch):
     """v0.6.8l (P5-2 gate): examples/daily_report.py 跑通 + 8 步全 OK/SKIP (v0.6.9 加 causal step 8)
 
     验证 daily_report 编排:
@@ -1151,19 +1154,16 @@ def test_daily_report_v068l_p52():
     date_str = datetime.now().strftime("%Y-%m-%d")
 
     # 跑全 pipeline (用 cache, 跳过 fetch 和可选 HTML/dashboard, 跳过 L3 因果 fit 慢)
-    os.environ["US_STOCK_CAUSAL_FAST"] = "1"  # 跳过 L3 CausalForestDML fit (~30s)
-    os.environ["US_STOCK_CAUSAL_NO_TOAST"] = "1"  # 禁用桌面 toast (避免无通知托盘环境崩)
-    try:
-        result = run_daily_report(
-            date_str=date_str,
-            skip_fetch=True,
-            skip_html=True,  # 需要先有 K-line SVG, smoke test 跳过
-            skip_dashboard=True,  # 跟 HTML 一样, smoke test 跳过
-            verbose=False,  # 不打 banner, 干净测试
-            force=True,  # R11 修: bypass KI-3 guard (今天已跑过, 默认 skip)
-        )
-    finally:
-        os.environ.pop("US_STOCK_CAUSAL_NO_TOAST", None)
+    monkeypatch.setenv("US_STOCK_CAUSAL_FAST", "1")
+    monkeypatch.setenv("US_STOCK_CAUSAL_NO_TOAST", "1")
+    result = run_daily_report(
+        date_str=date_str,
+        skip_fetch=True,
+        skip_html=True,  # 需要先有 K-line SVG, smoke test 跳过
+        skip_dashboard=True,  # 跟 HTML 一样, smoke test 跳过
+        verbose=False,  # 不打 banner, 干净测试
+        force=True,  # R11 修: bypass KI-3 guard (今天已跑过, 默认 skip)
+    )
 
     # 1. 返回 dict 结构
     assert "date" in result
@@ -1514,12 +1514,12 @@ def test_daily_report_step7_v068n_p86():
     real_load_check = _residual_check.load_baseline
     fake_capture = lambda d: {
         "as_of": d, "indices": ["DIA"], "windows": [1],
-        "residuals": {"DIA": {"1": 0.01}}
+        "residuals": {idx: {str(w): 0.01 for w in residual_regression.WINDOWS} for idx in residual_regression.INDICES}
     }
     fake_load = lambda: {
         "as_of": "baseline", "sector_weights_version": "test",
         "indices": ["DIA"], "windows": [1],
-        "residuals": {"DIA": {"1": 0.01}}
+        "residuals": {idx: {str(w): 0.01 for w in residual_regression.WINDOWS} for idx in residual_regression.INDICES}
     }
     residual_regression.capture_residuals = fake_capture
     residual_regression.load_baseline = fake_load
@@ -2676,7 +2676,7 @@ def test_etf_paired_47_nodes_v085_p102():
     assert len(spot_etf_nodes) == 12, f"应 12 spot ETF 节点, got {len(spot_etf_nodes)}"
 
 
-def test_daily_report_end_to_end_v085_p103():
+def test_daily_report_end_to_end_v085_p103(monkeypatch):
     """v0.8.5 (测试 80+): daily_report 47 节点 end-to-end < 12s, ≥ 8 步全 OK
 
     验证 daily cron 整体跑通:
@@ -2691,7 +2691,7 @@ def test_daily_report_end_to_end_v085_p103():
     from datetime import datetime
 
     date_str = datetime.now().strftime('%Y-%m-%d')
-    os.environ["US_STOCK_CAUSAL_FAST"] = "1"  # 跳过 L3 CausalForestDML fit
+    monkeypatch.setenv("US_STOCK_CAUSAL_FAST", "1")
 
     t0 = time.time()
     result = run_daily_report(
@@ -2771,12 +2771,14 @@ def test_residual_check_alert_field_names_v095_p107():
     # mock capture_residuals + load_baseline
     fake_capture = lambda d: {
         "as_of": d, "indices": ["DIA"], "windows": [1],
-        "residuals": {"DIA": {"1": 0.10}}  # 0.10%
+        "residuals": {idx: {str(w): (0.10 if idx == 'DIA' and w == 1 else 0.)
+                            for w in residual_regression.WINDOWS} for idx in residual_regression.INDICES}
     }
     fake_load = lambda: {
         "as_of": "baseline", "sector_weights_version": "test",
         "indices": ["DIA"], "windows": [1],
-        "residuals": {"DIA": {"1": 0.02}}  # 0.02% baseline
+        "residuals": {idx: {str(w): (0.02 if idx == 'DIA' and w == 1 else 0.)
+                            for w in residual_regression.WINDOWS} for idx in residual_regression.INDICES}
     }
     # 0.10% / 0.02% = 5x regression (超 1.5x threshold, abs_floor=0.05% 通过)
     real_capture_src = residual_regression.capture_residuals
@@ -2826,7 +2828,7 @@ def test_residual_check_alert_field_names_v095_p107():
     assert "1.00" not in msg or "5.00" in msg, f"alert message 不应只显示 fallback '1.00x', got: {msg}"
 
 
-def test_full_perf_47_nodes_v085_p105():
+def test_full_perf_47_nodes_v085_p105(monkeypatch):
     """v0.8.5 (测试 80+): 47 节点 + OLS path + PC cache 完整 daily cron 性能 ≤ 12s (V1.0 < 10s + 2s 余量)"""
     import os
     import time
@@ -2838,7 +2840,7 @@ def test_full_perf_47_nodes_v085_p105():
     _REPORT_CACHE.clear()
 
     date_str = datetime.now().strftime('%Y-%m-%d')
-    os.environ["US_STOCK_CAUSAL_FAST"] = "1"
+    monkeypatch.setenv("US_STOCK_CAUSAL_FAST", "1")
 
     t0 = time.time()
     result = run_daily_report(
@@ -2847,12 +2849,15 @@ def test_full_perf_47_nodes_v085_p105():
         skip_html=True,
         skip_dashboard=True,
         verbose=False,
+        force=True,
     )
     elapsed = time.time() - t0
 
     # V1.0 < 10s 目标 + 2s 余量
     assert elapsed <= 12.0, f"47 节点 daily_report 应 ≤ 12s, got {elapsed:.2f}s"
     assert result["elapsed_s"] <= 12.0, f"reported elapsed_s={result['elapsed_s']} 应 ≤ 12s"
+    assert result['steps']['markdown_report']['ok'] is True
+    assert result['steps']['causal']['ok'] is True
 
 
 def test_v1_0_docs_exist_v090_p106():
@@ -2865,44 +2870,19 @@ def test_v1_0_docs_exist_v090_p106():
     readme = project_root / "README.md"
     assert readme.exists(), f"README.md 应存在 ({readme})"
     readme_text = readme.read_text(encoding="utf-8")
-    readme_lines = readme_text.count("\n")
-    assert readme_lines > 100, f"README.md 应 > 100 行, got {readme_lines}"
-    for keyword in ["v0.8.5", "47 节点", "Pearl", "Phase 9", "9.0s"]:
-        assert keyword in readme_text, f"README.md 应含 '{keyword}'"
-
-    # USER_GUIDE
-    user_guide = project_root / "USER_GUIDE.md"
-    assert user_guide.exists(), f"USER_GUIDE.md 应存在 ({user_guide})"
-    ug_text = user_guide.read_text(encoding="utf-8")
-    ug_lines = ug_text.count("\n")
-    assert ug_lines > 200, f"USER_GUIDE.md 应 > 200 行, got {ug_lines}"
-    for keyword in ["快速开始", "install_task", "FAQ", "8 步"]:
-        assert keyword in ug_text, f"USER_GUIDE.md 应含 '{keyword}'"
-
-    # ARCHITECTURE
-    arch = project_root / "ARCHITECTURE.md"
-    assert arch.exists(), f"ARCHITECTURE.md 应存在 ({arch})"
-    arch_text = arch.read_text(encoding="utf-8")
-    arch_lines = arch_text.count("\n")
-    assert arch_lines > 200, f"ARCHITECTURE.md 应 > 200 行, got {arch_lines}"
-    for keyword in ["模块结构", "缓存层", "Pearl 3 层", "_GRAPH_CACHE"]:
-        assert keyword in arch_text, f"ARCHITECTURE.md 应含 '{keyword}'"
+    from src import __version__
+    import re
+    assert 'v'+__version__ in readme_text
+    assert '现实因果效应未认证' in readme_text
+    for name in ('USER_GUIDE.md','ARCHITECTURE.md'):
+        assert (project_root/name).is_file()
+    # Current local navigation must resolve; old version/performance slogans
+    # and arbitrary line counts do not demonstrate documentation correctness.
+    for target in re.findall(r'\]\(([^)]+)\)',readme_text):
+        if '://' in target or target.startswith('#'): continue
+        assert (project_root/target.split('#')[0]).exists(),target
 
 
 if __name__ == "__main__":
-    # Run as script (not pytest)
-    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
-    print(f"Running {len(tests)} tests...\n")
-    passed = 0
-    failed = 0
-    for t in tests:
-        name = t.__name__
-        try:
-            t()
-            print(f"  PASS {name}")
-            passed += 1
-        except Exception as e:
-            print(f"  FAIL {name}: {type(e).__name__}: {e}")
-            failed += 1
-    print(f"\n{passed}/{passed+failed} pass")
-    sys.exit(0 if failed == 0 else 1)
+    # Preserve pytest fixtures and its explicit --integration gate in script mode.
+    sys.exit(pytest.main([str(Path(__file__).resolve()), *sys.argv[1:]]))

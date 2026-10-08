@@ -1,4 +1,6 @@
-# Pre-push hygiene (R6 audit)
+# Pre-push hygiene
+
+2026-08的R6审计是历史记录，下面的检查需在当前版本重新执行。`.gitignore`不会取消已跟踪文件；用`git ls-files`核对，公开缓存不等于测试夹具。
 
 R1 隐私审计标准 + R6 pre-push hygiene 跟 R4 CI 集成。
 
@@ -20,12 +22,14 @@ R1 隐私审计标准 + R6 pre-push hygiene 跟 R4 CI 集成。
 
 ```powershell
 # 1) R1 grep (PowerShell 敏感信息与私钥检测)
-$hits = Select-String -Path . -Pattern 'BEGIN PRIVATE KEY|sk-[a-zA-Z0-9]{20,}' -Recurse -Include '*.py','*.md','*.json','*.yaml','*.cmd' -ErrorAction SilentlyContinue
+$tracked = git ls-files
+$inspect = $tracked | Where-Object { $_ -match '\.(py|md|json|ya?ml|cmd|ps1)$' }
+$hits = $inspect | ForEach-Object { Select-String -LiteralPath $_ -Pattern '-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|sk-[a-zA-Z0-9]{20,}' }
 if ($hits.Count -gt 0) { Write-Host "[FAIL] R1 privacy hits:" $hits.Count; exit 1 } else { Write-Host "[OK] R1 0 hits" }
 
 # 2) Key 不入 git
-git diff --cached --name-only | Select-String -Pattern '\.fred_key|sec_fetch.*\.json'
-if ($LASTEXITCODE -eq 0) { Write-Host "[FAIL] Key file in commit"; exit 1 }
+$sensitive = git diff --cached --name-only | Select-String -Pattern '(^|/)\.fred_key$|(^|/)\.env(\.|$)|\.(pem|key)$'
+if ($sensitive) { Write-Host "[FAIL] Key file in commit"; exit 1 }
 
 # 3) License 头 (src/ examples/ tests/ 顶部)
 foreach ($f in (Get-ChildItem src, examples, tests -Recurse -Include '*.py')) {
@@ -44,19 +48,24 @@ foreach ($f in (Get-ChildItem src, examples, tests -Recurse -Include '*.py')) {
 
 | 豁免 | 原因 |
 |---|---|
-| `commit_msg_*.txt` | git commit -F 临时文件, .gitignore 已 ignore |
+| `commit_msg_*.txt` | 临时文件应保持未跟踪；ignore不能取消已跟踪状态 |
 | `output/_*.txt` | debug / untracked 文件, R1 .gitignore 已 ignore |
 | `paper-agent / mavis skill` | 跨 project 引用, MIT 协议, 借鉴 OK |
-| `data/cache/*` | regenerable, .gitignore 已 ignore |
+| `data/cache/*` | 先区分可重建下载与唯一历史权重；仅忽略明确的运行缓存 |
 
 ## 已知失败
 
 - ⚠️ `tools/sec_fetch.py` 复制自 mavis skill, GBK 编码 (cosmetic, 不影响功能)
-- ⚠️ R3 dependencies 没 pyproject.toml (传统 requirements.txt 够用, v1.0 后再升级)
+- 依赖声明同时存在于pyproject.toml、requirements.txt和requirements-lock.txt；新增依赖需保持一致。
 
 ## R6 audit scope (2026-08-18)
 
 - 4 commits (R1 + R2 + R3 + R4) 跑过 R1 grep 0 hits 验证
-- 0 隐私泄漏跨 src/ examples/ tests/ docs/ .github/
+- 历史检查未命中所用模式；这不保证覆盖所有凭证或个人信息。
 - 0 路径硬编码 user 名跨 source code
 - 1 cosmetic issue (sec_fetch.py GBK 编码, 不影响功能, R10 跟 R1 不冲突)
+
+
+## 当前可执行发布门（2026-10-08）
+
+按顺序执行：`python tools/quality_gate.py`、`python -m ruff check src examples tools scripts tests archive setup.py --select E9,F63,F7,F82`、两运行版本的完整pytest、`python tools/verify_package.py`，再检查待提交差异/敏感文件与当前提交的GitHub结果。安全与依赖审计记录于[全量审查](full-audit-20261008.md)。pre-commit的Black/isort等全格式化钩子是独立风格流程；本次发布门未宣称这些旧风格债务全部通过。

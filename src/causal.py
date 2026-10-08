@@ -18,7 +18,11 @@ import json
 import warnings
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from econml.dml import CausalForestDML
+    from dowhy import gcm
 
 import numpy as np
 import pandas as pd
@@ -29,7 +33,8 @@ from loguru import logger
 from src.hypothesis_review import default_dag_assessment
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DAG_CONFIG = PROJECT_ROOT / "config" / "causal_dag.yaml"
+from src.resources import default_asset
+DAG_CONFIG = default_asset("config/causal_dag.yaml",PROJECT_ROOT)
 CACHE_ROOT = PROJECT_ROOT / "data" / "raw"
 
 
@@ -124,11 +129,11 @@ def load_dag_graph(cfg: dict | None = None) -> nx.DiGraph:
         cfg = load_dag_config()
     # v0.7.5 cache key: 用 mtime (DAG config 改时 invalidate)
     import hashlib
-    cache_key = hashlib.md5(cfg["dot"].encode("utf-8")).hexdigest()[:16]
+    cache_key = hashlib.sha256(cfg["dot"].encode("utf-8")).hexdigest()[:16]
     if cache_key in _GRAPH_CACHE:
         return _GRAPH_CACHE[cache_key]
     graphs = pydot.graph_from_dot_data(cfg["dot"])
-    assert len(graphs) == 1
+    if not graphs or len(graphs)!=1: raise ValueError("Exactly one parseable DAG required")
     g = nx.DiGraph(nx.drawing.nx_pydot.from_pydot(graphs[0]))
     _GRAPH_CACHE[cache_key] = g
     return g
@@ -194,10 +199,9 @@ def discover_dag_pc(
 
     # v0.8.0: date-based cache (P9-1.1 PC algorithm 47 节点 ~1.5s 慢, 同一天 re-run 直接返)
     # key = (date, alpha, data shape, data mtime hash) — data 改时 invalidate
-    import hashlib
     from datetime import date as _date
-    data_hash = hashlib.md5(pd.util.hash_pandas_object(data, index=True).values.tobytes()).hexdigest()[:16]
-    cache_key = (_date.today(), alpha, data.shape, data_hash)
+    data_hash = _compute_data_hash(data)
+    cache_key = (_date.today(), alpha, indep_test, data_hash)
     if cache_key in _PC_CACHE:
         logger.debug(f"[causal] PC algorithm cache hit (key={cache_key})")
         return _PC_CACHE[cache_key]

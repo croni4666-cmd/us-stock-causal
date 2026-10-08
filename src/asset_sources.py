@@ -13,11 +13,19 @@ import json
 import math
 from pathlib import Path, PurePosixPath
 import uuid
-from xml.etree import ElementTree as ET
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 from zipfile import ZipFile
 from zoneinfo import ZoneInfo
 
 import requests
+
+
+def _safe_xml(raw):
+    try:
+        return ET.fromstring(raw,forbid_dtd=True,forbid_entities=True,forbid_external=True)
+    except DefusedXmlException as exc:
+        raise ValueError("Unsafe issuer XML declarations") from exc
 
 
 SOURCE_SPECS = {
@@ -177,13 +185,13 @@ def _xlsx_rows(raw):
     with ZipFile(io.BytesIO(raw)) as archive:
         if sum(info.file_size for info in archive.infolist()) > MAX_BYTES * 5:
             raise ValueError("expanded XLSX too large")
-        workbook = ET.fromstring(archive.read("xl/workbook.xml"))
+        workbook = _safe_xml(archive.read("xl/workbook.xml"))
         sheet = next((s for s in workbook.findall("s:sheets/s:sheet", _NS)
                       if s.get("name") == "US GLD Historical Archive"), None)
         if sheet is None:
             raise ValueError("missing GLD archive sheet")
         rid = sheet.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
-        relations = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+        relations = _safe_xml(archive.read("xl/_rels/workbook.xml.rels"))
         target = next((r.get("Target") for r in relations if r.get("Id") == rid), None)
         if not target:
             raise ValueError("missing archive sheet relationship")
@@ -192,9 +200,9 @@ def _xlsx_rows(raw):
             raise ValueError("unsafe sheet path")
         strings = []
         if "xl/sharedStrings.xml" in archive.namelist():
-            root = ET.fromstring(archive.read("xl/sharedStrings.xml"))
+            root = _safe_xml(archive.read("xl/sharedStrings.xml"))
             strings = [''.join(si.itertext()) for si in root.findall("s:si", _NS)]
-        root = ET.fromstring(archive.read(path))
+        root = _safe_xml(archive.read(path))
         rows = []
         for row in root.findall("s:sheetData/s:row", _NS):
             values = {}

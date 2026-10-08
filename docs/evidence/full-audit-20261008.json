@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-10-08",
+  "audit_base": "2cef45e452eebd9acb8500d9b4f43798b83cd51f",
+  "original_tracked_inventory": 207,
+  "local_quality_gate": {
+    "status": "passed",
+    "python_3_11": {
+      "passed": 426,
+      "skipped": 3,
+      "upstream_warnings": 11
+    },
+    "python_3_12": {
+      "passed": 426,
+      "skipped": 3,
+      "upstream_warnings": 11
+    },
+    "critical_ruff": "passed",
+    "tracked_privacy_syntax": "passed",
+    "dependency_compatibility": "passed_both_runtimes",
+    "wheel_sdist_build": "passed",
+    "installed_defaults_verified": 10,
+    "installed_source_byte_parity": true,
+    "skill_format": "passed"
+  },
+  "security": {
+    "bandit_medium_high": 0,
+    "bandit_low_reviewed": 12,
+    "bandit_parse_errors": 0,
+    "known_vulnerability_hits_lock": 0,
+    "known_vulnerability_hits_installed": 0,
+    "installed_dependency_names_audited": 162,
+    "history_blobs_scanned": 343,
+    "history_secret_pattern_hits": 0,
+    "notifications_sent": 0,
+    "live_provider_calls_for_reproductions": 0
+  },
+  "cleanup": {
+    "quarantined_generated_files": 35,
+    "removed_from_git": 35,
+    "history_rewritten": false,
+    "baselines_evidence_notebooks_authored_research_preserved": true
+  },
+  "real_history": {
+    "quote_as_of": "2026-10-02",
+    "symbols": [
+      "GC=F",
+      "GLD",
+      "^IXIC",
+      "IEF",
+      "TLT"
+    ],
+    "installed_cli": "passed",
+    "safe_embedded_ohlcv_records": 6914,
+    "ai_actual_png_review": "performed",
+    "human_visual_acceptance": "separate",
+    "browser_hover_operation": "not_performed"
+  },
+  "causal_boundary": {
+    "dag_trust": "low_hypothesis_only",
+    "causal_status": "not_established",
+    "empirical_certification": false
+  },
+  "limitations": [
+    "pattern-based credential scan, not binary entropy forensics or proof against all secrets",
+    "known vulnerability lookup at audit time, not complete cross-platform hashed dependency lock",
+    "formatting/unused-import style debt excluded from critical defect gate",
+    "synthetic regressions and archived market replay are not economic causal identification",
+    "hostile concurrent filesystem and complete penetration testing not certified"
+  ],
+  "github": {
+    "pull_request": 8,
+    "branch": "feat/asset-specific-attribution",
+    "status": "pending_exact_head_ci",
+    "merged": false
+  },
+  "independent_final_review": {
+    "svg_css_escape": "independently_replayed_and_closed",
+    "daily_vix_log_change_units": "independently_replayed_and_closed",
+    "new_red_cases": 4,
+    "targeted_green": 15
+  }
+}

@@ -30,11 +30,15 @@ from __future__ import annotations
 
 import os
 from datetime import date, datetime, timedelta
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.events import MacroEvent
 from urllib.parse import urlencode
 
 from loguru import logger
 import requests
+from src.http_safety import get_bounded
 
 # Lazy import: src.events.MacroEvent / src.proxy 挪到函数内,
 # 这样 src/events_gdelt.py 直接 python 跑 main 时不依赖 sys.path
@@ -132,8 +136,7 @@ def fetch_gdelt_events(
     proxies = _get_proxies() if use_proxy else None
 
     try:
-        resp = requests.get(url, timeout=TIMEOUT, proxies=proxies)
-        resp.raise_for_status()
+        resp = get_bounded(url, timeout=TIMEOUT, proxies=proxies)
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 429:
             logger.warning(f"[gdelt] 限流 (429), 跳过本次")

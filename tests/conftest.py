@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 import shutil
+import socket
 import tempfile
 from pathlib import Path
 import numpy as np
@@ -67,6 +68,14 @@ def isolated_market(monkeypatch, market_root, request):
         yield
         return
     monkeypatch.setenv("US_STOCK_PROXY", "off")
+    monkeypatch.setenv("US_STOCK_CAUSAL_NO_TOAST", "1")
+    def no_connection(*args, **kwargs):
+        raise OSError("network connections disabled in offline tests")
+    monkeypatch.setattr(socket.socket, "connect", no_connection)
+    monkeypatch.setattr(socket.socket, "connect_ex", no_connection)
+    monkeypatch.setattr(socket.socket, "sendto", no_connection)
+    monkeypatch.setattr(socket, "create_connection", no_connection)
+    monkeypatch.setattr(socket, "getaddrinfo", no_connection)
     from src import attribution, causal, report, sector_weights_live
     for name in ("attribution", "thresholds", "causal", "report", "sector_weights_live",
                  "alert_logger", "retry", "yfinance_rate_limit", "residual_regression"):

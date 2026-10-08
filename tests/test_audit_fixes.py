@@ -226,19 +226,24 @@ def test_dag_cache_identity_and_auto_reduce():
 # =============================================================================
 
 def test_refutation_pass_fail_criteria():
-    """Verify refutation pass/fail thresholds for placebo and subset methods."""
-    ate = 2.0
-    # Placebo: new effect should be close to 0
-    placebo_pass = 0.05
-    placebo_fail = 1.20
-    assert abs(placebo_pass) <= max(0.3 * abs(ate), 0.02)
-    assert not (abs(placebo_fail) <= max(0.3 * abs(ate), 0.02))
-
-    # Data subset / Random common cause: new effect should remain close to ate
-    subset_pass = 2.10
-    subset_fail = 0.50
-    assert abs(subset_pass - ate) <= max(0.35 * abs(ate), 0.05)
-    assert not (abs(subset_fail - ate) <= max(0.35 * abs(ate), 0.05))
+    """Real OLS diagnostics recover known coefficients; no causal certification."""
+    from src.causal import _refute_with_ols
+    rng = np.random.default_rng(72)
+    treatment = rng.normal(size=1000)
+    data = pd.DataFrame({'T': treatment, 'Y': 2 * treatment},
+                        index=pd.bdate_range('2020-01-01', periods=len(treatment)))
+    graph = nx.DiGraph([('T', 'Y')])
+    result = _refute_with_ols('T', 'Y', data, graph, original_ate=2., n_refutations=3, rng_seed=42)
+    assert set(result) == {'random_common_cause', 'placebo_treatment_refuter', 'data_subset_refuter'}
+    assert result['random_common_cause']['new_effect'] == pytest.approx(2.)
+    assert result['data_subset_refuter']['new_effect'] == pytest.approx(2.)
+    # Independently derive the actual permuted regression slope.
+    diagnostic_rng = np.random.default_rng(42)
+    diagnostic_rng.standard_normal(len(data))  # first diagnostic consumes this draw
+    permuted = diagnostic_rng.permutation(treatment)
+    expected = np.cov(permuted, data['Y'], ddof=0)[0, 1] / np.var(permuted)
+    assert result['placebo_treatment_refuter']['new_effect'] == pytest.approx(expected)
+    assert abs(expected) < .2
 
 
 # =============================================================================

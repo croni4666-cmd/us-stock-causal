@@ -86,8 +86,8 @@ desktop.ini
 commit_msg_*.txt
 
 # Debug scripts / output (scripts starting with _ are throwaway, R1 audit)
-_*.py
-_*.txt
+/_*.py
+/_*.txt
 output\_*.txt
 output\_*.py
 test_*.log
@@ -101,3 +101,17 @@ output/asset_inventory.json
 *.task.xml*
 scripts/*.xml*
 scripts/*.bak*
+
+# Local review workspaces and secondary Python environments
+.review/
+.venv*/
+.baseline-test.log
+
+# Regenerable downloads, spreadsheet exports and chart outputs
+data/cache/etf_holdings/
+data/cache/etf_holdings_html/
+data/export/
+output/*.svg
+
+# Local release-check inventory
+quality-gate.json
