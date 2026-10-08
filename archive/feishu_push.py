@@ -108,13 +108,14 @@ def send_to_feishu(webhook_url: str, payload: dict) -> bool:
                 logger.info("[feishu] 推送成功")
                 return True
             else:
-                logger.error(f"[feishu] 推送失败: {data}")
+                logger.error("[feishu] 推送失败: non-success response code")
                 return False
         else:
-            logger.error(f"[feishu] HTTP {r.status_code}: {r.text[:200]}")
+            logger.error(f"[feishu] HTTP {r.status_code}")
             return False
     except Exception as e:
-        logger.error(f"[feishu] 网络错误: {e}")
+        # Request exceptions and server payloads can include the bearer URL.
+        logger.error(f"[feishu] 网络错误: {type(e).__name__}")
         return False
 
 
@@ -143,8 +144,6 @@ def main() -> int:
         print(f"   4. 跑: python examples/feishu_push.py --dry-run   (先看 payload)")
         print(f"      跑: python examples/feishu_push.py             (真发)")
         return 1
-    if webhook:
-        print(f"Webhook: {webhook[:50]}...{webhook[-10:]}")
 
     # 2. 生成报告
     from datetime import date as date_cls

@@ -48,6 +48,13 @@ def check(date_str: str) -> list[dict]:
     for v in violations:
         idx = v.get("index", "?")
         win = v.get("window", "?")
+        if v.get("validation_error"):
+            alerts.append(alert_logger.make_alert(
+                alert_type="residual", subject=f"{idx}/{win}",
+                message=f"残差比较输入不可用: {v['validation_error']}", severity="error",
+                details={"index": idx, "window": win, "validation_error": v["validation_error"]},
+            ))
+            continue
         # v0.9.5 RC1 prep: 字段名错 (R12 audit 修), compare_to_baseline 返
         # `current_pct` / `baseline_pct` / `regression_ratio`, 不是 `current` / `baseline` / `ratio`
         # 8/13-8/18 持续 6 天 alert 误报 (fallback 0.0/0.0/1.0 字段值)

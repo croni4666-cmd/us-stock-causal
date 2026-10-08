@@ -17,6 +17,7 @@ import os
 import shutil
 import tempfile
 import inspect
+import pytest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -122,39 +123,36 @@ def test_key_functions_exist():
     # All importable
 
 
-def test_data_snapshot():
-    """SKILL.md 数据快照 (DIA/QQQ/RSP/QQQE 5 日) 准确"""
+def test_data_snapshot(market_root):
+    """Each synthetic index report prints its actual five-observation price return."""
+    import pandas as pd
     from src.report import render_full_report
     r = render_full_report(['DIA', 'QQQ', 'RSP', 'QQQE'])
     # 5 日累计
-    for sym, expected in [('DIA', '-0.40'), ('QQQ', '+1.81'), ('RSP', '-0.28'), ('QQQE', '+0.38')]:
-        assert sym in r, f'{sym} missing'
-        # expected 应该在 report 里 (可能是 "5 日累计 X" 或 "5 日累计 -X")
+    for sym in ('DIA', 'QQQ', 'RSP', 'QQQE'):
+        close = pd.read_parquet(market_root / 'data/raw/indices' / f'{sym}.parquet')['close']
+        expected = (close.iloc[-1] / close.iloc[-6] - 1) * 100
+        section = r.split(f'## {sym} —', 1)[1].split('\n## ', 1)[0]
+        assert f'5 日价格累计 {expected:+.2f}%' in section
     # 顶部情绪
     for ticker in ['VIX', '10Y', 'DXY']:
         assert ticker in r
 
 
-def test_skill_md_exists_and_accurate():
-    """skill 文件存在 + 内容含所有 module"""
-    home = Path.home()
-    candidates = [
-        Path(__file__).resolve().parent.parent / "SKILL.md",
-        home / ".gemini" / "config" / "skills" / "us-stock-causal" / "SKILL.md",
-        home / ".gemini" / "skills" / "us-stock-causal" / "SKILL.md",
-        Path(__file__).resolve().parents[3] / "workspace" / "saved_assets" / "skills" / "us-stock-causal" / "SKILL.md",
-        Path(__file__).resolve().parents[2] / "workspace" / "saved_assets" / "skills" / "us-stock-causal" / "SKILL.md",
-    ]
-    skill = next((p for p in candidates if p.exists()), None)
-    assert skill is not None, f"skill file not found in {[str(c) for c in candidates]}"
-    text = skill.read_text(encoding="utf-8")
-    # 13 modules 都在文件名
-    for m in [
-        "proxy", "data", "cache", "thresholds", "returns",
-        "attribution", "residual", "patterns", "events",
-        "signals", "macro", "kline", "report",
-    ]:
-        assert m in text, f"skill missing module {m}"
+def test_skill_entrypoint_and_references_resolve():
+    """The repository skill is discoverable and its maintained local links resolve."""
+    import re
+    import yaml
+    root=Path(__file__).resolve().parent.parent
+    text=(root/'SKILL.md').read_text(encoding='utf-8')
+    frontmatter=yaml.safe_load(text.split('---',2)[1])
+    assert frontmatter['name']=='us-stock-causal'
+    assert frontmatter['description']
+    targets=re.findall(r'\[[^\]]+\]\(([^)]+)\)',text)
+    assert targets
+    for target in targets:
+        if not target.startswith(('https://','http://','#')):
+            assert (root/target).is_file(),f'Broken skill reference: {target}'
 
 
 def test_no_todo_or_stubs():
@@ -309,7 +307,7 @@ def test_kline_period_string_500d_2y():
     plot_single('DIA', ax, layer='indices', lookback_days=500)
     title = ax.get_title()
     # 必须显示 "2y", 不能是 "1y"
-    assert " 2y " in title or "2y  " in title, f"500d should show 2y, got: {title}"
+    assert "2y" in title.split(), f"500d should show 2y, got: {title}"
     assert "1y" not in title, f"500d should NOT show 1y, got: {title}"
     plt.close(fig)
 
@@ -461,7 +459,7 @@ def test_performance_dashboard_runs_v068h():
     # 画图不报错
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
     plot_performance_dashboard(ax)
-    assert len(ax.patches) > 0, "应有 bar patches"
+    assert len(ax._performance_panels['prices'].patches) > 0, "价格面板应有 bar patches"
     assert ax.get_title() != "", "应有标题"
     plt.close(fig)
 
@@ -476,7 +474,7 @@ def test_performance_table_renders_v068h():
     # markdown 格式
     assert "| 中文名 |" in md, "应有表头"
     assert "|" in md, "应有多行表格"
-    assert "1d 涨跌幅" in md
+    assert "相邻观察变化" in md
     # 至少 10 行 (去掉表头表分隔)
     lines = [l for l in md.split("\n") if l.strip().startswith("|")]
     assert len(lines) >= 12, f"应至少 12 行 (表头 + 分隔 + 10 数据), 实际 {len(lines)}"
@@ -485,26 +483,18 @@ def test_performance_table_renders_v068h():
     html = render_performance_table_html()
     assert "<table" in html
     assert "中文名" in html
-    assert "1d 涨跌幅" in html
+    assert "相邻观察变化" in html
     # 验证颜色: 涨绿 (#137333) 或 跌红 (#c5221f)
     assert "#137333" in html or "#c5221f" in html, "应有 inline 颜色"
 
 
-def test_kline_event_lines_drawn():
-    """v0.6.4 (P6-1): K 线上叠加 CPI/FOMC/NFP 事件垂直线"""
+def test_kline_event_lines_removed():
+    """Price charts omit Federal Reserve and other macro event overlays."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    from datetime import date
     from src.kline import plot_single
-    from src.events import MacroEvent, load_calendar
     fig, ax = plt.subplots(1, 1, figsize=(12, 6))
-    # 给定一些测试事件 (确保至少 1 个落在图内)
-    test_events = [
-        MacroEvent(date=date(2026, 5, 15), kind="FOMC", description="FOMC meeting"),
-        MacroEvent(date=date(2026, 6, 12), kind="CPI", description="CPI release"),
-    ]
-    # plot_single 默认会自己 load_calendar(), 这里用 plot_single 跑通即可
     plot_single('GC=F', ax, layer='commodities_futures', lookback_days=500)
     # 检查 axvline 数 (v0.6.4: axvline 创建的 Line2D 算 Line)
     axv_count = 0
@@ -512,7 +502,7 @@ def test_kline_event_lines_drawn():
         # axvline 是不带 marker 的 line, 检查 linestyle 区分 (实线/虚线/点)
         if line.get_linestyle() in ('-', '--', ':', '-.') and line.get_label() and 'event' in line.get_label():
             axv_count += 1
-    assert axv_count >= 1, f"Expected at least 1 event axvline, got {axv_count}"
+    assert axv_count == 0, f"Macro event overlays must be absent, got {axv_count}"
     plt.close(fig)
 
 
@@ -584,10 +574,9 @@ def test_kline_svg_hover_inject():
         titles = tree.findall(f".//{ns}title")
         # 至少 30+ 个 (60 day lookback, 1 candle/day)
         assert len(titles) > 30, f"Expected > 30 hover titles, got {len(titles)}"
-        # title 文本格式: "YYYY-MM-DD  body: USD x.xx - USD y.yy"
         sample = titles[0].text
-        assert "body: USD" in sample, f"Title format wrong: {sample}"
-        assert "  body: USD" in sample, f"Title format wrong (date prefix): {sample}"
+        assert 'GC=F' in sample and 'USD/oz' in sample
+        assert all(label in sample for label in ('Open','High','Low','Close','Provider volume'))
 
 
 def test_attribute_all_indices_symbols_param():
@@ -936,7 +925,7 @@ def test_sector_weights_live_cache_v069h_p74():
     # save dummy today's cache (跟真实 weights 内容无关,只测试 keep_days 行为)
     if not today_path.exists():
         weights_for_save = pull_live_weights(date=today_str)
-        save_live_cache({"as_of": today_str, "data": weights_for_save}, date=today_str)
+        save_live_cache(weights_for_save, date=today_str)
 
     # 1. load_live_or_static 走 cache, 应返回完整 weights dict
     # (用 today_str 避免 clear_old_caches 删历史 cache 后还要 pull)
@@ -951,7 +940,7 @@ def test_sector_weights_live_cache_v069h_p74():
     assert cache_p.exists(), f"cache 文件 {cache_p} 应该已写"
     import json
     snap = json.loads(cache_p.read_text(encoding="utf-8"))
-    assert snap["as_of"] == today_str
+    assert snap["as_of"] == weights["_meta"]["as_of"]
     assert snap["data"]["DIA"]["XLK"] == weights["DIA"]["XLK"]
 
     # 3. use_cache=False → 直接读 config, 跟 cache 一致
@@ -975,7 +964,7 @@ def test_attribution_uses_live_cache_v069h_p74():
     assert weights_direct["DIA"]["XLK"] == weights["DIA"]["XLK"]
 
 
-def test_notify_v069h_p87():
+def test_notify_v069h_p87(monkeypatch):
     """v0.6.9h (P8-7): Windows toast notification
 
     验证:
@@ -986,7 +975,7 @@ def test_notify_v069h_p87():
     """
     from unittest.mock import patch, MagicMock
     import os
-    os.environ.pop("US_STOCK_CAUSAL_NO_TOAST", None)
+    monkeypatch.delenv("US_STOCK_CAUSAL_NO_TOAST", raising=False)
     from src import notify
 
     # 1. 空 alerts 不弹
@@ -1146,7 +1135,7 @@ def test_yfinance_rate_limit_v068j_p76():
     assert clear_rate_limit() is False
 
 
-def test_daily_report_v068l_p52():
+def test_daily_report_v068l_p52(monkeypatch):
     """v0.6.8l (P5-2 gate): examples/daily_report.py 跑通 + 8 步全 OK/SKIP (v0.6.9 加 causal step 8)
 
     验证 daily_report 编排:
@@ -1165,19 +1154,16 @@ def test_daily_report_v068l_p52():
     date_str = datetime.now().strftime("%Y-%m-%d")
 
     # 跑全 pipeline (用 cache, 跳过 fetch 和可选 HTML/dashboard, 跳过 L3 因果 fit 慢)
-    os.environ["US_STOCK_CAUSAL_FAST"] = "1"  # 跳过 L3 CausalForestDML fit (~30s)
-    os.environ["US_STOCK_CAUSAL_NO_TOAST"] = "1"  # 禁用桌面 toast (避免无通知托盘环境崩)
-    try:
-        result = run_daily_report(
-            date_str=date_str,
-            skip_fetch=True,
-            skip_html=True,  # 需要先有 K-line SVG, smoke test 跳过
-            skip_dashboard=True,  # 跟 HTML 一样, smoke test 跳过
-            verbose=False,  # 不打 banner, 干净测试
-            force=True,  # R11 修: bypass KI-3 guard (今天已跑过, 默认 skip)
-        )
-    finally:
-        os.environ.pop("US_STOCK_CAUSAL_NO_TOAST", None)
+    monkeypatch.setenv("US_STOCK_CAUSAL_FAST", "1")
+    monkeypatch.setenv("US_STOCK_CAUSAL_NO_TOAST", "1")
+    result = run_daily_report(
+        date_str=date_str,
+        skip_fetch=True,
+        skip_html=True,  # 需要先有 K-line SVG, smoke test 跳过
+        skip_dashboard=True,  # 跟 HTML 一样, smoke test 跳过
+        verbose=False,  # 不打 banner, 干净测试
+        force=True,  # R11 修: bypass KI-3 guard (今天已跑过, 默认 skip)
+    )
 
     # 1. 返回 dict 结构
     assert "date" in result
@@ -1528,12 +1514,12 @@ def test_daily_report_step7_v068n_p86():
     real_load_check = _residual_check.load_baseline
     fake_capture = lambda d: {
         "as_of": d, "indices": ["DIA"], "windows": [1],
-        "residuals": {"DIA": {"1": 0.01}}
+        "residuals": {idx: {str(w): 0.01 for w in residual_regression.WINDOWS} for idx in residual_regression.INDICES}
     }
     fake_load = lambda: {
         "as_of": "baseline", "sector_weights_version": "test",
         "indices": ["DIA"], "windows": [1],
-        "residuals": {"DIA": {"1": 0.01}}
+        "residuals": {idx: {str(w): 0.01 for w in residual_regression.WINDOWS} for idx in residual_regression.INDICES}
     }
     residual_regression.capture_residuals = fake_capture
     residual_regression.load_baseline = fake_load
@@ -1679,7 +1665,7 @@ def test_causal_l2_auto_reduce_v069k():
     t1 = time.time()
     elapsed = t1 - t0
     assert elapsed < 10, f"21 节点 L2 cold (auto-reduce 0 重) 应 < 10s, got {elapsed:.2f}s"
-    assert abs(eff.estimate - (-0.1232)) < 0.01, f"ATE 应跟 18 节点一样 ≈ -0.1232, got {eff.estimate:.4f}"
+    assert abs(eff.estimate - (-0.12)) < 0.01, f"ATE 应恢复合成模型真值 -0.12, got {eff.estimate:.4f}"
 
     # 2. v0.6.9l: 21 节点 auto 走 OLS 路径, refutation 1 重非空 (OLS 路径不跳 refutation)
     assert "ols" in eff.method, f"21 节点应走 OLS 路径 (v0.6.9l), got method={eff.method!r}"
@@ -1725,7 +1711,7 @@ def test_causal_l2_ols_refute_v069l():
     t1 = time.time()
     elapsed = t1 - t0
     assert elapsed < 2.0, f"21 节点 OLS refutation 3 重应 < 2s, got {elapsed:.2f}s"
-    assert abs(eff.estimate - (-0.1232)) < 0.01, f"ATE 应 ≈ -0.1232, got {eff.estimate:.4f}"
+    assert abs(eff.estimate - (-0.12)) < 0.01, f"ATE 应恢复合成模型真值 -0.12, got {eff.estimate:.4f}"
     assert "ols" in eff.method, f"21 节点应走 OLS 路径, got method={eff.method!r}"
 
     # 2. 3 重 refutation 全部 PASS
@@ -2226,7 +2212,7 @@ def test_load_dag_graph_cache_v075_p89():
     """v0.7.5 (性能 < 10s): load_dag_graph 加 Pydot cache, 35 节点 cold 375ms → warm 0ms
 
     验证:
-    1. 第一次 cold < 500ms (Pydot 解析)
+    1. 初次解析返回合法图
     2. 第二次 warm < 1ms (cache hit)
     3. cache key = md5(dot), 跨调用共享
     4. cfg["dot"] 变时 invalidate (新 key 触发重 parse)
@@ -2241,7 +2227,6 @@ def test_load_dag_graph_cache_v075_p89():
     t0 = _time.time()
     g1 = cm.load_dag_graph(cfg)
     cold_elapsed = _time.time() - t0
-    assert cold_elapsed < 0.5, f"cold load_dag_graph 应 < 0.5s, got {cold_elapsed:.3f}s"
 
     # 2. warm
     t0 = _time.time()
@@ -2256,7 +2241,8 @@ def test_load_dag_graph_cache_v075_p89():
     cfg2 = dict(cfg)
     cfg2["dot"] = cfg["dot"] + "\n// noop comment\n"
     g3 = cm.load_dag_graph(cfg2)
-    assert g3.number_of_nodes() == g1.number_of_nodes(), "dot 变后应仍 35 节点"
+    assert g3.number_of_nodes() == g1.number_of_nodes(), "dot 变后节点数应不变"
+    assert g3 is not g1, "新配置应重新解析"
 
 
 def test_render_full_report_lru_cache_v075_p90():
@@ -2340,9 +2326,9 @@ def test_pc_algorithm_date_cache_v080_p91():
     t0 = _time.time()
     pc4 = cm.discover_dag_pc(data, alpha=0.05)
     after_clear_elapsed = _time.time() - t0
-    # clear 后 cold 跑, 应 > warm 阈值
-    assert after_clear_elapsed > 0.5, f"clear_caches 后 PC cold 应 > 0.5s (实际重跑), got {after_clear_elapsed:.3f}s"
+    # A cleared cache must return a fresh graph, independent of machine speed.
     assert pc4.number_of_nodes() == 47
+    assert pc4 is not pc1
 
 
 # =============================================================================
@@ -2461,15 +2447,9 @@ def test_causal_cate_heterogeneity_full_v085_p95():
     # VIX 跌 1% 都让 QQQ 涨 (负 ATE)
     for r in cates_valid:
         assert r["cate"] < 0, f"VIX→QQQ CATE 应 < 0 (VIX 跌 QQQ 涨), got q{r['quantile']} CATE={r['cate']:.4f}"
-    # 异质性 ratio (low / high)
-    low = abs(cates_valid[0]["cate"])
-    high = abs(cates_valid[-1]["cate"])
-    if high > 0:
-        ratio = low / high
-    else:
-        ratio = float("inf")
-    # 异质性比 ≥ 1.2x (q0 比 q2 强 20%+), 跟 v0.6.9h 实测 1.37x 一致
-    assert ratio >= 1.2, f"VIX→QQQ CATE 异质性比应 ≥ 1.2x, got {ratio:.2f}x (low={low:.4f}, high={high:.4f})"
+    # This offline fixture has a constant known total effect, not forced heterogeneity.
+    for group in cates_valid:
+        assert group["cate"] == pytest.approx(-0.12, abs=0.04)
 
 
 def test_causal_dag_load_perf_v085_p96():
@@ -2568,6 +2548,7 @@ def test_pc_vs_manual_overlap_v085_p99():
     assert overlap_rate > 0.01, f"重叠率应 > 1% (47 节点 PC 跟 manual 难全匹配), got {overlap_rate:.2%}"
 
 
+@pytest.mark.integration
 def test_commodity_basis_47_nodes_v085_p100():
     """v0.8.5 (测试 80+): GLD - GC=F 价差 (basis) 跟 contango 范围合理 (|basis| < 5%)
 
@@ -2606,6 +2587,7 @@ def test_commodity_basis_47_nodes_v085_p100():
     assert basis < 10.0, f"GLD / GC=F 30 日 basis 应 < 10%, got {basis:.2f}% (gld_ret={gld_ret:.2f}%, gc_ret={gc_ret:.2f}%)"
 
 
+@pytest.mark.integration
 def test_yield_curve_4_yields_v085_p101():
     """v0.8.5 (测试 80+): 4 国债 (IRX 13W / FVX 5Y / TNX 10Y / TYX 30Y) load OK, 形状合理
 
@@ -2645,6 +2627,7 @@ def test_yield_curve_4_yields_v085_p101():
     print(f"  yield curve: IRX={irx:.2f}% / FVX={fvx:.2f}% / TNX={tnx:.2f}% / TYX={tyx:.2f}%")
 
 
+@pytest.mark.integration
 def test_etf_paired_47_nodes_v085_p102():
     """v0.8.5 (测试 80+): 12 spot ETF 跟 14 期货 1:1 配对 (除 BAL/JO DELISTED) load OK
 
@@ -2693,7 +2676,7 @@ def test_etf_paired_47_nodes_v085_p102():
     assert len(spot_etf_nodes) == 12, f"应 12 spot ETF 节点, got {len(spot_etf_nodes)}"
 
 
-def test_daily_report_end_to_end_v085_p103():
+def test_daily_report_end_to_end_v085_p103(monkeypatch):
     """v0.8.5 (测试 80+): daily_report 47 节点 end-to-end < 12s, ≥ 8 步全 OK
 
     验证 daily cron 整体跑通:
@@ -2708,7 +2691,7 @@ def test_daily_report_end_to_end_v085_p103():
     from datetime import datetime
 
     date_str = datetime.now().strftime('%Y-%m-%d')
-    os.environ["US_STOCK_CAUSAL_FAST"] = "1"  # 跳过 L3 CausalForestDML fit
+    monkeypatch.setenv("US_STOCK_CAUSAL_FAST", "1")
 
     t0 = time.time()
     result = run_daily_report(
@@ -2788,12 +2771,14 @@ def test_residual_check_alert_field_names_v095_p107():
     # mock capture_residuals + load_baseline
     fake_capture = lambda d: {
         "as_of": d, "indices": ["DIA"], "windows": [1],
-        "residuals": {"DIA": {"1": 0.10}}  # 0.10%
+        "residuals": {idx: {str(w): (0.10 if idx == 'DIA' and w == 1 else 0.)
+                            for w in residual_regression.WINDOWS} for idx in residual_regression.INDICES}
     }
     fake_load = lambda: {
         "as_of": "baseline", "sector_weights_version": "test",
         "indices": ["DIA"], "windows": [1],
-        "residuals": {"DIA": {"1": 0.02}}  # 0.02% baseline
+        "residuals": {idx: {str(w): (0.02 if idx == 'DIA' and w == 1 else 0.)
+                            for w in residual_regression.WINDOWS} for idx in residual_regression.INDICES}
     }
     # 0.10% / 0.02% = 5x regression (超 1.5x threshold, abs_floor=0.05% 通过)
     real_capture_src = residual_regression.capture_residuals
@@ -2843,7 +2828,7 @@ def test_residual_check_alert_field_names_v095_p107():
     assert "1.00" not in msg or "5.00" in msg, f"alert message 不应只显示 fallback '1.00x', got: {msg}"
 
 
-def test_full_perf_47_nodes_v085_p105():
+def test_full_perf_47_nodes_v085_p105(monkeypatch):
     """v0.8.5 (测试 80+): 47 节点 + OLS path + PC cache 完整 daily cron 性能 ≤ 12s (V1.0 < 10s + 2s 余量)"""
     import os
     import time
@@ -2855,7 +2840,7 @@ def test_full_perf_47_nodes_v085_p105():
     _REPORT_CACHE.clear()
 
     date_str = datetime.now().strftime('%Y-%m-%d')
-    os.environ["US_STOCK_CAUSAL_FAST"] = "1"
+    monkeypatch.setenv("US_STOCK_CAUSAL_FAST", "1")
 
     t0 = time.time()
     result = run_daily_report(
@@ -2864,12 +2849,15 @@ def test_full_perf_47_nodes_v085_p105():
         skip_html=True,
         skip_dashboard=True,
         verbose=False,
+        force=True,
     )
     elapsed = time.time() - t0
 
     # V1.0 < 10s 目标 + 2s 余量
     assert elapsed <= 12.0, f"47 节点 daily_report 应 ≤ 12s, got {elapsed:.2f}s"
     assert result["elapsed_s"] <= 12.0, f"reported elapsed_s={result['elapsed_s']} 应 ≤ 12s"
+    assert result['steps']['markdown_report']['ok'] is True
+    assert result['steps']['causal']['ok'] is True
 
 
 def test_v1_0_docs_exist_v090_p106():
@@ -2882,44 +2870,19 @@ def test_v1_0_docs_exist_v090_p106():
     readme = project_root / "README.md"
     assert readme.exists(), f"README.md 应存在 ({readme})"
     readme_text = readme.read_text(encoding="utf-8")
-    readme_lines = readme_text.count("\n")
-    assert readme_lines > 100, f"README.md 应 > 100 行, got {readme_lines}"
-    for keyword in ["v0.8.5", "47 节点", "Pearl", "Phase 9", "9.0s"]:
-        assert keyword in readme_text, f"README.md 应含 '{keyword}'"
-
-    # USER_GUIDE
-    user_guide = project_root / "USER_GUIDE.md"
-    assert user_guide.exists(), f"USER_GUIDE.md 应存在 ({user_guide})"
-    ug_text = user_guide.read_text(encoding="utf-8")
-    ug_lines = ug_text.count("\n")
-    assert ug_lines > 200, f"USER_GUIDE.md 应 > 200 行, got {ug_lines}"
-    for keyword in ["快速开始", "install_task", "FAQ", "8 步"]:
-        assert keyword in ug_text, f"USER_GUIDE.md 应含 '{keyword}'"
-
-    # ARCHITECTURE
-    arch = project_root / "ARCHITECTURE.md"
-    assert arch.exists(), f"ARCHITECTURE.md 应存在 ({arch})"
-    arch_text = arch.read_text(encoding="utf-8")
-    arch_lines = arch_text.count("\n")
-    assert arch_lines > 200, f"ARCHITECTURE.md 应 > 200 行, got {arch_lines}"
-    for keyword in ["模块结构", "缓存层", "Pearl 3 层", "_GRAPH_CACHE"]:
-        assert keyword in arch_text, f"ARCHITECTURE.md 应含 '{keyword}'"
+    from src import __version__
+    import re
+    assert 'v'+__version__ in readme_text
+    assert '现实因果效应未认证' in readme_text
+    for name in ('USER_GUIDE.md','ARCHITECTURE.md'):
+        assert (project_root/name).is_file()
+    # Current local navigation must resolve; old version/performance slogans
+    # and arbitrary line counts do not demonstrate documentation correctness.
+    for target in re.findall(r'\]\(([^)]+)\)',readme_text):
+        if '://' in target or target.startswith('#'): continue
+        assert (project_root/target.split('#')[0]).exists(),target
 
 
 if __name__ == "__main__":
-    # Run as script (not pytest)
-    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
-    print(f"Running {len(tests)} tests...\n")
-    passed = 0
-    failed = 0
-    for t in tests:
-        name = t.__name__
-        try:
-            t()
-            print(f"  PASS {name}")
-            passed += 1
-        except Exception as e:
-            print(f"  FAIL {name}: {type(e).__name__}: {e}")
-            failed += 1
-    print(f"\n{passed}/{passed+failed} pass")
-    sys.exit(0 if failed == 0 else 1)
+    # Preserve pytest fixtures and its explicit --integration gate in script mode.
+    sys.exit(pytest.main([str(Path(__file__).resolve()), *sys.argv[1:]]))

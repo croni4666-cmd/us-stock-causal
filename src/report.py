@@ -29,7 +29,8 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from src.thresholds import get_thresholds, load_prices
+from src.thresholds import get_thresholds, load_prices, resolve_layer, YIELD_SYMBOLS
+from src.tickers_universe import INDEX_ETFS
 from src.attribution import attribute_index
 from src.patterns import find_similar_patterns
 from src.events import next_event
@@ -45,8 +46,19 @@ def _segment_1_market(symbol: str, layer: str, lookback_days: int, as_of: Option
     df = load_prices(symbol, layer)
     if as_of:
         df = df.loc[:as_of]
+    if symbol in YIELD_SYMBOLS:
+        daily = df["close"].diff().iloc[-lookback_days:] * 100
+        if len(daily)!=lookback_days or not np.isfinite(daily).all():
+            return f'报价窗口不足或存在缺失，无法完整计算{lookback_days}日收益率变化。'
+        return (
+            f"收益率 {df['close'].iloc[-1]:.2f}%，{lookback_days} 日累计变化 {daily.sum():+.2f}bp，"
+            f"最大上行 {daily.max():+.2f}bp / 最大下行 {daily.min():+.2f}bp；"
+            "这是收益率变化，不能作为债券投资收益。"
+        )
     rets = compute_returns(df["close"], method="simple")
     daily = rets.iloc[-lookback_days:]
+    if len(daily)!=lookback_days or not np.isfinite(daily).all():
+        return f'报价窗口不足或存在缺失，无法完整计算{lookback_days}日价格变化。'
 
     cum = cumulative_return(daily, method="simple")
     best_idx = daily.idxmax()
@@ -55,7 +67,7 @@ def _segment_1_market(symbol: str, layer: str, lookback_days: int, as_of: Option
     worst_date = worst_idx.date() if hasattr(worst_idx, 'date') else str(worst_idx)
 
     return (
-        f"5 日累计 {cum*100:+.2f}%, "
+        f"{lookback_days} 日价格累计 {cum*100:+.2f}%（未计分红）, "
         f"最好 {best_date} (+{daily[best_idx]*100:.2f}%), "
         f"最差 {worst_date} ({daily[worst_idx]*100:+.2f}%)"
     )
@@ -63,7 +75,14 @@ def _segment_1_market(symbol: str, layer: str, lookback_days: int, as_of: Option
 
 def _segment_2_attribution(symbol: str, lookback_days: int, as_of: Optional[str] = None, force: bool = False) -> str:
     """② 5 日归因"""
-    r = attribute_index(symbol, date=as_of, lookback_days=lookback_days, force=force)
+    if symbol not in INDEX_ETFS:
+        return "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。"
+    try:
+        r = attribute_index(symbol, date=as_of, lookback_days=lookback_days, force=force)
+    except FileNotFoundError as exc:
+        if "历史行业权重不可用" not in str(exc):
+            raise
+        return "历史权重不可用，无法计算该日的行业归因。"
     # top 3 贡献(按绝对值)
     contribs = sorted(
         r["sector_contributions_pct"].items(),
@@ -89,16 +108,24 @@ def _segment_3_thresholds(symbol: str, layer: str, as_of: Optional[str] = None) 
     s200_str = f"200 SMA {s200['position']} {s200['pct']:+.2f}%"
     pos52w = t["range_52w"]["position_pct"]
     p = t["pivots"]
+    if symbol in YIELD_SYMBOLS:
+        return (
+            f"收益率 {t['last_close']:.2f}%, {s200_str}, 52w {pos52w}%, "
+            f"R1 {p['r1']:.2f}% / S1 {p['s1']:.2f}%（收益率水平）"
+        )
+    unit = "点" if symbol.startswith("^") else "美元/盎司" if symbol == "GC=F" else "美元"
     return (
-        f"现价 ${t['last_close']}, "
+        f"现价 {t['last_close']} {unit}, "
         f"{s200_str}, 52w {pos52w}%, "
-        f"R1 ${p['r1']} / S1 ${p['s1']}"
+        f"R1 {p['r1']} / S1 {p['s1']} {unit}"
     )
 
 
 def _segment_4_patterns(symbol: str, layer: str, as_of: Optional[str] = None) -> str:
     """④ 历史相似"""
-    p = find_similar_patterns(symbol, pattern_length=20, n_matches=10, forecast_horizon=5, end_date=as_of)
+    if symbol in YIELD_SYMBOLS:
+        return "收益率指标不提供债券价格形态或投资收益胜率；债券 ETF 请查看 IEF / TLT。"
+    p = find_similar_patterns(symbol, pattern_length=20, n_matches=10, forecast_horizon=5, end_date=as_of, layer=layer)
     return (
         f"20d pattern 相似 top {p['n_matches']}, "
         f"5d fwd avg {p['avg_forward_return']:+.2f}% / "
@@ -107,16 +134,17 @@ def _segment_4_patterns(symbol: str, layer: str, as_of: Optional[str] = None) ->
     )
 
 
-def _segment_5_risk(symbol: str, as_of: Optional[str] = None) -> str:
+def _segment_5_risk(symbol: str, as_of: Optional[str] = None, layer: Optional[str] = None) -> str:
     """⑤ 风险"""
-    agg = aggregate_signals(symbol, as_of=as_of)
     warnings = []
-
-    # 信号矛盾
-    if agg.contradiction_score >= 0.5:
-        warnings.append(f"信号矛盾 score={agg.contradiction_score:.2f}({agg.verdict})")
-    elif agg.contradiction_score >= 0.3:
-        warnings.append(f"信号部分一致 score={agg.contradiction_score:.2f}")
+    if symbol in YIELD_SYMBOLS:
+        warnings.append("收益率方向不等于债券价格方向；该指标未计算债券持有回报")
+    else:
+        agg = aggregate_signals(symbol, as_of=as_of, layer=layer)
+        if agg.contradiction_score >= 0.5:
+            warnings.append(f"信号矛盾 score={agg.contradiction_score:.2f}({agg.verdict})")
+        elif agg.contradiction_score >= 0.3:
+            warnings.append(f"信号部分一致 score={agg.contradiction_score:.2f}")
 
     # 事件
     ne = next_event(from_date=as_of)
@@ -127,9 +155,9 @@ def _segment_5_risk(symbol: str, as_of: Optional[str] = None) -> str:
             warnings.append(f"{ne.days_until}d 后 {ne.kind}")
 
     # 距离超买
-    t = get_thresholds(symbol, as_of=as_of)
+    t = get_thresholds(symbol, as_of=as_of, layer=layer)
     s200_pct = t["vs_sma"]["sma_200"]["pct"]
-    if s200_pct > 12:
+    if symbol not in YIELD_SYMBOLS and s200_pct > 12:
         warnings.append(f"200 SMA {s200_pct:+.1f}% 距超买较近")
 
     return "; ".join(warnings) if warnings else "近期无重大风险"
@@ -137,12 +165,13 @@ def _segment_5_risk(symbol: str, as_of: Optional[str] = None) -> str:
 
 def five_segment_report(
     symbol: str,
-    layer: str = "indices",
+    layer: Optional[str] = None,
     lookback_days: int = 5,
     as_of: Optional[str] = None,
     force: bool = False,
 ) -> dict:
     """生成 5 段制报告"""
+    layer = resolve_layer(symbol, layer)
     report_date = as_of or str(date.today())
     return {
         "symbol": symbol,
@@ -152,7 +181,7 @@ def five_segment_report(
         "segment_2_attribution": _segment_2_attribution(symbol, lookback_days, as_of=as_of, force=force),
         "segment_3_thresholds": _segment_3_thresholds(symbol, layer, as_of=as_of),
         "segment_4_patterns": _segment_4_patterns(symbol, layer, as_of=as_of),
-        "segment_5_risk": _segment_5_risk(symbol, as_of=as_of),
+        "segment_5_risk": _segment_5_risk(symbol, as_of=as_of, layer=layer),
     }
 
 
@@ -181,52 +210,28 @@ def clear_report_cache() -> None:
     _REPORT_CACHE.clear()
 
 
-def _get_data_signature(symbols: list[str], layer: str) -> tuple:
+def _get_data_signature(symbols: list[str], layer: Optional[str]) -> tuple:
     """获取底层行情数据、行业与宏观数据及配置文件的综合签名 (mtime_ns, size) 避免数据更新后命中旧缓存."""
-    sig = []
-    # 1. 目标标的
-    for s in sorted(symbols):
-        safe = s.replace("^", "_").replace("=", "_").replace(".", "_")
-        pq = PROJECT_ROOT / "data" / "raw" / layer / f"{safe}.parquet"
-        if pq.exists():
-            st = pq.stat()
-            sig.append((f"{layer}:{s}", st.st_mtime_ns, st.st_size))
-        else:
-            sig.append((f"{layer}:{s}", 0, 0))
-
-    # 2. 宏观数据 (VIX/TNX/DXY 等)
-    macro_dir = PROJECT_ROOT / "data" / "raw" / "macro"
-    if macro_dir.exists():
-        for p in sorted(macro_dir.glob("*.parquet")):
-            st = p.stat()
-            sig.append((f"macro:{p.name}", st.st_mtime_ns, st.st_size))
-
-    # 3. 行业数据 (XLK/XLF 等)
-    sectors_dir = PROJECT_ROOT / "data" / "raw" / "sectors"
-    if sectors_dir.exists():
-        for p in sorted(sectors_dir.glob("*.parquet")):
-            st = p.stat()
-            sig.append((f"sectors:{p.name}", st.st_mtime_ns, st.st_size))
-
-    # 4. 关键配置文件 (权重/DAG/事件)
-    for cfg_rel in [
-        "config/sector_weights.json",
-        "config/causal_dag.yaml",
-        "config/events_2026.yaml",
-    ]:
-        cfg_path = PROJECT_ROOT / cfg_rel
-        if cfg_path.exists():
-            st = cfg_path.stat()
-            sig.append((cfg_rel, st.st_mtime_ns, st.st_size))
-        else:
-            sig.append((cfg_rel, 0, 0))
-
-    return tuple(sig)
+    paths = set((PROJECT_ROOT / "data" / "raw").rglob("*.parquet"))
+    paths.update((PROJECT_ROOT / "config").rglob("*.yaml"))
+    paths.update((PROJECT_ROOT / "config").rglob("*.json"))
+    paths.update((PROJECT_ROOT / "data" / "cache").glob("sector_weights_live_*.json"))
+    for symbol in symbols if layer is not None else []:
+        safe = symbol.replace("^", "_").replace("=", "_").replace(".", "_")
+        paths.add(PROJECT_ROOT / "data" / "raw" / layer / f"{safe}.parquet")
+    signature = []
+    for path in sorted(paths):
+        try:
+            stat = path.stat()
+            signature.append((str(path.relative_to(PROJECT_ROOT)), stat.st_mtime_ns, stat.st_size))
+        except FileNotFoundError:
+            signature.append((str(path.relative_to(PROJECT_ROOT)), 0, 0))
+    return tuple(signature)
 
 
 def render_full_report(
     symbols: list[str],
-    layer: str = "indices",
+    layer: Optional[str] = None,
     as_of: Optional[str] = None,
     force: bool = False,
 ) -> str:
@@ -241,6 +246,12 @@ def render_full_report(
         from src.attribution import clear_attribution_cache
         clear_attribution_cache()
 
+    # Populate the dated weight snapshot before computing the cache signature.
+    from src.attribution import load_sector_weights
+    try:
+        load_sector_weights(as_of=as_of)
+    except FileNotFoundError:
+        pass  # The attribution segment renders historical unavailability.
     report_date = as_of or str(date.today())
     data_sig = _get_data_signature(symbols, layer)
     cache_key = (report_date, tuple(symbols), layer, data_sig)
@@ -274,7 +285,7 @@ def render_full_report(
     sym_reports = {}
     with ThreadPoolExecutor(max_workers=min(len(symbols), 4)) as executor:
         future_to_sym = {
-            executor.submit(five_segment_report, sym, layer, as_of=as_of, force=force): sym
+            executor.submit(five_segment_report, sym, layer, as_of=as_of): sym
             for sym in symbols
         }
         for future in future_to_sym:
@@ -326,7 +337,8 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
         logger.warning(f"[causal section] 缺 parquet: {e}")
         return ""
 
-    lines = ["## 因果机制 (Phase 9.0 Pearl-style)\n"]
+    lines = ["## 候选DAG的关联与模型情景（低可信）\n",
+             "DAG默认低可信；因果效应尚未建立。正向支持：证据不足。图内形式识别仅依赖候选假设；不可检验前提保留为未验证依赖。\n"]
 
     # L2 do-calculus 2 个最 robust 的 query
     try:
@@ -347,30 +359,15 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
                     f"⚠️ DAG 存在未观测混杂变量 {missing}，无法估计因果干预效应"
                 )
             else:
-                direction = "↑" if eff.estimate > 0 else "↓"
-                delta_log_y = eff.estimate * 0.01
-                n_executed = len(eff.refutation)
-                n_passed = 0
-                for rname, rres in eff.refutation.items():
-                    if not isinstance(rres, dict) or "new_effect" not in rres:
-                        continue
-                    new_eff = rres.get("new_effect", 0.0)
-                    if "placebo" in rname.lower():
-                        if abs(new_eff) <= max(0.3 * abs(eff.estimate), 0.02):
-                            n_passed += 1
-                    else:
-                        if abs(new_eff - eff.estimate) <= max(0.35 * abs(eff.estimate), 0.05):
-                            n_passed += 1
-                refute_str = f"反驳测试 {n_passed}/{n_executed} 通过" if n_executed > 0 else "未运行反驳测试"
                 lines.append(
-                    f"- **L2 干预**: {label} `do(+1%)` → {outcome} 预期{direction} "
-                    f"{abs(delta_log_y):.4f} ({pct_y:+.2f}%, "
-                    f"p={eff.p_value:.3f} {sig}); "
-                    f"{refute_str}"
+                    f"- **候选图下的条件关联**: {label} 与 {outcome}，"
+                    f"系数 {eff.estimate:+.4f}，标准误 {eff.std_error:.4f}，p={eff.p_value:.3f}（统计诊断）；"
+                    f"图内形式识别 {eff.identification_status}；"
+                    f"扰动诊断记录 {len(eff.refutation)} 项，未作为已登记证伪或正向支持证据。"
                 )
     except Exception as e:
         logger.warning(f"[causal section] L2 query 失败: {e}")
-        lines.append(f"- L2 干预: 查询失败 ({type(e).__name__}: {e})")
+        lines.append(f"- 条件关联: 查询失败 ({type(e).__name__}: {e})")
 
     # L3 反事实 (可选, 慢)
     if include_l3:
@@ -381,9 +378,10 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
             cf = causal_mod.counterfactual_query(
                 date=last_date, treatment="VIX", outcome="QQQ",
                 counterfactual_value=cf_vix, data=data, cfg=cfg,
+                method="scm",
             )
             lines.append(
-                f"- **L3 反事实** (近似, 用 econml CATE 严格 L3 需 SCM): "
+                f"- **条件模型情景** (DoWhy SCM，线性结构模型，DAG未验证): "
                 f"{cf.date} 假设 VIX -{abs(cf_vix-actual_vix)*100:.1f}% "
                 f"(从 {actual_vix*100:+.2f}% 到 {cf_vix*100:+.2f}%), "
                 f"{cf.outcome} 实际 {cf.actual_outcome*100:+.2f}% → "
@@ -392,7 +390,7 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
             )
         except Exception as e:
             logger.warning(f"[causal section] L3 query 失败: {e}")
-            lines.append(f"- L3 反事实: 查询失败 ({type(e).__name__}: {e})")
+            lines.append(f"- 条件模型情景: 查询失败 ({type(e).__name__}: {e})")
 
     # P9-1.1: PC algorithm 跟手工 DAG 对比 (DAG 验证)
     try:
@@ -403,19 +401,13 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
         n_manual = manual_dag.number_of_edges()
         n_pc = pc_dag.number_of_edges()
         overlap_rate = n_overlap / (n_overlap + len(cmp["manual_only"]) + len(cmp["pc_only"])) if (n_overlap + len(cmp["manual_only"]) + len(cmp["pc_only"])) > 0 else 0
-        if n_overlap >= 2:
-            dag_status = "✅"
-        elif n_overlap >= 1:
-            dag_status = "⚠️"
-        else:
-            dag_status = "❌"
         overlap_str = ", ".join(f"{s}→{d}" for s, d in cmp["overlap"][:3])
         if len(cmp["overlap"]) > 3:
             overlap_str += f" 等 {n_overlap} 条"
         lines.append(
-            f"- **DAG 验证 (P9-1.1 PC vs 手工)**: {dag_status} 重叠 {n_overlap}/{n_pc} 边 "
+            f"- **DAG 结构对比 (PC vs 手工)**: 重叠 {n_overlap}/{n_pc} 边 "
             f"({overlap_rate*100:.0f}% 一致); PC 学出 {n_pc} 边, 手工 {n_manual} 边; "
-            f"主要重叠: {overlap_str if overlap_str else '无'}"
+            f"主要重叠: {overlap_str if overlap_str else '无'}；结构重叠不能验证因果方向。"
         )
     except Exception as e:
         logger.warning(f"[causal section] PC DAG 验证失败: {e}")
@@ -427,28 +419,27 @@ def render_causal_section(include_l3: bool = False, as_of: Optional[str] = None)
             treatment="VIX", outcome="QQQ", heterogeneity_var="VIX",
             n_quantiles=3, data=data, cfg=cfg,
         )
-        # 找 q2 (high VIX, 熊市) 和 q0 (low VIX, 牛市) 对比
+        # Groups use VIX log changes, not volatility levels or bull/bear regimes.
         cates_valid = [r for r in cate_h if r["cate"] is not None]
         if len(cates_valid) >= 2:
             low = cates_valid[0]  # q0 = lowest VIX
             high = cates_valid[-1]  # 末位 = highest VIX
             ratio = abs(high["cate"]) / abs(low["cate"]) if low["cate"] != 0 else float("inf")
-            het_status = "✅" if ratio > 1.5 else ("≈" if 0.7 <= ratio <= 1.5 else "❌")
             lines.append(
-                f"- **CATE 异质性 (P9-1.4)**: VIX→QQQ 跨 VIX 水平分 3 群 "
-                f"{het_status} q0 (VIX {low['range'][0]*100:+.1f}%~{low['range'][1]*100:+.1f}%) "
-                f"CATE={low['cate']:+.4f} vs q2 (VIX {high['range'][0]*100:+.1f}%~{high['range'][1]*100:+.1f}%) "
-                f"CATE={high['cate']:+.4f}, 高 VIX 群效应强度 {ratio:.2f}x"
+                f"- **条件模型分组对比（CATE）**: VIX→QQQ 按 VIX 日对数变化分 {len(cate_h)} 群，"
+                f"q{low['quantile']} ({low['range'][0]*100:+.1f}%~{low['range'][1]*100:+.1f}%) "
+                f"CATE={low['cate']:+.4f} vs q{high['quantile']} ({high['range'][0]*100:+.1f}%~{high['range'][1]*100:+.1f}%) "
+                f"CATE={high['cate']:+.4f}，模型数值比 {ratio:.2f}x；分组不代表 VIX 点位或牛熊状态，也不验证因果异质性。"
             )
     except Exception as e:
         logger.warning(f"[causal section] P9-1.4 CATE 异质性失败: {e}")
 
     # 引用 + 范围
+    graph = causal_mod.load_dag_graph(cfg)
     lines.append(
         f"\n*数据基础: {len(data)} 交易日 log return, "
-        f"7 节点 DAG (3 macro × 4 指数, 13 边含 VIX mediator v0.6.9g), n=508 起, "
-        f"OLS regression + DoWhy DAG 验证 + 1 重 refutation + PC algorithm 对比. "
-        f"Pearl L3 用 DoWhy gcm.InvertibleSCM (严格 SCM, v0.6.9e), CATE 异质性 P9-1.4 (v0.6.9h).*"
+        f"观测 {len(data.columns)} 个节点；手工 DAG {graph.number_of_nodes()} 个节点、{graph.number_of_edges()} 条边。"
+        f"OLS图内调整、扰动诊断和PC结构探索；模型情景使用DoWhy SCM，分组拟合使用EconML。均不作为因果认证。*"
     )
 
     return "\n".join(lines)

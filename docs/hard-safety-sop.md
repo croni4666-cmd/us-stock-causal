@@ -1,4 +1,6 @@
-# Hard Safety 政策 (R8 audit)
+# 历史Hard Safety操作记录（2026-08-18）
+
+本文保留旧Mavis环境的操作记录，不作为当前执行规则。当前清理以明确授权、路径边界核对、可恢复备份和Git差异审查为准；不假设旧工具仍可用。
 
 us-stock-causal 在 Windows PowerShell 环境跑, Mavis 系统的 hard-safety policy 拦了几个高风险操作。本文档列禁用 / 替代 / 何时需要 user 授权。
 

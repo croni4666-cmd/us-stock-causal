@@ -72,13 +72,14 @@ def step_fetch(skip: bool = False) -> dict:
     from examples.fetch_all import main as fetch_all_main
     t0 = time.time()
     try:
-        fetch_all_main()
-        return {"ok": True, "elapsed_s": round(time.time() - t0, 1)}
-    except SystemExit:
-        # fetch_all.py 调 sys.exit(0) on success
-        return {"ok": True, "elapsed_s": round(time.time() - t0, 1)}
+        code=fetch_all_main()
+    except SystemExit as exc:
+        code=exc.code
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}", "elapsed_s": round(time.time() - t0, 1)}
+    ok=code is None or (type(code) is int and code==0)
+    return {'ok':ok,'exit_code':code,'error':None if ok else 'fetch stage failed',
+            'elapsed_s':round(time.time()-t0,1)}
 
 
 def step_attribution(date_str: Optional[str] = None, force: bool = False) -> dict:
@@ -119,6 +120,9 @@ def step_residual_regression(date_str: Optional[str] = None) -> dict:
     else:
         print(f"  [WARN] {len(violations)} 处 P7-5 regression 越界 (>1.5x baseline, 漂移检测常态化):")
         for v in violations:
+            if v.get('validation_error'):
+                print(f"    - [ERROR] {v['validation_error']}")
+                continue
             print(f"    - {v['index']} {v['window']}: "
                   f"baseline {v['baseline_pct']:+.3f}% → current {v['current_pct']:+.3f}% "
                   f"(ratio {v['regression_ratio']}x)")
@@ -126,7 +130,8 @@ def step_residual_regression(date_str: Optional[str] = None) -> dict:
     # KI-4 修法: error 字段加 violation 摘要, 避免 print_summary 显示 "unknown"
     # (P7-5 regression 是 baseline 漂移检测, 不是 step 崩溃, 但 ok=False 触发 [FAIL] 分支)
     error_summary = None
-    status = "ok" if ok else "warning"  # warning 走 print_summary [WARN] 分支, 不算 fail
+    invalid=any(v.get('validation_error') for v in violations)
+    status = False if invalid else "ok" if ok else "warning"
     if not ok:
         error_summary = f"{len(violations)} 处 P7-5 regression 越界 (>1.5x baseline): "
         error_summary += ", ".join(f"{v['index']}/{v['window']} ({v['regression_ratio']}x)"
@@ -390,7 +395,7 @@ def step_causal(date_str: str) -> dict:
                   f"({pct_y:+.2f}%, p={vix_qqq.p_value:.3f}, n={vix_qqq.n_obs}); "
                   f"⚠️ 缺失混杂: {getattr(vix_qqq, 'missing_confounders', [])}, 无法估计因果干预")
         else:
-            q_type = "L2_intervention"
+            q_type = "formal_adjusted_association"
             n_executed = len(vix_qqq.refutation)
             n_passed = 0
             for rname, rres in vix_qqq.refutation.items():
@@ -403,9 +408,9 @@ def step_causal(date_str: str) -> dict:
                 else:
                     if abs(new_eff - vix_qqq.estimate) <= max(0.35 * abs(vix_qqq.estimate), 0.05):
                         n_passed += 1
-            print(f"  [L2 do-calculus] VIX do(+1%) → QQQ: {direction}{abs(delta_log_y):.4f} "
+            print(f"  [候选图下的条件关联] VIX log变化+0.01 → QQQ模型数值: {direction}{abs(delta_log_y):.4f} "
                   f"({pct_y:+.2f}%, p={vix_qqq.p_value:.3f}, n={vix_qqq.n_obs})")
-            print(f"    反驳测试 PASS 数: {n_passed}/{n_executed}")
+            print(f"    数值扰动诊断落入预设阈值: {n_passed}/{n_executed}；因果未建立，DAG低可信。")
 
         results["queries"].append({
             "type": q_type,
@@ -416,6 +421,7 @@ def step_causal(date_str: str) -> dict:
             "interpretation": vix_qqq.interpretation,
             "identification_status": getattr(vix_qqq, "identification_status", "identified"),
             "missing_confounders": getattr(vix_qqq, "missing_confounders", []),
+            "epistemic_assessment": vix_qqq.to_dict()['epistemic_assessment'],
         })
 
         # L3 反事实: 用最近一天, 假设 VIX 比实际低 (恐慌小, 应该利好)
@@ -434,7 +440,8 @@ def step_causal(date_str: str) -> dict:
                 counterfactual_value=cf_vix, data=data, cfg=cfg,
             )
             results["queries"].append({
-                "type": "L3_counterfactual",
+                "type": "model_scenario",
+                "causal_status": "not_established",
                 "date": cf.date,
                 "treatment": cf.treatment,
                 "outcome": cf.outcome,
@@ -442,8 +449,8 @@ def step_causal(date_str: str) -> dict:
                 "counterfactual_outcome": cf.counterfactual_outcome,
                 "delta": cf.delta,
             })
-            print(f"  [L3 counterfactual] {cf.date}: 假设 VIX -5% (从 {actual_vix*100:+.2f}% 到 {cf_vix*100:+.2f}%)")
-            print(f"    QQQ 实际 {cf.actual_outcome*100:+.2f}%, 反事实 {cf.counterfactual_outcome*100:+.2f}%, 差 {cf.delta*100:+.2f}%")
+            print(f"  [未验证模型情景，因果未建立] {cf.date}: VIX log变化减0.05 (从 {actual_vix:+.4f} 到 {cf_vix:+.4f})")
+            print(f"    QQQ 实际log变化 {cf.actual_outcome:+.4f}, 模型情景 {cf.counterfactual_outcome:+.4f}, 差 {cf.delta:+.4f}")
 
             # Query 2: 前一天同 (T, O) (cache hit, < 0.02s) — 演示 P9-1.5 价值
             t_cache_start = time.time()
@@ -456,7 +463,7 @@ def step_causal(date_str: str) -> dict:
 
         # P9-1.4: CATE 异质性 (跨 sub-population)
         # 经典用法: VIX 跌 1% 对 QQQ 影响, 牛市 vs 熊市不同
-        print(f"  [P9-1.4 CATE heterogeneity] VIX→QQQ 按 VIX 水平分 3 群 (low/mid/high)")
+        print(f"  [CATE条件模型诊断，因果未建立] VIX→QQQ 按 VIX 日对数变化分 3 群 (low/mid/high)")
         cate_results = causal.cate_heterogeneity(
             treatment="VIX", outcome="QQQ", heterogeneity_var="VIX",
             n_quantiles=3, data=data, cfg=cfg,
@@ -464,7 +471,7 @@ def step_causal(date_str: str) -> dict:
         for r in cate_results:
             if r["cate"] is not None:
                 print(f"    q{r['quantile']} {r['label']}: CATE={r['cate']:+.4f} (n={r['n_obs']}, "
-                      f"VIX range [{r['range'][0]*100:+.2f}%, {r['range'][1]*100:+.2f}%])")
+                      f"VIX log-change range [{r['range'][0]:+.4f}, {r['range'][1]:+.4f}])")
             else:
                 print(f"    q{r['quantile']}: SKIP ({r.get('skipped', '?')})")
         # 存进 results 给 report 用

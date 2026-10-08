@@ -13,6 +13,8 @@ plotly>=5.18.0
 
 # Data
 pandas>=2.0.0
+pandas-market-calendars>=5.0,<6
+tzdata>=2024.1
 numpy>=1.24.0
 pyarrow>=14.0.0
 
@@ -47,3 +49,7 @@ plyer>=2.1.0
 
 # Dev / test (optional)
 pytest>=7.0.0
+
+lxml>=4.9.0
+
+defusedxml>=0.7.1

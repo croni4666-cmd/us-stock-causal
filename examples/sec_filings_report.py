@@ -44,7 +44,8 @@ except Exception:
     pass
 
 # 11 行业 ETF top 3 权重股 (从 config 读)
-TICKER_MAP_PATH = PROJECT_ROOT / "config" / "sec_filings_tickers.json"
+from src.resources import default_asset
+TICKER_MAP_PATH = default_asset("config/sec_filings_tickers.json",PROJECT_ROOT)
 CACHE_DIR = PROJECT_ROOT / "data" / "cache" / "sec_filings"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 

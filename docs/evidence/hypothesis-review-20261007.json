@@ -1,0 +1,273 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-07T03:35:52.201992+00:00",
+  "dag_trust": "low_hypothesis_only",
+  "causal_status": "not_established",
+  "causal_probability": null,
+  "multiplicity": "Bonferroni simultaneous intervals over all registered entries",
+  "results": [
+    {
+      "id": "H_pos",
+      "statement": "上一观察区间10年收益率变化与下一观察区间QQQ回报呈正向线性关联",
+      "proposition_key": "c70d5976cb34672a1e124bef16d8f1615ec5e41452c0ee821cac4cbc32ea754d",
+      "falsification_status": "not_rejected",
+      "evidence_direction": "inconclusive",
+      "scope": "observable_linear_constraint_not_causal_identification",
+      "exploratory": true,
+      "family_size": 4,
+      "interval_alpha": 0.0125,
+      "registered_protocol": {
+        "treatment": "TNX_bp_change",
+        "outcome": "QQQ_pct_return",
+        "controls": [],
+        "units": {
+          "QQQ_pct_return": "pct_return",
+          "TNX_bp_change": "bp_change"
+        },
+        "start": "2024-01-03",
+        "end": "2026-10-02",
+        "registered_at": "2026-10-07T03:35:50.851837+00:00",
+        "hac_lags": 5,
+        "minimum_effect": 0.0,
+        "id": "H_pos",
+        "statement": "上一观察区间10年收益率变化与下一观察区间QQQ回报呈正向线性关联",
+        "kind": "lagged_directional_association",
+        "direction": "positive",
+        "lag_observations": 1
+      },
+      "registration_authenticated": false,
+      "positive_support_interpretation": "uncalibrated ordinal support only; no causal probability",
+      "input_sha256": "d5a3394281ca60534407ffc68d3e5c89d3d7c436c68c2df5f7b7c7162fd5242d",
+      "test_fingerprint": "be97d2b7172a41f8c085b6632e27c849ab88c936f7ef16b815d00582e58a397a",
+      "registration_time_utc": "2026-10-07T03:35:50.851837+00:00",
+      "missing_rows": 1,
+      "n_obs": 689,
+      "coefficient": 0.006468662398273846,
+      "coefficient_interval": [
+        -0.01997493213374385,
+        0.032912256930291546
+      ],
+      "coefficient_unit": "pct_return per bp_change",
+      "coefficient_p_value_against_zero": 0.5403402624701024,
+      "actual_start": "2024-01-04",
+      "actual_end": "2026-10-02",
+      "recomputed_locally": true
+    },
+    {
+      "id": "H_neg",
+      "statement": "同一数据与窗口下的负向线性关联候选命题",
+      "proposition_key": "259a32b6b967ccbe1922a9979a97f7a624b5eb2c8b5b27897371fb73d5912242",
+      "falsification_status": "not_rejected",
+      "evidence_direction": "inconclusive",
+      "scope": "observable_linear_constraint_not_causal_identification",
+      "exploratory": true,
+      "family_size": 4,
+      "interval_alpha": 0.0125,
+      "registered_protocol": {
+        "treatment": "TNX_bp_change",
+        "outcome": "QQQ_pct_return",
+        "controls": [],
+        "units": {
+          "QQQ_pct_return": "pct_return",
+          "TNX_bp_change": "bp_change"
+        },
+        "start": "2024-01-03",
+        "end": "2026-10-02",
+        "registered_at": "2026-10-07T03:35:50.851837+00:00",
+        "hac_lags": 5,
+        "minimum_effect": 0.0,
+        "id": "H_neg",
+        "statement": "同一数据与窗口下的负向线性关联候选命题",
+        "kind": "lagged_directional_association",
+        "direction": "negative",
+        "lag_observations": 1
+      },
+      "registration_authenticated": false,
+      "positive_support_interpretation": "uncalibrated ordinal support only; no causal probability",
+      "input_sha256": "d5a3394281ca60534407ffc68d3e5c89d3d7c436c68c2df5f7b7c7162fd5242d",
+      "test_fingerprint": "de01a7da9eaa56cea266e0866eb4b70e7d472fb780c9a5fc7533e302d91082b3",
+      "registration_time_utc": "2026-10-07T03:35:50.851837+00:00",
+      "missing_rows": 1,
+      "n_obs": 689,
+      "coefficient": 0.006468662398273846,
+      "coefficient_interval": [
+        -0.01997493213374385,
+        0.032912256930291546
+      ],
+      "coefficient_unit": "pct_return per bp_change",
+      "coefficient_p_value_against_zero": 0.5403402624701024,
+      "actual_start": "2024-01-04",
+      "actual_end": "2026-10-02",
+      "recomputed_locally": true
+    },
+    {
+      "id": "H_zero",
+      "statement": "同期收益率变化与QQQ回报经线性调整后的精确零关联候选",
+      "proposition_key": "46da073f6ca8fb3c11c04a0f43352c7745d54c2bae0b15da96ded359e7180ae3",
+      "falsification_status": "not_rejected",
+      "evidence_direction": "inconclusive",
+      "scope": "observable_linear_constraint_not_causal_identification",
+      "exploratory": true,
+      "family_size": 4,
+      "interval_alpha": 0.0125,
+      "registered_protocol": {
+        "treatment": "TNX_bp_change",
+        "outcome": "QQQ_pct_return",
+        "controls": [],
+        "units": {
+          "QQQ_pct_return": "pct_return",
+          "TNX_bp_change": "bp_change"
+        },
+        "start": "2024-01-03",
+        "end": "2026-10-02",
+        "registered_at": "2026-10-07T03:35:50.851837+00:00",
+        "hac_lags": 5,
+        "minimum_effect": 0.0,
+        "id": "H_zero",
+        "statement": "同期收益率变化与QQQ回报经线性调整后的精确零关联候选",
+        "kind": "conditional_linear_zero",
+        "tolerance": 0.0,
+        "lag_observations": 0
+      },
+      "registration_authenticated": false,
+      "positive_support_interpretation": "uncalibrated ordinal support only; no causal probability",
+      "input_sha256": "d5a3394281ca60534407ffc68d3e5c89d3d7c436c68c2df5f7b7c7162fd5242d",
+      "test_fingerprint": "afb0af4bdbb0386383f7db49d42917a02a99c4eb5e0c4d647384cd997ee30ebf",
+      "registration_time_utc": "2026-10-07T03:35:50.851837+00:00",
+      "missing_rows": 0,
+      "n_obs": 690,
+      "coefficient": 0.004821655751742768,
+      "coefficient_interval": [
+        -0.037769319072497864,
+        0.0474126305759834
+      ],
+      "coefficient_unit": "pct_return per bp_change",
+      "coefficient_p_value_against_zero": 0.7768736473644497,
+      "actual_start": "2024-01-03",
+      "actual_end": "2026-10-02",
+      "recomputed_locally": true
+    },
+    {
+      "id": "H_arrow",
+      "statement": "候选DAG中TNX导致QQQ的箭头（本数据没有方向识别合同）",
+      "proposition_key": "48846f0ab47a1e41ac2f8ee01dc3d689f780af1cefeb9dc0ea7be59c97e5bb55",
+      "falsification_status": "untestable",
+      "evidence_direction": "inconclusive",
+      "scope": "observable_linear_constraint_not_causal_identification",
+      "exploratory": true,
+      "family_size": 4,
+      "interval_alpha": 0.0125,
+      "registered_protocol": {
+        "id": "H_arrow",
+        "statement": "候选DAG中TNX导致QQQ的箭头（本数据没有方向识别合同）",
+        "kind": "causal_arrow"
+      },
+      "registration_authenticated": false,
+      "positive_support_interpretation": "uncalibrated ordinal support only; no causal probability",
+      "input_sha256": "d5a3394281ca60534407ffc68d3e5c89d3d7c436c68c2df5f7b7c7162fd5242d",
+      "test_fingerprint": "3aadd4b1a68d82b1d46a0aa4382d29b9c5c6fa47ca786000f0ec737b6afb874b",
+      "reason": "no executable observable constraint for this hypothesis kind"
+    }
+  ],
+  "assessments": [
+    {
+      "proposition_key": "c70d5976cb34672a1e124bef16d8f1615ec5e41452c0ee821cac4cbc32ea754d",
+      "support_tendency": "insufficient",
+      "support_records": 0,
+      "counter_records": 0,
+      "exploratory_support_records": 0,
+      "exploratory_counter_records": 0,
+      "duplicate_declaration_conflicts": 0,
+      "unique_input_count": 1,
+      "independent_replication_verified": false,
+      "causal_probability": null,
+      "limitations": [
+        "DAG remains a low-trust candidate; observable constraints do not identify causal directions",
+        "HAC intervals are approximate linear-model inference, not valid for arbitrary financial processes",
+        "failure to reject does not establish a proposition; p-values are not truth probabilities",
+        "registration timestamp and input units are declarations, not authenticated historical provenance",
+        "different hashes or AI reviewers do not establish independent replication",
+        "external citations and AI-generated assertions are not numerical supporting evidence"
+      ]
+    },
+    {
+      "proposition_key": "259a32b6b967ccbe1922a9979a97f7a624b5eb2c8b5b27897371fb73d5912242",
+      "support_tendency": "insufficient",
+      "support_records": 0,
+      "counter_records": 0,
+      "exploratory_support_records": 0,
+      "exploratory_counter_records": 0,
+      "duplicate_declaration_conflicts": 0,
+      "unique_input_count": 1,
+      "independent_replication_verified": false,
+      "causal_probability": null,
+      "limitations": [
+        "DAG remains a low-trust candidate; observable constraints do not identify causal directions",
+        "HAC intervals are approximate linear-model inference, not valid for arbitrary financial processes",
+        "failure to reject does not establish a proposition; p-values are not truth probabilities",
+        "registration timestamp and input units are declarations, not authenticated historical provenance",
+        "different hashes or AI reviewers do not establish independent replication",
+        "external citations and AI-generated assertions are not numerical supporting evidence"
+      ]
+    },
+    {
+      "proposition_key": "46da073f6ca8fb3c11c04a0f43352c7745d54c2bae0b15da96ded359e7180ae3",
+      "support_tendency": "insufficient",
+      "support_records": 0,
+      "counter_records": 0,
+      "exploratory_support_records": 0,
+      "exploratory_counter_records": 0,
+      "duplicate_declaration_conflicts": 0,
+      "unique_input_count": 1,
+      "independent_replication_verified": false,
+      "causal_probability": null,
+      "limitations": [
+        "DAG remains a low-trust candidate; observable constraints do not identify causal directions",
+        "HAC intervals are approximate linear-model inference, not valid for arbitrary financial processes",
+        "failure to reject does not establish a proposition; p-values are not truth probabilities",
+        "registration timestamp and input units are declarations, not authenticated historical provenance",
+        "different hashes or AI reviewers do not establish independent replication",
+        "external citations and AI-generated assertions are not numerical supporting evidence"
+      ]
+    },
+    {
+      "proposition_key": "48846f0ab47a1e41ac2f8ee01dc3d689f780af1cefeb9dc0ea7be59c97e5bb55",
+      "support_tendency": "insufficient",
+      "support_records": 0,
+      "counter_records": 0,
+      "exploratory_support_records": 0,
+      "exploratory_counter_records": 0,
+      "duplicate_declaration_conflicts": 0,
+      "unique_input_count": 1,
+      "independent_replication_verified": false,
+      "causal_probability": null,
+      "limitations": [
+        "DAG remains a low-trust candidate; observable constraints do not identify causal directions",
+        "HAC intervals are approximate linear-model inference, not valid for arbitrary financial processes",
+        "failure to reject does not establish a proposition; p-values are not truth probabilities",
+        "registration timestamp and input units are declarations, not authenticated historical provenance",
+        "different hashes or AI reviewers do not establish independent replication",
+        "external citations and AI-generated assertions are not numerical supporting evidence"
+      ]
+    }
+  ],
+  "limitations": [
+    "DAG remains a low-trust candidate; observable constraints do not identify causal directions",
+    "HAC intervals are approximate linear-model inference, not valid for arbitrary financial processes",
+    "failure to reject does not establish a proposition; p-values are not truth probabilities",
+    "registration timestamp and input units are declarations, not authenticated historical provenance",
+    "different hashes or AI reviewers do not establish independent replication",
+    "external citations and AI-generated assertions are not numerical supporting evidence"
+  ],
+  "historical_example": {
+    "mode": "exploratory_existing_historical_data",
+    "start": "2024-01-03",
+    "end": "2026-10-02",
+    "source_hashes": {
+      "QQQ": "d80b6e07d76a26980842537f0a57ddea04fb3a82b2d70b75e6a439d07514ed18",
+      "TNX": "ae20e791aa3b153929021cd88eed5e87368890e377f83f515de4debaba9b6b1a"
+    },
+    "publication_times": "unverified; cannot certify a tradable historical backtest",
+    "units_note": "TNX close is a percent yield quote; diff*100 converts percentage points to bp; QQQ ratio return*100 is percent"
+  }
+}

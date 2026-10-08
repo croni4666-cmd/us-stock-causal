@@ -13,7 +13,7 @@
 from __future__ import annotations
 import json
 import hashlib
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 from typing import Optional
 
@@ -36,11 +36,13 @@ TYPES = ["stale", "residual", "vix_spike", "ticker_fail", "parquet_corrupt"]
 
 def _alert_id(alert_type: str, subject: str, message: str) -> str:
     """生成稳定 alert ID (同 type+subject+message = 同 id, 用于 dedup)"""
-    h = hashlib.md5(f"{alert_type}|{subject}|{message}".encode("utf-8")).hexdigest()[:8]
+    h = hashlib.sha256(f"{alert_type}|{subject}|{message}".encode("utf-8")).hexdigest()[:8]
     return f"{alert_type}_{h}"
 
 
 def _alert_file(date_str: str) -> Path:
+    if not isinstance(date_str, str) or date.fromisoformat(date_str).isoformat() != date_str:
+        raise ValueError('alert date requires YYYY-MM-DD')
     return ALERT_DIR / f"alerts_{date_str}.json"
 
 
@@ -83,8 +85,8 @@ def write_alerts(date_str: str, alerts: list[dict]) -> Path:
     Returns:
         Path to alerts_<date>.json
     """
-    ALERT_DIR.mkdir(parents=True, exist_ok=True)
     f = _alert_file(date_str)
+    ALERT_DIR.mkdir(parents=True, exist_ok=True)
 
     # 合并已有 first_seen (dedup)
     existing = read_alerts(date_str)

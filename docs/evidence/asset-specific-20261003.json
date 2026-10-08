@@ -1,0 +1,1069 @@
+{
+  "schema_version": 1,
+  "source_observations": {
+    "QQQ": {
+      "provider": "Invesco",
+      "source_url": "https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/46090E103/holdings/fund?idType=cusip&productType=ETF",
+      "as_of": "2026-10-02",
+      "available_at": "2026-10-03T15:15:45.291017+00:00",
+      "sha256": "6f91615adacaf98ecd05e4eeb4b528b4b696308cd9b87373070b32e1566ff787",
+      "row_count": 106
+    },
+    "IEF": {
+      "provider": "iShares",
+      "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+      "as_of": "2026-10-01",
+      "available_at": "2026-10-03T15:15:45.783241+00:00",
+      "sha256": "a6c12ab1261fa5931c3e6a0aa4f9ce100565d6b69cd11636462998b87cf34f47",
+      "row_count": 18,
+      "independent_csv_weighted_duration": 6.864312
+    },
+    "TLT": {
+      "provider": "iShares",
+      "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+      "as_of": "2026-10-01",
+      "available_at": "2026-10-03T15:15:46.271120+00:00",
+      "sha256": "52d189c4580b0fc9d8a795204c7eb8eef3aa2d0c613fc1aaa80ca60367fb20de",
+      "row_count": 49,
+      "independent_csv_weighted_duration": 14.691242
+    },
+    "GLD": {
+      "provider": "SPDR",
+      "source_url": "https://api.spdrgoldshares.com/api/v1/historical-archive?product=gld&exchange=NYSE&lang=en",
+      "as_of": "2026-10-01",
+      "available_at": "2026-10-03T15:15:47.790237+00:00",
+      "sha256": "5cff24592bf949c0293556ea4f4feb396526ff2b5b346883a05cccb54a62c2e6",
+      "row_count": 5500
+    }
+  },
+  "checks": {
+    "qqq_end_weights_rejected": true,
+    "treasury_durations_match_independent_csv": true,
+    "all_daily_market_endpoints_available": true,
+    "five_day_future_holdings_rejected": true,
+    "late_downloads_rejected": true,
+    "gold_clocks_and_real_metrics": true
+  },
+  "periods": {
+    "daily": {
+      "start": "2026-10-01",
+      "end": "2026-10-02",
+      "mode": "retrospective",
+      "assets": [
+        {
+          "symbol": "GLD",
+          "returns": {
+            "symbol": "GLD",
+            "kind": "gold_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.006845007446811935,
+            "adjusted_return_proxy": -0.006845007446811935,
+            "adjustment_gap": 0.0
+          },
+          "profile": {
+            "as_of": "2026-10-01",
+            "date": "2026-10-01",
+            "close": 382.76,
+            "ounces_per_share": 0.09167709,
+            "nav_1030": 380.611193,
+            "indicative_1615": 383.081,
+            "midpoint_1615": 382.76,
+            "premium_pct_1615": -0.0838
+          },
+          "attribution": {
+            "status": "unavailable",
+            "reason": "exact GLD archive dates unavailable; no forward fill",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\commodities_spot_etf\\GLD.parquet",
+            "sha256": "5ac0f5bca122bbf5188e2c11f5faa1c64be09c1b882ba32a0a375b29c0d6cfe5",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "GC=F",
+          "returns": {
+            "symbol": "GC=F",
+            "kind": "continuous_futures_quote",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "continuous futures quote change excludes roll, collateral and margin effects"
+            ],
+            "price_return": -0.009518597401209083,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\commodities_futures\\GC_F.parquet",
+            "sha256": "d3e6789cc204099c4096af6e0fbb667ccfa01104331e176c43952467def110a4",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "IEF",
+          "returns": {
+            "symbol": "IEF",
+            "kind": "treasury_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.0027995519759960175,
+            "adjusted_return_proxy": -0.0027995519759960175,
+            "adjustment_gap": 0.0
+          },
+          "profile": {
+            "symbol": "IEF",
+            "as_of": "2026-10-01",
+            "bond_count": 16,
+            "bond_weight": 0.9999,
+            "duration_covered_weight": 0.9999,
+            "weighted_duration_years": 6.864312,
+            "missing_duration_ids": [],
+            "unknown_weight_count": 0,
+            "known_weight": 0.9999,
+            "complete": true,
+            "method": "portfolio-weighted issuer effective durations; linear parallel-shift approximation",
+            "causal_status": "not_identified"
+          },
+          "attribution": {
+            "status": "approximation",
+            "method": "single-tenor yield proxy; linear duration",
+            "beginning_as_of": "2026-10-01",
+            "beginning_source": {
+              "symbol": "IEF",
+              "provider": "iShares",
+              "source_url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf/latest-holdings.csv",
+              "sha256": "a6c12ab1261fa5931c3e6a0aa4f9ce100565d6b69cd11636462998b87cf34f47",
+              "as_of": "2026-10-01",
+              "retrieved_at": "2026-10-03T15:15:45.783241+00:00",
+              "available_at": "2026-10-03T15:15:45.783241+00:00",
+              "warnings": []
+            },
+            "yield_proxy": "^TNX",
+            "yield_delta_bp": 3.9999961853027344,
+            "yield_source": {
+              "path": ".review\\live-20261003\\data\\raw\\macro\\_TNX.parquet",
+              "sha256": "ae20e791aa3b153929021cd88eed5e87368890e377f83f515de4debaba9b6b1a",
+              "availability_status": "historical publication and revision times unverified"
+            },
+            "duration_years": 6.864312,
+            "estimated_price_effect": -0.0027457221814727786,
+            "residual": -5.38297945232389e-05,
+            "causal_status": "not_identified",
+            "limitations": [
+              "not full-curve repricing; carry, nonparallel shifts, convexity and fees remain unmodeled"
+            ]
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\IEF.parquet",
+            "sha256": "e26cdc7c1e675affdf2401266bdfab1eec96e4a445942ac4a7ae507fc191b830",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "TLT",
+          "returns": {
+            "symbol": "TLT",
+            "kind": "treasury_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.0029596670988124574,
+            "adjusted_return_proxy": -0.0029596670988124574,
+            "adjustment_gap": 0.0
+          },
+          "profile": {
+            "symbol": "TLT",
+            "as_of": "2026-10-01",
+            "bond_count": 47,
+            "bond_weight": 1.0001,
+            "duration_covered_weight": 1.0001,
+            "weighted_duration_years": 14.691242,
+            "missing_duration_ids": [],
+            "unknown_weight_count": 0,
+            "known_weight": 1.0001,
+            "complete": true,
+            "method": "portfolio-weighted issuer effective durations; linear parallel-shift approximation",
+            "causal_status": "not_identified"
+          },
+          "attribution": {
+            "status": "approximation",
+            "method": "single-tenor yield proxy; linear duration",
+            "beginning_as_of": "2026-10-01",
+            "beginning_source": {
+              "symbol": "TLT",
+              "provider": "iShares",
+              "source_url": "https://www.ishares.com/us/products/239454/ishares-20%2B-year-treasury-bond-etf/latest-holdings.csv",
+              "sha256": "52d189c4580b0fc9d8a795204c7eb8eef3aa2d0c613fc1aaa80ca60367fb20de",
+              "as_of": "2026-10-01",
+              "retrieved_at": "2026-10-03T15:15:46.271120+00:00",
+              "available_at": "2026-10-03T15:15:46.271120+00:00",
+              "warnings": []
+            },
+            "yield_proxy": "^TYX",
+            "yield_delta_bp": 2.6999950408935547,
+            "yield_source": {
+              "path": ".review\\live-20261003\\data\\raw\\macro\\_TYX.parquet",
+              "sha256": "76629d9149dd39e78d1a27412b7266c40649aa6242ca7686dd9facae5b588e51",
+              "availability_status": "historical publication and revision times unverified"
+            },
+            "duration_years": 14.691242,
+            "estimated_price_effect": -0.003966628054456711,
+            "residual": 0.0010069609556442533,
+            "causal_status": "not_identified",
+            "limitations": [
+              "not full-curve repricing; carry, nonparallel shifts, convexity and fees remain unmodeled"
+            ]
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\TLT.parquet",
+            "sha256": "77cf23abe924c3844b545e5f3c556ed015d98eb1b24a8d0a4900a54975b77636",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "QQQ",
+          "returns": {
+            "symbol": "QQQ",
+            "kind": "equity_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": 0.010174773924072733,
+            "adjusted_return_proxy": 0.010174773924072733,
+            "adjustment_gap": 0.0
+          },
+          "profile": {
+            "as_of": "2026-10-02",
+            "holding_count": 106,
+            "equity_count": 101,
+            "equity_weight": 0.99751692,
+            "known_weight": 0.9999999900000001,
+            "unknown_weight_count": 1,
+            "classification": "issuer security types; no sector mapping",
+            "non_equity": [
+              {
+                "type": "Currency",
+                "weight": 0.00243394
+              },
+              {
+                "type": "Index Future",
+                "weight": 0.0013819300000000002
+              },
+              {
+                "type": "Currency Collateral",
+                "weight": 4.913e-05
+              },
+              {
+                "type": "Synthetic Cash",
+                "weight": -0.0013819300000000002
+              },
+              {
+                "type": "Currency",
+                "weight": null
+              }
+            ]
+          },
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no eligible beginning holdings/availability; current structure is not historical attribution",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\QQQ.parquet",
+            "sha256": "d80b6e07d76a26980842537f0a57ddea04fb3a82b2d70b75e6a439d07514ed18",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^NDX",
+          "returns": {
+            "symbol": "^NDX",
+            "kind": "price_index",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "price index change excludes reinvested dividends; QQQ weights are not index weights"
+            ],
+            "price_return": 0.010044375931328897,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\_NDX.parquet",
+            "sha256": "559606f2c894efd900742aead2cdde647dcadc959672178a0442b8140f2f3d81",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^IXIC",
+          "returns": {
+            "symbol": "^IXIC",
+            "kind": "price_index",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "price index change excludes reinvested dividends; QQQ weights are not index weights"
+            ],
+            "price_return": 0.01188093638882659,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\_IXIC.parquet",
+            "sha256": "37e7a423578954064dbe217bbb929d11e97d403fde50e314933475074495d8e8",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^TNX",
+          "returns": {
+            "symbol": "^TNX",
+            "kind": "yield_quote",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "yield quote change is not a bond investment return"
+            ],
+            "yield_start_pct": 5.236999988555908,
+            "yield_end_pct": 5.2769999504089355,
+            "yield_delta_bp": 3.9999961853027344
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\macro\\_TNX.parquet",
+            "sha256": "ae20e791aa3b153929021cd88eed5e87368890e377f83f515de4debaba9b6b1a",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^TYX",
+          "returns": {
+            "symbol": "^TYX",
+            "kind": "yield_quote",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "yield quote change is not a bond investment return"
+            ],
+            "yield_start_pct": 5.603000164031982,
+            "yield_end_pct": 5.630000114440918,
+            "yield_delta_bp": 2.6999950408935547
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\macro\\_TYX.parquet",
+            "sha256": "76629d9149dd39e78d1a27412b7266c40649aa6242ca7686dd9facae5b588e51",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        }
+      ]
+    },
+    "five_sessions": {
+      "start": "2026-09-25",
+      "end": "2026-10-02",
+      "mode": "retrospective",
+      "assets": [
+        {
+          "symbol": "GLD",
+          "returns": {
+            "symbol": "GLD",
+            "kind": "gold_etf",
+            "start": "2026-09-25",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.033730685265108695,
+            "adjusted_return_proxy": -0.033730685265108695,
+            "adjustment_gap": 0.0
+          },
+          "profile": {
+            "as_of": "2026-10-01",
+            "date": "2026-10-01",
+            "close": 382.76,
+            "ounces_per_share": 0.09167709,
+            "nav_1030": 380.611193,
+            "indicative_1615": 383.081,
+            "midpoint_1615": 382.76,
+            "premium_pct_1615": -0.0838
+          },
+          "attribution": {
+            "status": "unavailable",
+            "reason": "exact GLD archive dates unavailable; no forward fill",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\commodities_spot_etf\\GLD.parquet",
+            "sha256": "5ac0f5bca122bbf5188e2c11f5faa1c64be09c1b882ba32a0a375b29c0d6cfe5",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "GC=F",
+          "returns": {
+            "symbol": "GC=F",
+            "kind": "continuous_futures_quote",
+            "start": "2026-09-25",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "continuous futures quote change excludes roll, collateral and margin effects"
+            ],
+            "price_return": -0.036772281644662064,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\commodities_futures\\GC_F.parquet",
+            "sha256": "d3e6789cc204099c4096af6e0fbb667ccfa01104331e176c43952467def110a4",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "IEF",
+          "returns": {
+            "symbol": "IEF",
+            "kind": "treasury_etf",
+            "start": "2026-09-25",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.010555521647135468,
+            "adjusted_return_proxy": -0.007142608028458786,
+            "adjustment_gap": 0.003412913618676683
+          },
+          "profile": {
+            "symbol": "IEF",
+            "as_of": "2026-10-01",
+            "bond_count": 16,
+            "bond_weight": 0.9999,
+            "duration_covered_weight": 0.9999,
+            "weighted_duration_years": 6.864312,
+            "missing_duration_ids": [],
+            "unknown_weight_count": 0,
+            "known_weight": 0.9999,
+            "complete": true,
+            "method": "portfolio-weighted issuer effective durations; linear parallel-shift approximation",
+            "causal_status": "not_identified"
+          },
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no eligible beginning holdings/availability; current structure is not historical attribution",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\IEF.parquet",
+            "sha256": "e26cdc7c1e675affdf2401266bdfab1eec96e4a445942ac4a7ae507fc191b830",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "TLT",
+          "returns": {
+            "symbol": "TLT",
+            "kind": "treasury_etf",
+            "start": "2026-09-25",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.023197129916412318,
+            "adjusted_return_proxy": -0.019263100551071055,
+            "adjustment_gap": 0.003934029365341263
+          },
+          "profile": {
+            "symbol": "TLT",
+            "as_of": "2026-10-01",
+            "bond_count": 47,
+            "bond_weight": 1.0001,
+            "duration_covered_weight": 1.0001,
+            "weighted_duration_years": 14.691242,
+            "missing_duration_ids": [],
+            "unknown_weight_count": 0,
+            "known_weight": 1.0001,
+            "complete": true,
+            "method": "portfolio-weighted issuer effective durations; linear parallel-shift approximation",
+            "causal_status": "not_identified"
+          },
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no eligible beginning holdings/availability; current structure is not historical attribution",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\TLT.parquet",
+            "sha256": "77cf23abe924c3844b545e5f3c556ed015d98eb1b24a8d0a4900a54975b77636",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "QQQ",
+          "returns": {
+            "symbol": "QQQ",
+            "kind": "equity_etf",
+            "start": "2026-09-25",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": 0.006823394344988243,
+            "adjusted_return_proxy": 0.006823394344988243,
+            "adjustment_gap": 0.0
+          },
+          "profile": {
+            "as_of": "2026-10-02",
+            "holding_count": 106,
+            "equity_count": 101,
+            "equity_weight": 0.99751692,
+            "known_weight": 0.9999999900000001,
+            "unknown_weight_count": 1,
+            "classification": "issuer security types; no sector mapping",
+            "non_equity": [
+              {
+                "type": "Currency",
+                "weight": 0.00243394
+              },
+              {
+                "type": "Index Future",
+                "weight": 0.0013819300000000002
+              },
+              {
+                "type": "Currency Collateral",
+                "weight": 4.913e-05
+              },
+              {
+                "type": "Synthetic Cash",
+                "weight": -0.0013819300000000002
+              },
+              {
+                "type": "Currency",
+                "weight": null
+              }
+            ]
+          },
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no eligible beginning holdings/availability; current structure is not historical attribution",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\QQQ.parquet",
+            "sha256": "d80b6e07d76a26980842537f0a57ddea04fb3a82b2d70b75e6a439d07514ed18",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^NDX",
+          "returns": {
+            "symbol": "^NDX",
+            "kind": "price_index",
+            "start": "2026-09-25",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "price index change excludes reinvested dividends; QQQ weights are not index weights"
+            ],
+            "price_return": 0.006527638980731831,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\_NDX.parquet",
+            "sha256": "559606f2c894efd900742aead2cdde647dcadc959672178a0442b8140f2f3d81",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^IXIC",
+          "returns": {
+            "symbol": "^IXIC",
+            "kind": "price_index",
+            "start": "2026-09-25",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "price index change excludes reinvested dividends; QQQ weights are not index weights"
+            ],
+            "price_return": 0.004512170087923595,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\_IXIC.parquet",
+            "sha256": "37e7a423578954064dbe217bbb929d11e97d403fde50e314933475074495d8e8",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^TNX",
+          "returns": {
+            "symbol": "^TNX",
+            "kind": "yield_quote",
+            "start": "2026-09-25",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "yield quote change is not a bond investment return"
+            ],
+            "yield_start_pct": 5.184000015258789,
+            "yield_end_pct": 5.2769999504089355,
+            "yield_delta_bp": 9.299993515014648
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\macro\\_TNX.parquet",
+            "sha256": "ae20e791aa3b153929021cd88eed5e87368890e377f83f515de4debaba9b6b1a",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^TYX",
+          "returns": {
+            "symbol": "^TYX",
+            "kind": "yield_quote",
+            "start": "2026-09-25",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "yield quote change is not a bond investment return"
+            ],
+            "yield_start_pct": 5.504000186920166,
+            "yield_end_pct": 5.630000114440918,
+            "yield_delta_bp": 12.599992752075195
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\macro\\_TYX.parquet",
+            "sha256": "76629d9149dd39e78d1a27412b7266c40649aa6242ca7686dd9facae5b588e51",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        }
+      ]
+    },
+    "point_in_time": {
+      "start": "2026-10-01",
+      "end": "2026-10-02",
+      "mode": "point_in_time",
+      "assets": [
+        {
+          "symbol": "GLD",
+          "returns": {
+            "symbol": "GLD",
+            "kind": "gold_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.006845007446811935,
+            "adjusted_return_proxy": -0.006845007446811935,
+            "adjustment_gap": 0.0
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official source meeting analysis date/availability cutoff",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\commodities_spot_etf\\GLD.parquet",
+            "sha256": "5ac0f5bca122bbf5188e2c11f5faa1c64be09c1b882ba32a0a375b29c0d6cfe5",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "GC=F",
+          "returns": {
+            "symbol": "GC=F",
+            "kind": "continuous_futures_quote",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "continuous futures quote change excludes roll, collateral and margin effects"
+            ],
+            "price_return": -0.009518597401209083,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\commodities_futures\\GC_F.parquet",
+            "sha256": "d3e6789cc204099c4096af6e0fbb667ccfa01104331e176c43952467def110a4",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "IEF",
+          "returns": {
+            "symbol": "IEF",
+            "kind": "treasury_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.0027995519759960175,
+            "adjusted_return_proxy": -0.0027995519759960175,
+            "adjustment_gap": 0.0
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official source meeting analysis date/availability cutoff",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\IEF.parquet",
+            "sha256": "e26cdc7c1e675affdf2401266bdfab1eec96e4a445942ac4a7ae507fc191b830",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "TLT",
+          "returns": {
+            "symbol": "TLT",
+            "kind": "treasury_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": -0.0029596670988124574,
+            "adjusted_return_proxy": -0.0029596670988124574,
+            "adjustment_gap": 0.0
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official source meeting analysis date/availability cutoff",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\TLT.parquet",
+            "sha256": "77cf23abe924c3844b545e5f3c556ed015d98eb1b24a8d0a4900a54975b77636",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "QQQ",
+          "returns": {
+            "symbol": "QQQ",
+            "kind": "equity_etf",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": 0.010174773924072733,
+            "adjusted_return_proxy": 0.010174773924072733,
+            "adjustment_gap": 0.0
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official source meeting analysis date/availability cutoff",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\QQQ.parquet",
+            "sha256": "d80b6e07d76a26980842537f0a57ddea04fb3a82b2d70b75e6a439d07514ed18",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^NDX",
+          "returns": {
+            "symbol": "^NDX",
+            "kind": "price_index",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "price index change excludes reinvested dividends; QQQ weights are not index weights"
+            ],
+            "price_return": 0.010044375931328897,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\_NDX.parquet",
+            "sha256": "559606f2c894efd900742aead2cdde647dcadc959672178a0442b8140f2f3d81",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^IXIC",
+          "returns": {
+            "symbol": "^IXIC",
+            "kind": "price_index",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "price index change excludes reinvested dividends; QQQ weights are not index weights"
+            ],
+            "price_return": 0.01188093638882659,
+            "adjusted_return_proxy": null,
+            "adjustment_gap": null
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\indices\\_IXIC.parquet",
+            "sha256": "37e7a423578954064dbe217bbb929d11e97d403fde50e314933475074495d8e8",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^TNX",
+          "returns": {
+            "symbol": "^TNX",
+            "kind": "yield_quote",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "yield quote change is not a bond investment return"
+            ],
+            "yield_start_pct": 5.236999988555908,
+            "yield_end_pct": 5.2769999504089355,
+            "yield_delta_bp": 3.9999961853027344
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\macro\\_TNX.parquet",
+            "sha256": "ae20e791aa3b153929021cd88eed5e87368890e377f83f515de4debaba9b6b1a",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        },
+        {
+          "symbol": "^TYX",
+          "returns": {
+            "symbol": "^TYX",
+            "kind": "yield_quote",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "causal_status": "not_identified",
+            "limitations": [
+              "yield quote change is not a bond investment return"
+            ],
+            "yield_start_pct": 5.603000164031982,
+            "yield_end_pct": 5.630000114440918,
+            "yield_delta_bp": 2.6999950408935547
+          },
+          "profile": null,
+          "attribution": {
+            "status": "unavailable",
+            "reason": "no official fund holdings model for this price index, futures or yield quote",
+            "causal_status": "not_identified"
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\macro\\_TYX.parquet",
+            "sha256": "76629d9149dd39e78d1a27412b7266c40649aa6242ca7686dd9facae5b588e51",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        }
+      ]
+    },
+    "gold_archive": {
+      "start": "2026-09-30",
+      "end": "2026-10-01",
+      "mode": "retrospective",
+      "assets": [
+        {
+          "symbol": "GLD",
+          "returns": {
+            "symbol": "GLD",
+            "kind": "gold_etf",
+            "start": "2026-09-30",
+            "end": "2026-10-01",
+            "causal_status": "not_identified",
+            "limitations": [
+              "adjusted series is a provider total-return proxy, not an official fund return"
+            ],
+            "price_return": 0.005041522545417898,
+            "adjusted_return_proxy": 0.005041522545417898,
+            "adjustment_gap": 0.0
+          },
+          "profile": {
+            "as_of": "2026-10-01",
+            "date": "2026-10-01",
+            "close": 382.76,
+            "ounces_per_share": 0.09167709,
+            "nav_1030": 380.611193,
+            "indicative_1615": 383.081,
+            "midpoint_1615": 382.76,
+            "premium_pct_1615": -0.0838
+          },
+          "attribution": {
+            "status": "ok",
+            "mode": "retrospective",
+            "start": "2026-09-30",
+            "end": "2026-10-01",
+            "price_return": 0.0050414872387354315,
+            "nav_return_1030": -0.005915254516265067,
+            "backing_change": -1.2980173711762966e-05,
+            "ounces_per_share": 0.09167709,
+            "premium_pct_1615": -0.0838,
+            "causal_status": "not_identified",
+            "limitations": [
+              "different pricing times",
+              "independent licensed gold benchmark unavailable",
+              "backing change is measured, not automatically attributed to management fees"
+            ]
+          },
+          "market_source": {
+            "path": ".review\\live-20261003\\data\\raw\\commodities_spot_etf\\GLD.parquet",
+            "sha256": "5ac0f5bca122bbf5188e2c11f5faa1c64be09c1b882ba32a0a375b29c0d6cfe5",
+            "availability_status": "historical publication and revision times unverified"
+          },
+          "errors": []
+        }
+      ]
+    }
+  },
+  "verification": {
+    "python_3_11": "193 passed, 3 skipped, 11 warnings",
+    "python_3_12": "193 passed, 3 skipped, 11 warnings",
+    "new_regressions": 63,
+    "review_important_findings_fixed": 4,
+    "live_official_sources": 4,
+    "isolated_installed_cli": "passed after packaging fix",
+    "wheel_contents": "documented CLI and asset modules included"
+  }
+}

@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from src.thresholds import load_prices, safe_name
+from src.thresholds import load_prices, safe_name, resolve_layer
 
 INDEX_SYMBOLS = {"DIA", "QQQ", "RSP", "QQQE"}
 SECTOR_SYMBOLS = {"XLK", "XLF", "XLE", "XLY", "XLP", "XLV", "XLI", "XLU", "XLB", "XLRE", "XLC"}
@@ -40,6 +40,7 @@ def find_similar_patterns(
     n_matches: int = 10,
     forecast_horizon: int = 5,
     end_date: Optional[str] = None,
+    layer: Optional[str] = None,
 ) -> dict:
     """
     找历史最相似的 N 个 pattern windows,看后续收益分布
@@ -65,18 +66,11 @@ def find_similar_patterns(
             'top_matches': [{...}, ...]  # 每个 match 的详情
         }
     """
-    if symbol in INDEX_SYMBOLS:
-        layer = "indices"
-    elif symbol in SECTOR_SYMBOLS:
-        layer = "sectors"
-    else:
-        layer = "macro"
-
-    df = load_prices(symbol, layer)
-    rets = df["close"].pct_change().dropna()
-
-    if end_date:
-        rets = rets.loc[:end_date]
+    df = load_prices(symbol, resolve_layer(symbol, layer))
+    if end_date: df=df.loc[:end_date]
+    if not np.isfinite(df['close']).all() or (df['close']<=0).any():
+        raise ValueError('Pattern matching requires complete finite positive quotes; no filling')
+    rets = df["close"].pct_change(fill_method=None).iloc[1:]
 
     if len(rets) < pattern_length + forecast_horizon + 30:
         raise ValueError(

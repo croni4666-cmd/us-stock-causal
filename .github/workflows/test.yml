@@ -4,16 +4,27 @@
 
 name: test
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [master, main]
   pull_request:
-    branches: [master, main]
+    branches: [master, main, fix/audit-follow-through]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      live_data:
+        description: "Run live provider integration tests"
+        type: boolean
+        default: false
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
 
@@ -26,6 +37,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
+      - name: Install Chinese chart fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-noto-cjk
+
       - name: Install dependencies (lock)
         run: |
           python -m pip install --upgrade pip
@@ -35,14 +51,23 @@ jobs:
         run: |
           pip install -e .
 
-      - name: Run tests (smoke + regression suites)
+      - name: Run offline regression tests
         run: |
-          pytest tests -v --tb=short
+          pytest tests -v --tb=short -W 'error:Glyph .* missing from font:UserWarning'
+
+      - name: Check tracked privacy, artifacts and syntax
+        run: python tools/quality_gate.py --output quality-gate.json
+
+      - name: Check critical Python defects
+        run: python -m ruff check src examples tools scripts tests archive setup.py --select E9,F63,F7,F82
+
+      - name: Verify wheel sources and runtime defaults
+        run: python tools/verify_package.py
 
       - name: Check pre-push hygiene (R6)
         run: |
           # Check for forbidden patterns (unresolved placeholders, private keys, local user profiles)
-          if grep -rE 'C:\\Users\\[a-zA-Z0-9_-]+\\.mavis|BEGIN PRIVATE KEY|sk-[a-zA-Z0-9]{20,}' \
+          if grep -rE 'C:\\Users\\[a-zA-Z0-9_-]+\\.mavis|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|sk-[a-zA-Z0-9]{20,}' \
               --include='*.py' --include='*.md' --include='*.json' --include='*.yaml' --include='*.yml' \
               --include='*.cmd' --include='*.ps1' \
               src/ examples/ tests/ docs/ 2>/dev/null; then
@@ -50,3 +75,33 @@ jobs:
             exit 1
           fi
           echo "R6 pre-push hygiene OK"
+
+  merge-gate:
+    name: merge-gate
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    if: always()
+    steps:
+      - name: Require every runtime and quality gate to pass
+        env:
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: |
+          if [ "$SMOKE_RESULT" != "success" ]; then
+            echo "::error::Required runtime/quality checks failed, were skipped, or were cancelled."
+            exit 1
+          fi
+          echo "Merge gate passed: both runtimes, privacy/syntax, critical defects, wheel resources, and hygiene."
+
+  integration:
+    if: github.event_name == 'workflow_dispatch' && inputs.live_data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements-lock.txt
+      - run: pip install -e .
+      - name: Run explicitly requested live provider tests
+        run: pytest tests -m integration --integration -v --tb=short

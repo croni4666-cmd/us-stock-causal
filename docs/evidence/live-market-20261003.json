@@ -1,0 +1,823 @@
+{
+  "captured_at_utc": "2026-10-03T13:44:04.692708+00:00",
+  "provider": "Yahoo Finance via src.data.fetch",
+  "start": "2024-01-01",
+  "end_exclusive": "2026-10-03",
+  "observed_date": "2026-10-02",
+  "reviewed_commit": "441702b8ffe020875d05b26271b105475477a896",
+  "assets": {
+    "GC=F": {
+      "ok": true,
+      "status": "full",
+      "rows": 693,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits"
+      ],
+      "last_close": 4162.2998046875,
+      "previous_close": 4202.2998046875,
+      "daily_change_pct": -0.9518597401209083,
+      "five_session_change_pct": -3.6772281644662064,
+      "absolute_change": -40.0,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "d3e6789cc204099c4096af6e0fbb667ccfa01104331e176c43952467def110a4",
+      "seconds": 2.08,
+      "unit": "美元/盎司",
+      "live_checks": {
+        "report": {
+          "symbol": "GC=F",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "5 日价格累计 -3.68%（未计分红）, 最好 2026-10-01 (+0.37%), 最差 2026-09-28 (-3.54%)",
+          "segment_2_attribution": "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。",
+          "segment_3_thresholds": "现价 4162.3 美元/盎司, 200 SMA below -8.59%, 52w 18.3%, R1 4226.93 / S1 4173.53 美元/盎司",
+          "segment_4_patterns": "20d pattern 相似 top 10, 5d fwd avg -0.30% / win 70% / max +2.67% / min -7.94%",
+          "segment_5_risk": "信号部分一致 score=0.33; 0d 后 NFP(9月非农就业)"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": -3.6772281644662064,
+        "adjusted_five_session_change_pct": -3.6772281644662064,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    },
+    "GLD": {
+      "ok": true,
+      "status": "full",
+      "rows": 691,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits",
+        "capital gains"
+      ],
+      "last_close": 380.1400146484375,
+      "previous_close": 382.760009765625,
+      "daily_change_pct": -0.6845007446811935,
+      "five_session_change_pct": -3.3730685265108695,
+      "absolute_change": -2.6199951171875,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "5ac0f5bca122bbf5188e2c11f5faa1c64be09c1b882ba32a0a375b29c0d6cfe5",
+      "seconds": 0.47,
+      "unit": "美元/份",
+      "live_checks": {
+        "report": {
+          "symbol": "GLD",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "5 日价格累计 -3.37%（未计分红）, 最好 2026-09-29 (+1.32%), 最差 2026-09-28 (-3.94%)",
+          "segment_2_attribution": "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。",
+          "segment_3_thresholds": "现价 380.14 美元, 200 SMA below -8.65%, 52w 18.2%, R1 384.19 / S1 380.85 美元",
+          "segment_4_patterns": "20d pattern 相似 top 10, 5d fwd avg -1.66% / win 40% / max +3.29% / min -7.97%",
+          "segment_5_risk": "信号部分一致 score=0.33; 0d 后 NFP(9月非农就业)"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": -3.3730685265108695,
+        "adjusted_five_session_change_pct": -3.3730685265108695,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    },
+    "^IRX": {
+      "ok": true,
+      "status": "full",
+      "rows": 691,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits"
+      ],
+      "last_close": 3.993000030517578,
+      "previous_close": 3.9820001125335693,
+      "daily_change_pct": 0.27624102644763227,
+      "five_session_change_pct": -1.8918952800035749,
+      "absolute_change": 0.010999917984008789,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "f7232344f16a560e5606653afb9e0526a11d505b2a67f7f652d78b8c7369852e",
+      "seconds": 0.42,
+      "unit": "%",
+      "live_checks": {
+        "report": {
+          "symbol": "^IRX",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "收益率 3.99%，5 日累计变化 -7.70bp，最大上行 +1.10bp / 最大下行 -4.80bp；这是收益率变化，不能作为债券投资收益。",
+          "segment_2_attribution": "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。",
+          "segment_3_thresholds": "收益率 3.99%, 200 SMA above +9.16%, 52w 82.9%, R1 4.00% / S1 3.97%（收益率水平）",
+          "segment_4_patterns": "收益率指标不提供债券价格形态或投资收益胜率；债券 ETF 请查看 IEF / TLT。",
+          "segment_5_risk": "收益率方向不等于债券价格方向；该指标未计算债券持有回报; 0d 后 NFP(9月非农就业)"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": -1.8918952800035749,
+        "adjusted_five_session_change_pct": -1.8918952800035749,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    },
+    "^FVX": {
+      "ok": true,
+      "status": "full",
+      "rows": 691,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits"
+      ],
+      "last_close": 5.054999828338623,
+      "previous_close": 5.005000114440918,
+      "daily_change_pct": 0.9989952598290941,
+      "five_session_change_pct": 0.9586550658829518,
+      "absolute_change": 0.04999971389770508,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "f54ba32bf2d42701859ec3a6044348d1bf07e001c6d67944b14aeca17bc0155e",
+      "seconds": 0.45,
+      "unit": "%",
+      "live_checks": {
+        "report": {
+          "symbol": "^FVX",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "收益率 5.05%，5 日累计变化 +4.80bp，最大上行 +6.10bp / 最大下行 -8.40bp；这是收益率变化，不能作为债券投资收益。",
+          "segment_2_attribution": "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。",
+          "segment_3_thresholds": "收益率 5.05%, 200 SMA above +22.79%, 52w 96.2%, R1 5.09% / S1 4.95%（收益率水平）",
+          "segment_4_patterns": "收益率指标不提供债券价格形态或投资收益胜率；债券 ETF 请查看 IEF / TLT。",
+          "segment_5_risk": "收益率方向不等于债券价格方向；该指标未计算债券持有回报; 0d 后 NFP(9月非农就业)"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": 0.9586550658829518,
+        "adjusted_five_session_change_pct": 0.9586550658829518,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    },
+    "^TNX": {
+      "ok": true,
+      "status": "full",
+      "rows": 691,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits"
+      ],
+      "last_close": 5.2769999504089355,
+      "previous_close": 5.236999988555908,
+      "daily_change_pct": 0.7637953397066299,
+      "five_session_change_pct": 1.7939802252393333,
+      "absolute_change": 0.039999961853027344,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "ae20e791aa3b153929021cd88eed5e87368890e377f83f515de4debaba9b6b1a",
+      "seconds": 0.44,
+      "unit": "%",
+      "live_checks": {
+        "report": {
+          "symbol": "^TNX",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "收益率 5.28%，5 日累计变化 +9.30bp，最大上行 +5.60bp / 最大下行 -5.60bp；这是收益率变化，不能作为债券投资收益。",
+          "segment_2_attribution": "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。",
+          "segment_3_thresholds": "收益率 5.28%, 200 SMA above +18.57%, 52w 95.3%, R1 5.32% / S1 5.18%（收益率水平）",
+          "segment_4_patterns": "收益率指标不提供债券价格形态或投资收益胜率；债券 ETF 请查看 IEF / TLT。",
+          "segment_5_risk": "收益率方向不等于债券价格方向；该指标未计算债券持有回报; 0d 后 NFP(9月非农就业)"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": 1.7939802252393333,
+        "adjusted_five_session_change_pct": 1.7939802252393333,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    },
+    "^TYX": {
+      "ok": true,
+      "status": "full",
+      "rows": 691,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits"
+      ],
+      "last_close": 5.630000114440918,
+      "previous_close": 5.603000164031982,
+      "daily_change_pct": 0.48188380543443543,
+      "five_session_change_pct": 2.289242791455215,
+      "absolute_change": 0.026999950408935547,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "76629d9149dd39e78d1a27412b7266c40649aa6242ca7686dd9facae5b588e51",
+      "seconds": 0.45,
+      "unit": "%",
+      "live_checks": {
+        "report": {
+          "symbol": "^TYX",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "收益率 5.63%，5 日累计变化 +12.60bp，最大上行 +5.70bp / 最大下行 -3.50bp；这是收益率变化，不能作为债券投资收益。",
+          "segment_2_attribution": "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。",
+          "segment_3_thresholds": "收益率 5.63%, 200 SMA above +12.53%, 52w 94.8%, R1 5.67% / S1 5.56%（收益率水平）",
+          "segment_4_patterns": "收益率指标不提供债券价格形态或投资收益胜率；债券 ETF 请查看 IEF / TLT。",
+          "segment_5_risk": "收益率方向不等于债券价格方向；该指标未计算债券持有回报; 0d 后 NFP(9月非农就业)"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": 2.289242791455215,
+        "adjusted_five_session_change_pct": 2.289242791455215,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    },
+    "IEF": {
+      "ok": true,
+      "status": "full",
+      "rows": 691,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits",
+        "capital gains"
+      ],
+      "last_close": 89.05000305175781,
+      "previous_close": 89.30000305175781,
+      "daily_change_pct": -0.27995519759960175,
+      "five_session_change_pct": -1.0555521647135468,
+      "absolute_change": -0.25,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "e26cdc7c1e675affdf2401266bdfab1eec96e4a445942ac4a7ae507fc191b830",
+      "seconds": 0.53,
+      "unit": "美元/份",
+      "live_checks": {
+        "report": {
+          "symbol": "IEF",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "5 日价格累计 -1.06%（未计分红）, 最好 2026-10-01 (+-0.01%), 最差 2026-09-28 (-0.52%)",
+          "segment_2_attribution": "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。",
+          "segment_3_thresholds": "现价 89.05 美元, 200 SMA below -5.74%, 52w 4.4%, R1 89.65 / S1 88.79 美元",
+          "segment_4_patterns": "20d pattern 相似 top 10, 5d fwd avg -0.02% / win 60% / max +0.91% / min -1.91%",
+          "segment_5_risk": "信号部分一致 score=0.33; 0d 后 NFP(9月非农就业)"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": -1.0555521647135468,
+        "adjusted_five_session_change_pct": -0.7142608028458786,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    },
+    "TLT": {
+      "ok": true,
+      "status": "full",
+      "rows": 691,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits",
+        "capital gains"
+      ],
+      "last_close": 77.4800033569336,
+      "previous_close": 77.70999908447266,
+      "daily_change_pct": -0.29596670988124574,
+      "five_session_change_pct": -2.319712991641232,
+      "absolute_change": -0.2299957275390625,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "77cf23abe924c3844b545e5f3c556ed015d98eb1b24a8d0a4900a54975b77636",
+      "seconds": 0.69,
+      "unit": "美元/份",
+      "live_checks": {
+        "report": {
+          "symbol": "TLT",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "5 日价格累计 -2.32%（未计分红）, 最好 2026-10-01 (+-0.09%), 最差 2026-09-28 (-0.88%)",
+          "segment_2_attribution": "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。",
+          "segment_3_thresholds": "现价 77.48 美元, 200 SMA below -9.30%, 52w 4.7%, R1 78.25 / S1 76.96 美元",
+          "segment_4_patterns": "20d pattern 相似 top 10, 5d fwd avg +0.02% / win 60% / max +1.95% / min -3.30%",
+          "segment_5_risk": "信号部分一致 score=0.33; 0d 后 NFP(9月非农就业)"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": -2.319712991641232,
+        "adjusted_five_session_change_pct": -1.9263100551071055,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    },
+    "^IXIC": {
+      "ok": true,
+      "status": "full",
+      "rows": 691,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits"
+      ],
+      "last_close": 27190.859375,
+      "previous_close": 26871.599609375,
+      "daily_change_pct": 1.188093638882659,
+      "five_session_change_pct": 0.4512170087923595,
+      "absolute_change": 319.259765625,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "37e7a423578954064dbe217bbb929d11e97d403fde50e314933475074495d8e8",
+      "seconds": 0.44,
+      "unit": "点",
+      "live_checks": {
+        "report": {
+          "symbol": "^IXIC",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "5 日价格累计 +0.45%（未计分红）, 最好 2026-10-02 (+1.19%), 最差 2026-09-28 (-0.92%)",
+          "segment_2_attribution": "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。",
+          "segment_3_thresholds": "现价 27190.86 点, 200 SMA above +9.95%, 52w 97.6%, R1 27012.75 / S1 26732.17 点",
+          "segment_4_patterns": "20d pattern 相似 top 10, 5d fwd avg +0.47% / win 60% / max +4.42% / min -3.48%",
+          "segment_5_risk": "信号矛盾 score=0.67(mixed); 0d 后 NFP(9月非农就业)"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": 0.4512170087923595,
+        "adjusted_five_session_change_pct": 0.4512170087923595,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    },
+    "^NDX": {
+      "ok": true,
+      "status": "full",
+      "rows": 691,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits"
+      ],
+      "last_close": 30807.9296875,
+      "previous_close": 30501.560546875,
+      "daily_change_pct": 1.0044375931328897,
+      "five_session_change_pct": 0.6527638980731831,
+      "absolute_change": 306.369140625,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "559606f2c894efd900742aead2cdde647dcadc959672178a0442b8140f2f3d81",
+      "seconds": 0.47,
+      "unit": "点",
+      "live_checks": {
+        "report": {
+          "symbol": "^NDX",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "5 日价格累计 +0.65%（未计分红）, 最好 2026-10-02 (+1.00%), 最差 2026-09-28 (-1.08%)",
+          "segment_2_attribution": "该标的不适用已配置的股票行业权重归因；未提供替代资产因子模型。",
+          "segment_3_thresholds": "现价 30807.93 点, 200 SMA above +12.12%, 52w 97.4%, R1 30653.65 / S1 30312.06 点",
+          "segment_4_patterns": "20d pattern 相似 top 10, 5d fwd avg +0.08% / win 40% / max +4.70% / min -3.17%",
+          "segment_5_risk": "信号部分一致 score=0.33; 0d 后 NFP(9月非农就业); 200 SMA +12.1% 距超买较近"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": 0.6527638980731831,
+        "adjusted_five_session_change_pct": 0.6527638980731831,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    },
+    "QQQ": {
+      "ok": true,
+      "status": "full",
+      "rows": 691,
+      "first": "2024-01-02",
+      "last": "2026-10-02",
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "adj close",
+        "volume",
+        "dividends",
+        "stock splits",
+        "capital gains"
+      ],
+      "last_close": 749.5800170898438,
+      "previous_close": 742.030029296875,
+      "daily_change_pct": 1.0174773924072733,
+      "five_session_change_pct": 0.6823394344988243,
+      "absolute_change": 7.54998779296875,
+      "duplicate_dates": 0,
+      "missing_ohlc": 0,
+      "invalid_ohlc": 0,
+      "sha256": "d80b6e07d76a26980842537f0a57ddea04fb3a82b2d70b75e6a439d07514ed18",
+      "seconds": 0.53,
+      "unit": "美元/份",
+      "live_checks": {
+        "report": {
+          "symbol": "QQQ",
+          "as_of": "2026-10-02",
+          "lookback_days": 5,
+          "segment_1_market": "5 日价格累计 +0.68%（未计分红）, 最好 2026-10-02 (+1.02%), 最差 2026-09-28 (-1.07%)",
+          "segment_2_attribution": "主升 XLK+0.91% / XLC-0.48% / XLV-0.10%, 残差 +0.53%",
+          "segment_3_thresholds": "现价 749.58 美元, 200 SMA above +12.11%, 52w 97.5%, R1 745.72 / S1 737.3 美元",
+          "segment_4_patterns": "20d pattern 相似 top 10, 5d fwd avg +0.10% / win 40% / max +4.60% / min -3.14%",
+          "segment_5_risk": "信号部分一致 score=0.33; 0d 后 NFP(9月非农就业); 200 SMA +12.1% 距超买较近"
+        },
+        "verified_ohlc": true,
+        "verified_five_session_change": true,
+        "price_five_session_change_pct": 0.6823394344988243,
+        "adjusted_five_session_change_pct": 0.6823394344988243,
+        "fresh_cache": true
+      },
+      "cache_second_fetch": {
+        "ok": true,
+        "result": {
+          "status": "cached"
+        }
+      }
+    }
+  },
+  "causal": {
+    "dataset": {
+      "rows": 690,
+      "columns": [
+        "TNX",
+        "IRX",
+        "FVX",
+        "TYX",
+        "VIX",
+        "DXY",
+        "DIA",
+        "QQQ",
+        "RSP",
+        "QQQE",
+        "XLK",
+        "XLF",
+        "XLV",
+        "XLE",
+        "XLY",
+        "XLP",
+        "XLI",
+        "XLU",
+        "XLB",
+        "XLRE",
+        "XLC",
+        "GC_F",
+        "SI_F",
+        "PL_F",
+        "PA_F",
+        "HG_F",
+        "CL_F",
+        "BZ_F",
+        "NG_F",
+        "ZW_F",
+        "ZC_F",
+        "ZS_F",
+        "SB_F",
+        "CT_F",
+        "KC_F",
+        "GLD",
+        "SLV",
+        "PPLT",
+        "PALL",
+        "CPER",
+        "USO",
+        "BNO",
+        "UNG",
+        "WEAT",
+        "CORN",
+        "SOYB",
+        "CANE"
+      ],
+      "first": "2024-01-03 00:00:00",
+      "last": "2026-10-02 00:00:00"
+    },
+    "TNX->QQQ": {
+      "ok": true,
+      "result": {
+        "treatment": "TNX",
+        "outcome": "QQQ",
+        "estimate": 0.03181343302613976,
+        "estimand": "Pearl L2 (No backdoor confounding in DAG); OLS refutation (3 重)",
+        "refutation": {
+          "random_common_cause": {
+            "new_effect": 0.03222446461332245
+          },
+          "placebo_treatment_refuter": {
+            "new_effect": 0.015619244829390817
+          },
+          "data_subset_refuter": {
+            "new_effect": 0.022400431420559558
+          }
+        },
+        "method": "ols_refute_ols",
+        "n_obs": 690,
+        "p_value": 0.44231201579294444,
+        "std_error": 0.04138391491038178,
+        "interpretation": "TNX 变动 +1% (log return +0.01), QQQ 预期↑ 0.0003 (+0.03%, p=0.442 不显著); 基于 690 个交易日, std_err=0.0414",
+        "identification_status": "identified_unconfounded",
+        "adjustment_set": [],
+        "missing_confounders": [],
+        "reason": "No unblocked backdoor paths in DAG"
+      }
+    },
+    "TNX->QQQ:scm": {
+      "ok": true,
+      "result": {
+        "date": "2026-10-02",
+        "treatment": "TNX",
+        "outcome": "QQQ",
+        "actual_outcome": 0.010123359372051416,
+        "counterfactual_treatment": 0.017608931913831512,
+        "counterfactual_outcome": 0.0027925553654190366,
+        "delta": -0.007330804006632379
+      }
+    },
+    "VIX->QQQ": {
+      "ok": true,
+      "result": {
+        "treatment": "VIX",
+        "outcome": "QQQ",
+        "estimate": -0.12175242442664443,
+        "estimand": "Pearl L2 Backdoor Adjustment (controlled: ['TNX']); OLS refutation (3 重)",
+        "refutation": {
+          "random_common_cause": {
+            "new_effect": -0.12181612310312104
+          },
+          "placebo_treatment_refuter": {
+            "new_effect": 0.0011793829815177385
+          },
+          "data_subset_refuter": {
+            "new_effect": -0.12327448630591355
+          }
+        },
+        "method": "ols_refute_ols",
+        "n_obs": 690,
+        "p_value": 6.172225632978354e-136,
+        "std_error": 0.0038547959144077664,
+        "interpretation": "VIX 变动 +1% (log return +0.01), QQQ 预期↓ 0.0012 (-0.12%, p=0.000 显著, 控制后门混杂: ['TNX']); 基于 690 个交易日, std_err=0.0039",
+        "identification_status": "identified_adjusted",
+        "adjustment_set": [
+          "TNX"
+        ],
+        "missing_confounders": [],
+        "reason": "Valid backdoor adjustment set identified and observed"
+      }
+    },
+    "VIX->QQQ:scm": {
+      "ok": true,
+      "result": {
+        "date": "2026-10-02",
+        "treatment": "VIX",
+        "outcome": "QQQ",
+        "actual_outcome": 0.010123359372051416,
+        "counterfactual_treatment": -0.05816511843886569,
+        "counterfactual_outcome": 0.008924349720422947,
+        "delta": -0.001199009651628469
+      }
+    },
+    "GLD->GC_F": {
+      "ok": true,
+      "result": {
+        "treatment": "GLD",
+        "outcome": "GC_F",
+        "estimate": 0.9203138255032979,
+        "estimand": "Pearl L2 (No backdoor confounding in DAG); OLS refutation (3 重)",
+        "refutation": {
+          "random_common_cause": {
+            "new_effect": 0.9204292955671017
+          },
+          "placebo_treatment_refuter": {
+            "new_effect": 0.06428422253704158
+          },
+          "data_subset_refuter": {
+            "new_effect": 0.8869037705543542
+          }
+        },
+        "method": "ols_refute_ols",
+        "n_obs": 690,
+        "p_value": 7.0005659540834165e-276,
+        "std_error": 0.015319599425954487,
+        "interpretation": "GLD 变动 +1% (log return +0.01), GC_F 预期↑ 0.0092 (+0.92%, p=0.000 显著); 基于 690 个交易日, std_err=0.0153",
+        "identification_status": "identified_unconfounded",
+        "adjustment_set": [],
+        "missing_confounders": [],
+        "reason": "No unblocked backdoor paths in DAG"
+      }
+    },
+    "GLD->GC_F:scm": {
+      "ok": true,
+      "result": {
+        "date": "2026-10-02",
+        "treatment": "GLD",
+        "outcome": "GC_F",
+        "actual_outcome": -0.009564188790832333,
+        "counterfactual_treatment": 0.0031314580322487255,
+        "counterfactual_outcome": -0.0003610505357993575,
+        "delta": 0.009203138255032975
+      }
+    },
+    "TNX->GC_F": {
+      "ok": false,
+      "error": "ValueError: [causal] DAG 中 TNX 到 GC_F 不存在有向路径；不能把观察回归标为因果效应"
+    },
+    "TNX->GC_F:scm": {
+      "ok": true,
+      "result": {
+        "date": "2026-10-02",
+        "treatment": "TNX",
+        "outcome": "GC_F",
+        "actual_outcome": -0.009564188790832333,
+        "counterfactual_treatment": 0.017608931913831512,
+        "counterfactual_outcome": -0.009564188790832333,
+        "delta": 0.0
+      }
+    }
+  },
+  "live_provider_tests": {
+    "passed": 3,
+    "pytest_exit_code": 0
+  },
+  "dag_nodes_fetched": 47,
+  "primary_sources": [
+    {
+      "name": "Nasdaq 综合指数",
+      "url": "https://indexes.nasdaq.com/Index/Overview/COMP"
+    },
+    {
+      "name": "Nasdaq 100",
+      "url": "https://indexes.nasdaq.com/Index/Overview/NDX"
+    },
+    {
+      "name": "IEF 官方收盘价",
+      "url": "https://www.ishares.com/us/products/239456/ishares-710-year-treasury-bond-etf"
+    },
+    {
+      "name": "TLT 官方收盘价",
+      "url": "https://www.ishares.com/us/products/239454/ishares-20-year-treasury-bond-etf"
+    },
+    {
+      "name": "财政部收益率曲线",
+      "url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve&field_tdr_date_value=2026"
+    },
+    {
+      "name": "GLD 定义",
+      "url": "https://www.spdrgoldshares.com/usa/gld/"
+    },
+    {
+      "name": "QQQ 定义",
+      "url": "https://www.invesco.com/qqq-etf/en/about.html"
+    },
+    {
+      "name": "COMEX 黄金规格",
+      "url": "https://www.cmegroup.com/markets/metals/precious/gold.contractSpecs.html"
+    }
+  ],
+  "offline_verification": {
+    "python3.11": {
+      "passed": 130,
+      "skipped": 3,
+      "warnings": 11
+    },
+    "python3.12": {
+      "passed": 130,
+      "skipped": 3,
+      "warnings": 11
+    }
+  }
+}

@@ -30,10 +30,13 @@ def compute_returns(
     Returns:
         同类型,index 跟 prices 一致,前 `periods` 行是 NaN
     """
+    if type(periods) is not int or periods < 1:
+        raise ValueError('periods must be a positive integer')
+    prices=prices.where(np.isfinite(prices) & (prices>0))
     if method == "log":
         rets = np.log(prices / prices.shift(periods))
     elif method == "simple":
-        rets = prices.pct_change(periods=periods)
+        rets = prices.pct_change(periods=periods,fill_method=None)
     else:
         raise ValueError(f"method must be 'log' or 'simple', got '{method}'")
 
@@ -46,9 +49,13 @@ def cumulative_return(rets: pd.Series, method: str = "log") -> float:
     log: exp(sum) - 1
     simple: prod(1 + r) - 1
     """
-    rets_clean = rets.dropna()
-    if len(rets_clean) == 0:
-        return 0.0
+    valid=np.flatnonzero(rets.notna().to_numpy())
+    if not len(valid): raise ValueError('No available period returns')
+    # Leading structural NA from a shifted price series is allowed; missing
+    # observations inside a requested return window must never be compounded away.
+    rets_clean=rets.iloc[valid[0]:]
+    if not np.isfinite(rets_clean.to_numpy(dtype=float)).all():
+        raise ValueError('Incomplete or nonfinite return window')
 
     if method == "log":
         return float(np.exp(rets_clean.sum()) - 1)

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import re
 import time
+import hashlib
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urljoin
@@ -34,6 +35,7 @@ from loguru import logger
 import requests
 import lxml.html
 import lxml.etree
+from src.http_safety import get_bounded, MAX_BYTES
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CACHE_DIR = PROJECT_ROOT / "data" / "cache" / "etf_holdings_html"
@@ -45,16 +47,18 @@ UA = "us-stock-causal research@example.com"
 
 def fetch_n30d_html(url: str, use_cache: bool = True) -> Optional[str]:
     """拉 N-30D HTML, 缓存 1d 到 data/cache/etf_holdings_html/"""
-    # cache key 用 URL 末尾文件名 (含 accession + primary doc)
-    cache_key = url.split("/")[-1]
+    # Hash the complete URL: basename keys both collide across filings and can
+    # contain Windows path separators. Caller URLs never become path segments.
+    cache_key = hashlib.sha256(url.encode('utf-8')).hexdigest()
     cache_file = CACHE_DIR / f"{cache_key}.html"
-    if use_cache and cache_file.exists():
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    if (use_cache and cache_file.exists() and cache_file.stat().st_size <= MAX_BYTES
+            and 0 <= time.time() - cache_file.stat().st_mtime < 24 * 3600):
         logger.info(f"[n30d-parser] HTML cache hit {cache_key} ({cache_file.stat().st_size // 1024}KB)")
         return cache_file.read_text(encoding="utf-8", errors="ignore")
 
     try:
-        resp = requests.get(url, headers={"User-Agent": UA}, timeout=TIMEOUT)
-        resp.raise_for_status()
+        resp = get_bounded(url, headers={"User-Agent": UA}, timeout=TIMEOUT)
     except Exception as e:
         logger.warning(f"[n30d-parser] HTML 拉取失败: {e}")
         return None
