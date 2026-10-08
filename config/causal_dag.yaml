@@ -23,6 +23,15 @@
 
 dag_name: "Phase 9.0 + 9.1.2 + 9.1.7 batch 1+2+3+4+5: Macro + Yield Curve + Commodities (Futures+Spot ETF) → Industry → Equity"
 
+# Every arrow remains a hypothesis. This metadata is not evidence or a belief score.
+epistemic_policy:
+  graph_trust: low_hypothesis_only
+  causal_status: not_established
+  positive_support: insufficient
+  requires_registered_observable_test: true
+  edge_orientations_empirically_validated: false
+  causal_probability: null
+
 # DOT 格式 (graphviz), DoWhy / networkx / causal-learn 都吃
 dot: |
   digraph causal_p9_17_b3 {

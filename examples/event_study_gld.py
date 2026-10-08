@@ -225,7 +225,7 @@ def build_report(study_df: pd.DataFrame, prices: dict[str, pd.DataFrame],
     today = date.today()
 
     # GLD 最近 30 日 summary
-    gld = prices["GLD"]["close"]
+    gld = prices['GLD']['close']
     gld_30d_ago = gld[gld.index >= gld.index[-1] - pd.Timedelta(days=30)].iloc[0]
     gld_now = gld.iloc[-1]
     gld_ytd_start = gld[gld.index >= pd.Timestamp(today.year, 1, 1)].iloc[0]
@@ -340,19 +340,19 @@ def build_report(study_df: pd.DataFrame, prices: dict[str, pd.DataFrame],
         ago = s[s.index >= s.index[-1] - pd.Timedelta(days=30)].iloc[0]
         return ((last / ago) - 1) * 100
     gld_now_s  = f"${gld_now:.2f}"
-    gld_30d_s  = f"{_pct_30d(prices["GLD"]["close"]):+.2f}%"
-    gcf_s      = f"${prices["GC=F"]["close"].iloc[-1]:.2f}"
-    gcf_30d_s  = f"{_pct_30d(prices["GC=F"]["close"]):+.2f}%"
-    dxy_s      = f"{prices["DXY"]["close"].iloc[-1]:.2f}"
-    dxy_30d_s  = f"{_pct_30d(prices["DXY"]["close"]):+.2f}%"
-    tnx_s      = f"{prices["^TNX"]["close"].iloc[-1]:.2f}%"
-    tnx_30d_s  = f"{_pct_30d(prices["^TNX"]["close"]):+.2f}%"
-    vix_s      = f"{prices["^VIX"]["close"].iloc[-1]:.2f}"
-    vix_30d_s  = f"{_pct_30d(prices["^VIX"]["close"]):+.2f}%"
-    gdx_s      = f"${prices["GDX"]["close"].iloc[-1]:.2f}"
-    gdx_30d_s  = f"{_pct_30d(prices["GDX"]["close"]):+.2f}%"
-    gspc_s     = f"{prices["^GSPC"]["close"].iloc[-1]:.2f}"
-    gspc_30d_s = f"{_pct_30d(prices["^GSPC"]["close"]):+.2f}%"
+    gld_30d_s  = f"{_pct_30d(prices['GLD']['close']):+.2f}%"
+    gcf_s      = f"${prices['GC=F']['close'].iloc[-1]:.2f}"
+    gcf_30d_s  = f"{_pct_30d(prices['GC=F']['close']):+.2f}%"
+    dxy_s      = f"{prices['DXY']['close'].iloc[-1]:.2f}"
+    dxy_30d_s  = f"{_pct_30d(prices['DXY']['close']):+.2f}%"
+    tnx_s      = f"{prices['^TNX']['close'].iloc[-1]:.2f}%"
+    tnx_30d_s  = f"{_pct_30d(prices['^TNX']['close']):+.2f}%"
+    vix_s      = f"{prices['^VIX']['close'].iloc[-1]:.2f}"
+    vix_30d_s  = f"{_pct_30d(prices['^VIX']['close']):+.2f}%"
+    gdx_s      = f"${prices['GDX']['close'].iloc[-1]:.2f}"
+    gdx_30d_s  = f"{_pct_30d(prices['GDX']['close']):+.2f}%"
+    gspc_s     = f"{prices['^GSPC']['close'].iloc[-1]:.2f}"
+    gspc_30d_s = f"{_pct_30d(prices['^GSPC']['close']):+.2f}%"
     event_table_str = chr(10).join(event_table_lines)
 
     md += f"""## 1. 行情速览
@@ -620,7 +620,7 @@ def main() -> int:
 
     # 2.5 破位点检测 (50/200 SMA)
     print("\n[2.5] 50/200 SMA 破位点检测...")
-    gld_close = prices["GLD"]["close"]
+    gld_close = prices['GLD']['close']
     sma50 = add_sma(gld_close, 50)
     sma200 = add_sma(gld_close, 200)
 
@@ -663,7 +663,7 @@ def main() -> int:
     plt.rcParams['axes.unicode_minus'] = False
 
     # 算 GLD 的 SMA50 / SMA200 (full 2y, 不在子图 sub 里 NaN)
-    gld_full = prices["GLD"]["close"]
+    gld_full = prices['GLD']['close']
     sma50_full = add_sma(gld_full, 50)
     sma200_full = add_sma(gld_full, 200)
 
@@ -748,7 +748,7 @@ def main() -> int:
                               rotation=90, fontsize=7, alpha=0.6, color="gray")
 
     # === 子图 3: DXY ===
-    dxy = prices["DXY"]["close"]
+    dxy = prices['DXY']['close']
     recent_dxy = dxy[dxy.index >= dxy.index[-1] - pd.Timedelta(days=120)]
     axes[2].plot(recent_dxy.index, recent_dxy.values, color="#1f77b4", linewidth=2, label="DXY")
     axes[2].set_title("DXY 美元指数 120 日", fontsize=11, fontweight="bold")
@@ -757,7 +757,7 @@ def main() -> int:
     axes[2].legend(loc="upper left", fontsize=8)
 
     # === 子图 4: 10Y Yield ===
-    tnx = prices["^TNX"]["close"]
+    tnx = prices['^TNX']['close']
     recent_tnx = tnx[tnx.index >= tnx.index[-1] - pd.Timedelta(days=120)]
     axes[3].plot(recent_tnx.index, recent_tnx.values, color="#d62728", linewidth=2, label="10Y Yield %")
     axes[3].set_title("10Y 美债收益率 120 日", fontsize=11, fontweight="bold")

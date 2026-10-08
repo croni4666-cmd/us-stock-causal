@@ -41,6 +41,7 @@ from typing import Optional
 
 from loguru import logger
 import requests
+from src.http_safety import get_bounded
 
 # UA header (SEC fair access policy 强制)
 DEFAULT_UA = "us-stock-causal research@example.com"
@@ -105,8 +106,7 @@ def fetch_ticker_to_cik(force_refresh: bool = False) -> dict[str, str]:
 
     headers = {"User-Agent": DEFAULT_UA, "Accept-Encoding": "gzip, deflate"}
     try:
-        resp = requests.get(TICKERS_URL, timeout=TIMEOUT, headers=headers, proxies=_get_proxies())
-        resp.raise_for_status()
+        resp = get_bounded(TICKERS_URL, timeout=TIMEOUT, headers=headers, proxies=_get_proxies())
     except Exception as e:
         logger.warning(f"[etf-holdings] tickers 拉取失败: {e}")
         return {}
@@ -153,8 +153,7 @@ def fetch_etf_submissions(cik: str, force_refresh: bool = False) -> dict:
     url = SUBMISSIONS_URL.format(cik=cik)
     headers = {"User-Agent": DEFAULT_UA, "Accept-Encoding": "gzip, deflate"}
     try:
-        resp = requests.get(url, timeout=TIMEOUT, headers=headers, proxies=_get_proxies())
-        resp.raise_for_status()
+        resp = get_bounded(url, timeout=TIMEOUT, headers=headers, proxies=_get_proxies())
     except Exception as e:
         logger.warning(f"[etf-holdings] submissions CIK {cik} 失败: {e}")
         return {"cik": cik, "name": "", "recent_filings": []}

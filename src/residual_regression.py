@@ -18,6 +18,8 @@ Why P7-5:
 """
 from __future__ import annotations
 import json
+import math
+from numbers import Real
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -33,7 +35,8 @@ BASELINE_DIR = PROJECT_ROOT / "data" / "baseline"
 # → 漂移 6 处 violation (DIA/5d 2.06x, DIA/20d 1.69x, QQQ/1d 2.7x 等)
 # KI-4 修法: 重抓 v069p.json (8/18 锁), 8/25 手动再抓 (v069q), 9/1 第三次 (v069r)
 # 9/3 v0.9.5 RC1 拍板是否改 P7-5 月度 → 周度自动化
-DEFAULT_BASELINE = BASELINE_DIR / "residuals_v069p.json"
+from src.resources import default_asset
+DEFAULT_BASELINE = default_asset("data/baseline/residuals_v069p.json",PROJECT_ROOT)
 INDICES = ["DIA", "QQQ", "RSP", "QQQE"]
 WINDOWS = [1, 5, 20]
 
@@ -114,13 +117,33 @@ def compare_to_baseline(
     Returns:
         (pass: bool, violations: list[dict>])
     """
+    if (isinstance(tolerance, bool) or not isinstance(tolerance, Real) or
+            not math.isfinite(tolerance) or tolerance <= 0 or
+            isinstance(abs_floor, bool) or not isinstance(abs_floor, Real) or
+            not math.isfinite(abs_floor) or abs_floor < 0):
+        raise ValueError("residual comparison thresholds must be finite and nonnegative; tolerance > 0")
     violations = []
     for idx in INDICES:
-        if idx not in baseline["residuals"] or idx not in current["residuals"]:
-            continue
         for lb_str in [str(w) for w in WINDOWS]:
-            base_val = abs(baseline["residuals"][idx].get(lb_str, 0))
-            cur_val = abs(current["residuals"][idx].get(lb_str, 0))
+            values = []
+            errors = []
+            for label, snapshot in (("baseline", baseline), ("current", current)):
+                residuals = snapshot.get("residuals") if isinstance(snapshot, dict) else None
+                windows = residuals.get(idx) if isinstance(residuals, dict) else None
+                value = windows.get(lb_str) if isinstance(windows, dict) else None
+                if isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value):
+                    errors.append(f"{label} {idx}/{lb_str}d is missing or not a finite number")
+                    values.append(0.)  # Numeric display compatibility; validation_error carries missingness.
+                else:
+                    values.append(abs(float(value)))
+            base_val, cur_val = values
+            if errors:
+                violations.append({
+                    "index": idx, "window": f"{lb_str}d", "baseline_pct": round(base_val, 4),
+                    "current_pct": round(cur_val, 4), "threshold_pct": 0.,
+                    "regression_ratio": "invalid", "validation_error": "; ".join(errors),
+                })
+                continue
             # 容忍: 当前 ≤ max(tolerance * baseline, abs_floor)
             threshold = max(tolerance * base_val, abs_floor)
             if cur_val > threshold:

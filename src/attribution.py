@@ -16,6 +16,7 @@ import json
 import functools
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -25,7 +26,8 @@ from src.returns import compute_returns, cumulative_return
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CACHE_ROOT = PROJECT_ROOT / "data" / "raw"
-WEIGHTS_PATH = PROJECT_ROOT / "config" / "sector_weights.json"
+from src.resources import default_asset
+WEIGHTS_PATH = default_asset("config/sector_weights.json",PROJECT_ROOT)
 SECTOR_TICKERS = ["XLK", "XLF", "XLE", "XLY", "XLP", "XLV", "XLI", "XLU", "XLB", "XLRE", "XLC"]
 
 
@@ -140,6 +142,9 @@ def attribute_index(
             'top_drivers': ['XLK', 'XLC', ...]
         }
     """
+    if type(lookback_days) is not int or lookback_days<1:
+        raise ValueError('lookback_days must be a positive integer')
+    if method not in ('log','simple'): raise ValueError('method must be log or simple')
     if force:
         clear_attribution_cache()
     weights_data = load_sector_weights(as_of=date, use_live_cache=not force)
@@ -148,12 +153,16 @@ def attribute_index(
     weights = weights_data[index_symbol]
     # 去掉 _meta 和 note
     weights = {k: v for k, v in weights.items() if k in SECTOR_TICKERS}
+    if not weights or any(isinstance(w,bool) or not np.isfinite(w) or w<0 for w in weights.values()):
+        raise ValueError('Valid finite nonnegative sector weights required')
 
     # 读 returns
     # 拉 2y 数据,后续按 date 切片
     start_pull = "2024-01-01"
     end_pull = date or datetime.now().strftime("%Y-%m-%d")
     rets = get_sector_returns(start_pull, end_pull, force=force)
+    if rets.empty: raise ValueError('No returns through requested date')
+    if method=='simple': rets=np.expm1(rets)
 
     if date is None:
         end_date = rets.index[-1]
@@ -161,7 +170,9 @@ def attribute_index(
         end_date = pd.Timestamp(date)
         if end_date not in rets.index:
             # 用 end_date 之前最近一天
-            end_date = rets.index[rets.index <= end_date][-1]
+            earlier=rets.index[rets.index <= end_date]
+            if not len(earlier): raise ValueError('No returns before requested date')
+            end_date = earlier[-1]
 
     if lookback_days == 1:
         window = [end_date]
@@ -169,6 +180,9 @@ def attribute_index(
         idx_pos = rets.index.get_loc(end_date)
         start_pos = max(0, idx_pos - lookback_days + 1)
         window = rets.index[start_pos:idx_pos + 1]
+    required=[index_symbol]+[s for s,w in weights.items() if w>0]
+    if len(window)!=lookback_days or not np.isfinite(rets.loc[window,required].to_numpy()).all():
+        raise ValueError('Complete finite index and weighted-sector return window required')
 
     # 累计归因
     sector_contribs = {}
@@ -178,9 +192,9 @@ def attribute_index(
                 sector_contribs[s] = w * rets.loc[end_date, s]
             else:
                 # 累计: log return 可加
-                sector_contribs[s] = w * rets.loc[window, s].sum()
+                sector_contribs[s] = w * (rets.loc[window,s].sum() if method=='log' else cumulative_return(rets.loc[window,s],'simple'))
 
-    actual = rets.loc[window, index_symbol].sum() if lookback_days > 1 else rets.loc[end_date, index_symbol]
+    actual = (rets.loc[window,index_symbol].sum() if method=='log' else cumulative_return(rets.loc[window,index_symbol],'simple')) if lookback_days>1 else rets.loc[end_date,index_symbol]
     predicted = sum(sector_contribs.values())
     residual = actual - predicted
 
@@ -192,6 +206,7 @@ def attribute_index(
         "date": str(end_date.date()),
         "lookback_days": lookback_days,
         "method": method,
+        "return_basis": 'log_return_approximation' if method=='log' else 'simple_price_return',
         "actual_return_pct": round(actual * 100, 3),
         "sector_contributions_pct": {s: round(v * 100, 3) for s, v in sorted_contribs.items()},
         "predicted_return_pct": round(predicted * 100, 3),

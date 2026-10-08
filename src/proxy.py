@@ -20,6 +20,7 @@ import os
 import socket
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
 
 from loguru import logger
 
@@ -55,7 +56,10 @@ def _parse_proxy_spec(spec: str) -> Optional[str]:
       "clash:7897"     -> 用指定端口
       "http://x:1234"  -> 直接用这个 URL
     """
-    spec = spec.strip().lower()
+    spec = spec.strip()
+    if spec.lower().startswith(("http://", "https://", "socks5://")):
+        return spec
+    spec = spec.lower()
     if spec in ("off", "none", "false", "0", "disable", "disabled"):
         return None
     if spec.startswith(("http://", "https://", "socks5://")):
@@ -69,7 +73,7 @@ def _parse_proxy_spec(spec: str) -> Optional[str]:
         return _detect_clash_proxy()
     if spec in ("auto", "true", "1", "enable", "enabled"):
         return _detect_clash_proxy()
-    logger.warning(f"[proxy] 无法解析 proxy spec '{spec}',禁用代理")
+    logger.warning("[proxy] 无法解析 proxy spec,禁用代理")
     return None
 
 
@@ -96,6 +100,12 @@ def setup_proxy(spec: Optional[str] = None) -> Optional[str]:
 
     proxy_url = _parse_proxy_spec(spec)
     if proxy_url is None:
+        if spec.strip().lower() in ('auto', 'true', '1', 'enable', 'enabled', 'clash'):
+            existing = next((os.environ[k] for k in ('HTTPS_PROXY', 'https_proxy',
+                            'HTTP_PROXY', 'http_proxy') if os.environ.get(k)), None)
+            if existing:
+                logger.info(f'[proxy] 保留已有代理 {_display_proxy(existing)}')
+                return existing
         for k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
             os.environ.pop(k, None)
         logger.info("[proxy] 代理禁用,直连(注意: yfinance / Stooq 可能有风控)")
@@ -103,13 +113,25 @@ def setup_proxy(spec: Optional[str] = None) -> Optional[str]:
 
     for k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
         os.environ[k] = proxy_url
-    logger.info(f"[proxy] 已设置 HTTP(S)_PROXY={proxy_url}")
+    logger.info(f"[proxy] 已设置 HTTP(S)_PROXY={_display_proxy(proxy_url)}")
     return proxy_url
 
 
 def is_proxied() -> bool:
     """检查当前是否在代理下"""
     return bool(os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY"))
+
+
+def _display_proxy(value: str) -> str:
+    """Log only the endpoint, never URL credentials, paths, or query tokens."""
+    try:
+        parsed = urlsplit(value)
+        host = parsed.hostname or '(unknown)'
+        if ':' in host:
+            host = '[' + host + ']'
+        return f'{parsed.scheme}://{host}' + (f':{parsed.port}' if parsed.port else '')
+    except ValueError:
+        return '(invalid proxy URL)'
 
 
 # 模块级副作用: import 时就设好
@@ -122,5 +144,5 @@ except Exception as e:
 
 
 if __name__ == "__main__":
-    print(f"Active proxy: {os.environ.get('HTTPS_PROXY', '(none)')}")
+    print(f"Active proxy: {_display_proxy(os.environ.get('HTTPS_PROXY', ''))}")
     print(f"is_proxied(): {is_proxied()}")

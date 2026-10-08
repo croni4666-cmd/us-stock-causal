@@ -6,6 +6,8 @@ __pycache__/
 .Python
 *.egg-info/
 .eggs/
+build/
+dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -23,6 +25,14 @@ data/cache/alerts/alerts_*.json
 data/cache/retry_log.json
 data/cache/sec_filings/
 data/cache/sector_weights_live_*.json
+data/asset_sources/
+output/asset_report.md
+output/asset_report.json
+output/hypothesis_report.md
+output/hypothesis_report.json
+output/*.ma-review.md
+output/*.ma-review.json
+output/*.manifest.json
 *.parquet
 *.csv
 
@@ -76,14 +86,32 @@ desktop.ini
 commit_msg_*.txt
 
 # Debug scripts / output (scripts starting with _ are throwaway, R1 audit)
-_*.py
-_*.txt
+/_*.py
+/_*.txt
 output\_*.txt
 output\_*.py
 test_*.log
 
 # Backups and Task Scheduler exports
+data/asset_market/
+data/asset_runs/
+data/treasury_curves/
+output/asset_inventory.json
 *.bak*
 *.task.xml*
 scripts/*.xml*
 scripts/*.bak*
+
+# Local review workspaces and secondary Python environments
+.review/
+.venv*/
+.baseline-test.log
+
+# Regenerable downloads, spreadsheet exports and chart outputs
+data/cache/etf_holdings/
+data/cache/etf_holdings_html/
+data/export/
+output/*.svg
+
+# Local release-check inventory
+quality-gate.json

@@ -10,6 +10,7 @@ src/cache.py - Parquet 增量缓存
 from __future__ import annotations
 
 import os
+import re
 import time
 from datetime import date, datetime, timedelta, time as dtime, timezone
 from pathlib import Path
@@ -31,14 +32,31 @@ def safe_name(symbol: str) -> str:
     GC=F -> GC_F
     BRK.B -> BRK_B
     """
+    _validate_component(symbol)
     return symbol.replace("^", "_").replace("=", "_").replace(".", "_")
+
+
+def _validate_component(value: str) -> None:
+    """Reject paths and Windows device filenames before any filesystem action."""
+    reserved = {'CON', 'PRN', 'AUX', 'NUL', *(f'COM{i}' for i in range(1, 10)),
+                *(f'LPT{i}' for i in range(1, 10))}
+    if (not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9^=._-]{1,64}', value)
+            or value in ('.', '..') or value.endswith('.')
+            or value.split('.')[0].upper() in reserved):
+        raise ValueError('invalid cache path component')
 
 
 def cache_path(symbol: str, layer: str, cache_root: Path) -> Path:
     """生成缓存路径: <cache_root>/<layer>/<safe_name>.parquet"""
-    layer_dir = cache_root / layer
+    _validate_component(layer)
+    name = safe_name(symbol)
+    root = Path(cache_root).resolve()
+    layer_dir = root / layer
+    path = layer_dir / f"{name}.parquet"
+    if not path.resolve().is_relative_to(root):
+        raise ValueError('cache path escapes root')
     layer_dir.mkdir(parents=True, exist_ok=True)
-    return layer_dir / f"{safe_name(symbol)}.parquet"
+    return path
 
 
 @lru_cache(maxsize=128)
@@ -130,7 +148,7 @@ def write_cache(df: pd.DataFrame, parquet_path: Path) -> None:
         raise
 
 
-def update_or_fetch(
+def _update_or_fetch(
     symbol: str,
     layer: str,
     fetcher: Callable[..., pd.DataFrame],
@@ -186,6 +204,7 @@ def update_or_fetch(
             return cached, "refresh_failed_cached"
         return pd.DataFrame(), "empty"
 
+
     # 2. 缓存存在 + 新鲜 (今天拉过) → 直接返回
     if is_fresh(path, max_age_days=1) and not force_refresh:
         cached = read_cache(path)
@@ -214,8 +233,22 @@ def update_or_fetch(
     # 4. 无缓存 → 全量拉
     try:
         df = fetcher(symbol, start=start, end=end)
+        if df is None or df.empty: return pd.DataFrame(), "empty"
         write_cache(df, path)
         return df, "full"
     except Exception as e:
         logger.error(f"[{symbol}] 全量拉取失败: {e}")
         return pd.DataFrame(), "empty"
+
+
+def update_or_fetch(symbol,layer,fetcher,cache_root,start='2025-01-01',end=None,force_refresh=False):
+    """Preserve end-exclusive provider semantics without truncating stored history."""
+    cutoff=pd.Timestamp(end) if end is not None else None
+    if cutoff is not None and (pd.isna(cutoff) or cutoff.tz is not None):
+        raise ValueError('end requires a naive date/time')
+    if cutoff is not None and not force_refresh:
+        cached=read_cache(cache_path(symbol,layer,cache_root))
+        if cached is not None and len(cached) and cached.index[-1]>=cutoff:
+            return cached.loc[cached.index<cutoff].copy(),'cached'
+    data,status=_update_or_fetch(symbol,layer,fetcher,cache_root,start,end,force_refresh)
+    return (data.loc[data.index<cutoff].copy() if cutoff is not None and len(data) else data),status

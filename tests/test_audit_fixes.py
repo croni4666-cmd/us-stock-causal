@@ -226,19 +226,24 @@ def test_dag_cache_identity_and_auto_reduce():
 # =============================================================================
 
 def test_refutation_pass_fail_criteria():
-    """Verify refutation pass/fail thresholds for placebo and subset methods."""
-    ate = 2.0
-    # Placebo: new effect should be close to 0
-    placebo_pass = 0.05
-    placebo_fail = 1.20
-    assert abs(placebo_pass) <= max(0.3 * abs(ate), 0.02)
-    assert not (abs(placebo_fail) <= max(0.3 * abs(ate), 0.02))
-
-    # Data subset / Random common cause: new effect should remain close to ate
-    subset_pass = 2.10
-    subset_fail = 0.50
-    assert abs(subset_pass - ate) <= max(0.35 * abs(ate), 0.05)
-    assert not (abs(subset_fail - ate) <= max(0.35 * abs(ate), 0.05))
+    """Real OLS diagnostics recover known coefficients; no causal certification."""
+    from src.causal import _refute_with_ols
+    rng = np.random.default_rng(72)
+    treatment = rng.normal(size=1000)
+    data = pd.DataFrame({'T': treatment, 'Y': 2 * treatment},
+                        index=pd.bdate_range('2020-01-01', periods=len(treatment)))
+    graph = nx.DiGraph([('T', 'Y')])
+    result = _refute_with_ols('T', 'Y', data, graph, original_ate=2., n_refutations=3, rng_seed=42)
+    assert set(result) == {'random_common_cause', 'placebo_treatment_refuter', 'data_subset_refuter'}
+    assert result['random_common_cause']['new_effect'] == pytest.approx(2.)
+    assert result['data_subset_refuter']['new_effect'] == pytest.approx(2.)
+    # Independently derive the actual permuted regression slope.
+    diagnostic_rng = np.random.default_rng(42)
+    diagnostic_rng.standard_normal(len(data))  # first diagnostic consumes this draw
+    permuted = diagnostic_rng.permutation(treatment)
+    expected = np.cov(permuted, data['Y'], ddof=0)[0, 1] / np.var(permuted)
+    assert result['placebo_treatment_refuter']['new_effect'] == pytest.approx(expected)
+    assert abs(expected) < .2
 
 
 # =============================================================================
@@ -252,7 +257,7 @@ def test_negative_causal_effect_sign_formatting():
     assert fmt["pct_y"] == -0.2
     assert "-0.20%" in fmt["text"]
     assert "+0.20%" not in fmt["text"]
-    assert "预期↓ 0.0020 (-0.20%)" in fmt["text"]
+    assert "模型数值↓ 0.0020 (-0.20%)" in fmt["text"]
 
 
 # =============================================================================
@@ -449,7 +454,7 @@ def test_unidentifiable_causal_rendering_no_l2_or_do():
     assert "无法估计因果干预效应" in vl
     assert "['Z']" in vl
 
-    # When Z is added to data, identifiability is restored!
+    # Z restores formal identification in the candidate graph, not empirical certification.
     df_with_z = df.copy()
     df_with_z["Z"] = z
     with patch.object(causal, "load_dag_config", return_value=cfg), \
@@ -459,8 +464,10 @@ def test_unidentifiable_causal_rendering_no_l2_or_do():
 
     vix_lines_restored = [l for l in rendered_restored.splitlines() if "恐慌指数 (VIX)" in l and "QQQ" in l]
     assert len(vix_lines_restored) == 1
-    assert "**L2 干预**" in vix_lines_restored[0]
-    assert "`do(+1%)`" in vix_lines_restored[0]
+    assert "**候选图下的条件关联**" in vix_lines_restored[0]
+    assert "**L2 干预**" not in vix_lines_restored[0]
+    assert "`do(+1%)`" not in vix_lines_restored[0]
+    assert "正向支持：证据不足" in rendered_restored
 
 
 def test_historical_weights_date_integrity(tmp_path, monkeypatch):

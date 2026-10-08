@@ -34,7 +34,8 @@ try:
 except Exception:
     pass
 
-CONFIG_PATH = PROJECT_ROOT / "config" / "tickers.yaml"
+from src.resources import default_asset
+CONFIG_PATH = default_asset("config/tickers.yaml",PROJECT_ROOT)
 CACHE_ROOT = PROJECT_ROOT / "data" / "raw"
 
 
@@ -170,7 +171,7 @@ def main() -> int:
     print(f"  状态: {status}")
     print("=" * 72)
     print(f"\n下一步: Phase 2 - 因果分析 (归因分解 + 历史模式匹配 + 关键阈值)")
-    return 0
+    return 1 if grand_total['fail'] else 0
 
 
 if __name__ == "__main__":

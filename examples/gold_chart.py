@@ -20,13 +20,12 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import pandas as pd
 
 # 把项目根加进 path, 避免 import src 子包找不到
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.kline import plot_single, savefig_multi_format, DEFAULT_DPI
-from src.thresholds import get_thresholds
+from src.thresholds import get_thresholds, load_prices
 
 
 def main() -> None:
@@ -38,24 +37,15 @@ def main() -> None:
     fig, ax = plt.subplots(1, 1, figsize=(16, 8))
     plot_single(symbol, ax, layer=layer, lookback_days=lookback_days)
 
-    # 标题 — 5 SMA 全显示
+    # Preserve the single instrument title and dedicated latest-close marker.
     t = get_thresholds(symbol, layer=layer)
-    smas = t["smas"]
-    vs = t["vs_sma"]
-    pos52w = t["range_52w"]["position_pct"]
-    parts = [f"close USD {t['last_close']:.2f}"]
-    for w in [20, 50, 100, 150, 200]:
-        v = smas.get(f"sma_{w}")
-        p = vs.get(f"sma_{w}", {}).get("pct")
-        if v is not None and p is not None and not pd.isna(v):
-            parts.append(f"SMA{w} {p:+.1f}%")
-    parts.append(f"52w {pos52w}%")
-    title = f"{symbol}  2y  |  " + "  ".join(parts)
-    ax.set_title(title, fontsize=11, fontweight="bold", loc="left", pad=10)
+    prices=load_prices(symbol,layer)
+    as_of=str(prices.index[-1].date())
+    smas=t['smas']
 
     # 写到项目根 output/ (不是 CWD),避免被 workspace 截走
     project_root = Path(__file__).resolve().parent.parent
-    output_base = project_root / "output" / "gold_1y_2026-07-13"
+    output_base = project_root / "output" / f"gold_2y_{as_of}"
     written = savefig_multi_format(
         fig, output_base,
         formats=("png", "svg"),  # 双输出
@@ -66,7 +56,7 @@ def main() -> None:
     for p in written:
         print(f"  - {p}")
     print(f"[gold_chart] last close: USD {t['last_close']:.2f}")
-    print(f"[gold_chart] 52w range: {t['range_52w']['low']:.2f} - {t['range_52w']['high']:.2f}  (now at {pos52w}%)")
+    print(f"[gold_chart] data as of: {as_of}; last futures close, not a live spot quote")
     print(f"[gold_chart] SMAs: {smas}")
 
 

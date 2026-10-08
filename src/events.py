@@ -27,7 +27,8 @@ import yaml
 from loguru import logger
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CALENDAR_PATH = PROJECT_ROOT / "config" / "events_2026.yaml"
+from src.resources import default_asset
+CALENDAR_PATH = default_asset("config/events_2026.yaml",PROJECT_ROOT)
 
 
 @dataclass

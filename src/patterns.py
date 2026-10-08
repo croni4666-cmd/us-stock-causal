@@ -67,10 +67,10 @@ def find_similar_patterns(
         }
     """
     df = load_prices(symbol, resolve_layer(symbol, layer))
-    rets = df["close"].pct_change().dropna()
-
-    if end_date:
-        rets = rets.loc[:end_date]
+    if end_date: df=df.loc[:end_date]
+    if not np.isfinite(df['close']).all() or (df['close']<=0).any():
+        raise ValueError('Pattern matching requires complete finite positive quotes; no filling')
+    rets = df["close"].pct_change(fill_method=None).iloc[1:]
 
     if len(rets) < pattern_length + forecast_horizon + 30:
         raise ValueError(

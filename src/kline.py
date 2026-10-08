@@ -26,11 +26,17 @@ v0.6.2 quality boost:
   改用 matplotlib 手画蜡烛 + plot,代码多 ~50 行但完全可控。
 
 输出: output/kline_<date>.{png,svg} (PNG 200-400KB@300dpi, SVG 20-60KB)
+
+2026-10-07: 行情图移除所有宏观事件叠线；收盘价/标的/单位/日期独立标识。
+实际显示窗口控制纵轴；候选事件关系不作为图上的因果解释。
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional, Union
+import json
+import math
+from uuid import uuid4
 
 import numpy as np
 import pandas as pd
@@ -39,7 +45,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from loguru import logger
 
-from src.thresholds import get_thresholds, load_prices
+from src.thresholds import load_prices, compute_pivots
+from src.chart_labels import configure_chart_font,unit_label,instrument_label
 from matplotlib.ticker import MaxNLocator, FuncFormatter
 
 
@@ -50,7 +57,8 @@ mpl.rcParams['text.antialiased'] = True
 mpl.rcParams['patch.antialiased'] = True
 
 
-def _set_ylim_52w_padding(ax: plt.Axes, df_visible: pd.DataFrame, padding: float = 0.20) -> None:
+def _set_ylim_52w_padding(ax: plt.Axes, df_visible: pd.DataFrame, padding: float = 0.20,
+                         window: Optional[int] = 252) -> None:
     """v0.6.8h: 设置 ylim 为 52w high+20% / 52w low-20% (User 建议)
 
     User 反馈: 默认 ylim 范围太大 (黄金图 2000-5800), 价格离 y 轴太远。
@@ -60,7 +68,7 @@ def _set_ylim_52w_padding(ax: plt.Axes, df_visible: pd.DataFrame, padding: float
     """
     if len(df_visible) < 2:
         return
-    window = min(len(df_visible), 252)
+    window = len(df_visible) if window is None else min(len(df_visible), window)
     high_52w = float(df_visible["high"].iloc[-window:].max())
     low_52w = float(df_visible["low"].iloc[-window:].min())
     if high_52w <= 0 or low_52w <= 0 or high_52w <= low_52w:
@@ -140,26 +148,41 @@ def _draw_events(ax: plt.Axes, df: pd.DataFrame, events: Optional[list] = None) 
     return n_drawn
 
 
-def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
+def _draw_candles(ax: plt.Axes, df: pd.DataFrame, symbol='unknown',unit='unverified') -> str:
     """在 ax 上画 OHLC 蜡烛
 
-    v0.6.6 (P6-5): 给每根 candle 设 gid 前缀 (candle-wick-YYYY-MM-DD / candle-body-...),
-    后处理 _inject_ohlcv_hover 按 gid 找元素加 <title>
+    Each series gets a unique source key; raw values accompany wick/body/doji.
+    SVG export uses that key rather than interpreting rendered geometry.
 
     注意: matplotlib 的 ax.vlines/hlines 返回 LineCollection, 不支持 gid 参数
     → 用 ax.plot 画 1 段 Line2D, 然后 set_gid() 显式设
     """
+    fig=ax.figure
+    if not hasattr(fig,'_candle_source_namespace'): fig._candle_source_namespace=uuid4().hex
+    fig._candle_series_count=getattr(fig,'_candle_series_count',0)+1
+    series=f'{fig._candle_source_namespace}-s{fig._candle_series_count}'
+    metadata=getattr(ax,'_candle_metadata',{})
+    ax._candle_metadata=metadata
+    def value(raw):
+        try: return float(raw) if pd.notna(raw) and math.isfinite(float(raw)) else None
+        except (TypeError,ValueError): return None
     for idx, row in df.iterrows():
         is_up = row["close"] >= row["open"]
         color = COLOR_UP if is_up else COLOR_DOWN
         date_str = idx.strftime("%Y-%m-%d")
+        observation={'symbol':symbol,'unit':unit,'date':date_str,
+            **{field:value(row[field]) for field in ('open','high','low','close')},
+            'volume':value(row.get('volume')) if pd.notna(row.get('volume')) else None}
+        wick_gid=f'candle-wick-{series}-{date_str}'
+        body_gid=f'candle-body-{series}-{date_str}'
+        metadata[wick_gid]=observation; metadata[body_gid]=observation
 
         # Wick (high-low) — ax.plot 2 点, 显式 set_gid
         wick_line, = ax.plot(
             [idx, idx], [row["low"], row["high"]],
             color=color, linewidth=0.6, alpha=0.9,
         )
-        wick_line.set_gid(f"candle-wick-{date_str}")
+        wick_line.set_gid(wick_gid)
 
         # Body (open-close rectangle)
         body_height = abs(row["close"] - row["open"])
@@ -170,7 +193,7 @@ def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
                 [row["close"], row["close"]],
                 color=color, linewidth=0.9,
             )
-            body_line.set_gid(f"candle-body-{date_str}")
+            body_line.set_gid(body_gid)
         else:
             body_bottom = min(row["close"], row["open"])
             bar_container = ax.bar(
@@ -185,10 +208,12 @@ def _draw_candles(ax: plt.Axes, df: pd.DataFrame) -> None:
             )
             # ax.bar 返回 BarContainer, 给每个 Rectangle 设 gid
             for rect in bar_container:
-                rect.set_gid(f"candle-body-{date_str}")
+                rect.set_gid(body_gid)
+    return series
 
 
-def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bool = True, layer: str = "indices") -> None:
+def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bool = True, layer: str = "indices",
+                     sma_windows=None,show_pivots=True) -> None:
     """在 ax 上画 5 SMA (滑动平均曲线) + R1/S1 (v0.6.1 P6-6 bug fix)
 
     v0.6.0 错误: 用 ax.hlines 画 SMA → 画成 1 根水平线,不是真滑动平均
@@ -196,9 +221,6 @@ def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bo
 
     R1/S1 仍是 hlines (pivot 是不变的常数,不是时间序列)
     """
-    t = get_thresholds(symbol, layer=layer)
-
-    smas_last = t["smas"]  # {sma_20: float, sma_50: float, ...} 最近值
     first_date = df.index[0]
     last_date = df.index[-1]
 
@@ -212,35 +234,37 @@ def _draw_thresholds(ax: plt.Axes, df: pd.DataFrame, symbol: str, show_50sma: bo
     ]
 
     close = df["close"]
-    for key, color, lw, ls, alpha, zorder in sma_styles:
-        last_val = smas_last.get(key)
-        if last_val is None or pd.isna(last_val):
-            continue
+    styles={int(key.split('_')[1]):(color,lw,ls,alpha,zorder) for key,color,lw,ls,alpha,zorder in sma_styles}
+    selected=tuple(styles) if sma_windows is None else sma_windows
+    for w in selected:
+        color,lw,ls,alpha,zorder=styles.get(w,('#546e7a',1.2,'-',.75,3))
         # 跳过 50 SMA 如果 show_50sma=False
-        if key == "sma_50" and not show_50sma:
+        if w == 50 and not show_50sma:
             continue
-        w = int(key.split("_")[1])
         sma_series = close.rolling(w).mean()
+        if pd.isna(sma_series.iloc[-1]): continue
         # 滑动平均曲线 — 每天的均值,不是单值
         ax.plot(
             df.index, sma_series,
             color=color, linewidth=lw, linestyle=ls, alpha=alpha,
-            label=f"{w} SMA ${last_val:.2f}",
+            label=f"{w} SMA（{w}日简单均线）",
             zorder=zorder,
         )
 
     # R1 / S1 仍是 hlines (pivot 是常数)
-    r1 = t["pivots"]["r1"]
-    s1 = t["pivots"]["s1"]
+    if not show_pivots: return
+    pivots=compute_pivots(df)
+    r1 = pivots["r1"]
+    s1 = pivots["s1"]
     ax.hlines(
         r1, first_date, last_date,
         colors=COLOR_R1, linestyles="--", linewidth=1.2,
-        label=f"R1 ${r1:.2f}",
+        label=f"R1（一级阻力） {r1:.2f}",
     )
     ax.hlines(
         s1, first_date, last_date,
         colors=COLOR_S1, linestyles="--", linewidth=1.2,
-        label=f"S1 ${s1:.2f}",
+        label=f"S1（一级支撑） {s1:.2f}",
     )
 
 
@@ -251,6 +275,16 @@ def plot_single(
     lookback_days: int = 252,
     show_50sma: bool = True,
     compact_title: bool = False,
+    *,
+    data: Optional[pd.DataFrame] = None,
+    as_of: Optional[str] = None,
+    sma_windows=None,
+    show_pivots: bool = True,
+    ma_review: bool = True,
+    review_windows=(50,100,200),
+    recent_observations: int = 5,
+    history_search_observations=None,
+    price_unit: Optional[str] = None,
 ) -> plt.Axes:
     """Plot single symbol K-line on given axes
 
@@ -261,7 +295,10 @@ def plot_single(
     fix: 用 cache 全量数据画, xlim 限定最后 lookback_days, 让 SMA 从图一开始就连续。
     要求: cache 至少 lookback_days + 200 (2y 缓存能保证 1y 图 200 SMA 全程有效)。
     """
-    df = load_prices(symbol, layer)
+    configure_chart_font()
+    df = load_prices(symbol, layer) if data is None else data.copy()
+    if as_of is not None: df=df.loc[:as_of]
+    if len(df)<2: raise ValueError('price chart needs at least two observations through requested date')
 
     # v0.6.8g: 不再切片! 画全量数据, xlim 限定显示窗口
     # 这样 200 SMA 滚动 200 天有 warmup, 1y 图全程有效
@@ -274,21 +311,18 @@ def plot_single(
         visible_start = df.index[-lookback_days]
         ax.set_xlim(visible_start, df.index[-1])
 
-    # 蜡烛
-    _draw_candles(ax, df)
+    unit = price_unit or ('USD/oz' if symbol == 'GC=F' else 'USD/share' if layer in ('indices','commodities_spot_etf') else 'USD')
+    # Preserve raw observation metadata instead of inferring open/close from geometry.
+    series=_draw_candles(ax, df,symbol=symbol,unit=unit)
     # 阈值线
-    _draw_thresholds(ax, df, symbol, show_50sma=show_50sma, layer=layer)
-    # v0.6.4 (P6-1) 事件线: FOMC / CPI / NFP 垂直线
-    _draw_events(ax, df)
-    # v0.6.8h (P6-7.5): ylim 用 52w high/low ±20% (User 反馈默认 ylim 离价格太远)
+    _draw_thresholds(ax, df, symbol, show_50sma=show_50sma, layer=layer,
+                     sma_windows=sma_windows,show_pivots=show_pivots)
+    # Price charts intentionally contain no macro/Federal Reserve event overlays.
+    # Use the actual displayed window so earlier prices cannot be cropped away.
     if len(df) >= 2:
-        _set_ylim_52w_padding(ax, df)
+        _set_ylim_52w_padding(ax, df.iloc[-lookback_days:], window=None)
 
-    # 标题 — 5 SMA 全显示 (v0.6.0) + 实际 lookback period (v0.6.3 fix)
-    t = get_thresholds(symbol, layer=layer)
-    smas = t["smas"]
-    vs = t["vs_sma"]
-    pos52w = t["range_52w"]["position_pct"]
+    # Keep price/date separate from moving-average legend and window title.
     # period 字符串: 252d → 1y, 500d → 2y, 126d → 6m (v0.6.3 用 round 不用 //)
     if lookback_days >= 252:
         period = f"{round(lookback_days / 252)}y"
@@ -296,34 +330,33 @@ def plot_single(
         period = f"{round(lookback_days / 21)}mo"
     else:
         period = f"{lookback_days}d"
-    # 拼标题
-    # - compact_title (4-subplot 模式): 只显示 close + SMA200 + 52w
-    # - 全显示模式 (单 subplot): close + 5 SMA + 52w
-    if compact_title:
-        s200_pct = vs.get("sma_200", {}).get("pct")
-        if s200_pct is not None and not pd.isna(s200_pct):
-            title = f"{symbol}  {period}  |  USD {t['last_close']:.2f}  |  SMA200 {s200_pct:+.1f}%  |  52w {pos52w}%"
-        else:
-            title = f"{symbol}  {period}  |  USD {t['last_close']:.2f}  |  52w {pos52w}%"
-        # v0.6.3 fix: matplotlib 3.11.0 + loc="left" 让 title 消失, 改默认 (center)
-        ax.set_title(title, fontsize=10, fontweight="bold", pad=8)
-    else:
-        parts = [f"close USD {t['last_close']:.2f}"]
-        for w in [20, 50, 100, 150, 200]:
-            v = smas.get(f"sma_{w}")
-            p = vs.get(f"sma_{w}", {}).get("pct")
-            if v is not None and p is not None and not pd.isna(v):
-                parts.append(f"SMA{w} {p:+.1f}%")
-        parts.append(f"52w {pos52w}%")
-        title = f"{symbol}  {period}  |  " + "  ".join(parts)
-        ax.set_title(title, fontsize=10, fontweight="bold", pad=8)
-    ax.set_ylabel("Price (USD)", fontsize=8)
-    ax.legend(loc="upper left", fontsize=7, framealpha=0.85, ncol=2)
+    # Separate instrument/window from the latest observed price and indicator key.
+    if ma_review:
+        from src.chart_review import analyze_ma_crossings
+        ax._ma_review = analyze_ma_crossings(df,symbol,unit,windows=review_windows,
+            recent_observations=recent_observations,history_search_observations=history_search_observations)
+    elif hasattr(ax,'_ma_review'): del ax._ma_review
+    name = 'Gold COMEX futures（COMEX黄金期货）' if symbol == 'GC=F' else 'SPDR Gold Shares ETF（SPDR黄金ETF）' if symbol == 'GLD' else instrument_label(symbol)
+    ax.set_title(f"{name} ({symbol}) | {period}" if symbol in ('GC=F','GLD') else f"{name} | {period}",
+                 fontsize=10, fontweight='bold', pad=8)
+    ax.set_ylabel(f"Price（价格） | {unit_label(unit)}", fontsize=8)
+    latest_date=df.index[-1]
+    latest_close=float(df['close'].iloc[-1])
+    ax.plot([latest_date],[latest_close],marker='o',color='#174a7e',markersize=4,zorder=7)
+    price=ax.annotate(f"Last close（最新收盘价） {latest_close:,.2f}\n{unit_label(unit)} | {symbol}\n{latest_date.date()}",
+                     xy=(.985,.965),xycoords='axes fraction',ha='right',va='top',
+                     fontsize=9,fontweight='bold',color='#174a7e',zorder=10,
+                     bbox={'boxstyle':'round,pad=0.45','facecolor':'white','edgecolor':'#174a7e','alpha':.95})
+    price.set_gid(f'latest-close-label-{series}')
+    if ax.get_legend_handles_labels()[0]:
+        ax.legend(loc="upper left", fontsize=7, framealpha=0.85, ncol=2)
     ax.grid(True, alpha=0.3, linestyle="-", linewidth=0.5)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
     ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
     plt.setp(ax.xaxis.get_majorticklabels(), rotation=0, fontsize=7)
     plt.setp(ax.yaxis.get_majorticklabels(), fontsize=7)
+    start=df.index[-min(len(df),lookback_days)].date()
+    ax.set_xlabel(f"Observed dates（观察日期）: {start} → {latest_date.date()}",fontsize=8)
 
     # Y 轴留点 margin,让标签不全贴边
     y_min, y_max = ax.get_ylim()
@@ -375,20 +408,18 @@ def plot_4_indices(
 
 def _inject_ohlcv_hover(svg_path: Path, fig: plt.Figure) -> int:
     """
-    v0.6.6 (P6-5): 给 SVG 加 <title> 标签, 浏览器 hover 显示 OHLCV
-
-    matplotlib 的 set_gid() 设到 SVG 的 `id` 属性 (不是 `gid`), 蜡烛
-    patch 在 SVG 输出里是 `<g id="candle-body-YYYY-MM-DD">...</g>`, 直接按 id 找
+    Bind each wick/body/doji to its own raw observation, then namespace SVG IDs.
+    Re-injection replaces titles using the preserved source key. XML/source
+    verification is recorded separately from browser and human visual acceptance.
 
     Args:
         svg_path: 写完的 SVG 路径
-        fig: matplotlib Figure (不直接用, 但保留接口一致)
+        fig: Figure containing per-axis source observation metadata
 
     Returns: 注入的 <title> 数量
     """
     from lxml import etree
-    import re as _re
-    import matplotlib.dates as mdates
+    from src.svg_metadata import namespace_svg_ids
 
     # 解析 SVG
     parser = etree.XMLParser(remove_blank_text=False)
@@ -396,40 +427,42 @@ def _inject_ohlcv_hover(svg_path: Path, fig: plt.Figure) -> int:
     root = tree.getroot()
     ns = "{http://www.w3.org/2000/svg}"
 
-    # 找所有 id="candle-body-YYYY-MM-DD" 的元素
-    # matplotlib 把 gid="candle-body-..." 输出成 id="..." (svg id 属性, 不是 gid)
+    metadata={}
+    def axes_tree(ax):
+        yield ax
+        for child in ax.child_axes: yield from axes_tree(child)
+    for ax in fig.axes:
+        for candidate in axes_tree(ax): metadata.update(getattr(candidate,'_candle_metadata',{}))
     n_injected = 0
-    for el in root.iter():
-        el_id = el.get("id") or ""
-        if not el_id.startswith("candle-body-"):
-            continue
-        date_str = el_id.replace("candle-body-", "")
-        # 从 ax.patches 找对应 candle (按 x 位置)
-        # 简单方案: 用 ax.patches 找 gid="candle-body-{date_str}" 的
-        # 但 fig 在 savefig 之后, ax 还有 patch 数据吗? — 有, fig 一直持有
-        candle = None
-        try:
-            ax = fig.axes[0]
-            for patch in ax.patches:
-                if (patch.get_gid() or "") == f"candle-body-{date_str}":
-                    candle = patch
-                    break
-        except Exception:
-            pass
-        if candle is None:
-            continue
-        body_low = float(candle.get_y())
-        body_high = float(candle.get_y() + candle.get_height())
-        title_text = (
-            f"{date_str}  body: USD {body_low:.2f} - USD {body_high:.2f}"
-        )
-        title_el = etree.SubElement(el, f"{ns}title")
-        title_el.text = title_text
+    # Snapshot before replacing existing title children: mutating a live lxml
+    # iterator can stop traversal during re-injection.
+    for el in list(root.iter()):
+        key=el.get('data-source-gid') or el.get('id')
+        if key not in metadata: continue
+        observation=metadata[key]
+        for previous_title in list(el.findall(ns+'title')): el.remove(previous_title)
+        title_el=etree.Element(ns+'title')
+        o,c=observation['open'],observation['close']
+        digits=4 if o is not None and c is not None and o!=c and round(o,2)==round(c,2) else 2
+        def price(v): return 'unavailable' if v is None else f'{v:,.{digits}f}'
+        volume=observation['volume']
+        volume_text='unavailable' if volume is None else f'{volume:,.4f}'.rstrip('0').rstrip('.')
+        title_el.text=(f"{instrument_label(observation['symbol'])} | {observation['date']} | {unit_label(observation['unit'])}\n"
+            f"Open（开盘） {price(o)}; High（最高） {price(observation['high'])}; Low（最低） {price(observation['low'])}; Close（收盘） {price(c)}\n"
+            f"Provider volume（数据源成交量） {volume_text} (provider units（数据源单位）)")
+        el.insert(0,title_el)
+        el.set('data-source-gid',key)
+        el.set('data-ohlcv',json.dumps(observation,ensure_ascii=False,allow_nan=False))
         n_injected += 1
-
-    if n_injected > 0:
-        tree.write(str(svg_path), xml_declaration=True, encoding="utf-8")
-        logger.info(f"[kline] injected {n_injected} OHLCV hover titles into {svg_path.name}")
+    id_count=namespace_svg_ids(root)
+    tree.write(str(svg_path),xml_declaration=True,encoding='utf-8')
+    verified=bool(metadata) and n_injected==len(metadata) and all(
+        all(r[k] is not None for k in ('open','high','low','close')) and r['symbol']!='unknown' and r['unit']!='unverified'
+        for r in metadata.values())
+    statuses=getattr(fig,'_svg_export_status',{}); fig._svg_export_status=statuses
+    statuses[str(svg_path.resolve())]={'source_metadata_verified':verified,'hover_entries':n_injected,
+        'expected_hover_entries':len(metadata),'unique_document_ids':id_count,'local_references_resolved':True}
+    logger.info(f'[kline] injected {n_injected} source OHLCV titles into {svg_path.name}')
     return n_injected
 
 
@@ -469,6 +502,8 @@ def savefig_multi_format(
                 _inject_ohlcv_hover(out, fig)
             except Exception as e:
                 logger.warning(f"[kline] hover inject failed (non-fatal): {e}")
+                statuses=getattr(fig,'_svg_export_status',{}); fig._svg_export_status=statuses
+                statuses[str(out.resolve())]={'source_metadata_verified':False,'reason':str(e)}
             written.append(out)
             logger.info(f"[kline] saved SVG (vector): {out} ({out.stat().st_size // 1024}KB)")
         elif fmt == "pdf":
@@ -479,6 +514,12 @@ def savefig_multi_format(
         else:
             logger.warning(f"[kline] unknown format: {fmt}, skipped")
 
+    if written:
+        reviews=[ax._ma_review for ax in fig.axes if hasattr(ax,'_ma_review')]
+        if reviews:
+            from src.chart_review import write_ma_review
+            review_paths=write_ma_review(output_path,reviews)
+            logger.info(f"[kline] separate moving-average review: {review_paths[0]}")
     return written
 
 

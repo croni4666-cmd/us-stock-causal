@@ -1,0 +1,2 @@
+recursive-include config *.json *.yaml
+recursive-include data/baseline *.json

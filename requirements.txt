@@ -49,3 +49,7 @@ plyer>=2.1.0
 
 # Dev / test (optional)
 pytest>=7.0.0
+
+lxml>=4.9.0
+
+defusedxml>=0.7.1

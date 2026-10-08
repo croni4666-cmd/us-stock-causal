@@ -1,22 +1,8 @@
-"""src/performance_dashboard.py - 全标的 1d 涨跌幅总览 (v0.6.8h 新增)
-
-设计:
-- 1 张 horizontal bar chart: 1d % change for all 报告里的标的
-- 1 张 markdown table: 中文名 / 现价 USD / 1d 涨跌幅 / 52w 高低
-
-数据源: cache parquet (data/raw/{layer}/{safe_name}.parquet)
-涵盖标的 (默认):
-  - 4 指数 (indices): DIA / QQQ / RSP / QQQE
-  - 11 行业 (sectors): XLK / XLF / XLV / XLY / XLP / XLE / XLI / XLB / XLU / XLC / XLRE
-  - 2 黄金 (commodities_futures + commodities_spot_etf): GC=F / GLD
-  - 3 宏观 (macro): ^VIX / ^TNX / DX-Y.NYB
-
-颜色:
-- 涨 (正): 绿色 (#26a69a) 跟 K 线涨绿一致
-- 跌 (负): 红色 (#ef5350) 跟 K 线跌红一致
-- 横轴 0% 一根虚线
-"""
+"""Quote summary with typed price, yield and index measures; no shared macro return scale."""
 from __future__ import annotations
+import math
+import numpy as np
+from html import escape
 import sys
 from pathlib import Path
 from typing import Optional
@@ -29,7 +15,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 from loguru import logger
 
-from src.thresholds import load_prices
+from src.thresholds import load_prices, YIELD_SYMBOLS
+from src.chart_labels import configure_chart_font,unit_label,instrument_label
 
 
 # 中英文对照表 (用于表格显示)
@@ -95,236 +82,159 @@ DEFAULT_SYMBOLS: list[tuple[str, str]] = [
 ]
 
 
-def compute_1d_change(symbol: str, layer: str, as_of: Optional[str] = None) -> Optional[dict]:
-    """算 1d 涨跌幅 + 52w 高低 + 现价 (支持 as_of 历史时点截断)
+def _measure(symbol,layer):
+    if symbol in YIELD_SYMBOLS: return 'yield_bp','%','bp'
+    if symbol=='^VIX': return 'vix_points','VIX points','VIX points'
+    if symbol in ('DXY','DX-Y.NYB'): return 'index_points','index points','index points'
+    if layer=='macro': return 'quote_delta','provider quote units','provider quote units'
+    unit='USD/oz' if symbol=='GC=F' else 'provider quote units' if layer=='commodities_futures' else 'index points' if symbol.startswith('^') else 'USD/share'
+    return 'price_quote_pct',unit,'%'
 
-    Returns:
-        dict {symbol, layer, last_close, prev_close, change_pct, high_52w, low_52w}
-        or None if data missing
+
+def compute_1d_change(symbol,layer,as_of=None):
+    """Adjacent available quote changes, with explicit level and change units.
+
+    change_pct remains a relative-quote diagnostic for compatibility, not a
+    generic investment return. Displays use change_value/change_unit instead.
     """
     try:
-        df = load_prices(symbol, layer)
-    except FileNotFoundError:
-        logger.warning(f"[perf] {symbol} ({layer}) 无 cache, 跳过")
+        df=load_prices(symbol,layer)
+        if df is None or len(df)<2: return None
+        if as_of is not None: df=df.loc[:as_of]
+        idx=df.index
+        if len(df)<2: return None
+        if (not isinstance(idx,pd.DatetimeIndex) or idx.tz is not None or idx.hasnans or
+            idx.has_duplicates or not idx.is_monotonic_increasing or not idx.equals(idx.normalize())):
+            raise ValueError('unique increasing daily quote dates required')
+        values=df[['close','high','low']].to_numpy(dtype=float)
+        if not np.isfinite(values).all(): raise ValueError('nonfinite quotes; no filling')
+        last,previous=float(df['close'].iloc[-1]),float(df['close'].iloc[-2])
+        kind,level_unit,change_unit=_measure(symbol,layer)
+        if kind=='price_quote_pct' and (last<=0 or previous<=0):
+            raise ValueError('positive price endpoints required for relative quote changes')
+        relative=(last-previous)/previous*100 if previous!=0 else None
+        change=(last-previous)*100 if kind=='yield_bp' else relative if kind=='price_quote_pct' else last-previous
+        window=min(len(df),252)
+        return {'symbol':symbol,'layer':layer,'last_close':last,'prev_close':previous,
+            'change_pct':relative,'change_value':change,'change_unit':change_unit,'metric_kind':kind,
+            'level_unit':level_unit,'date':str(idx[-1].date()),'previous_date':str(idx[-2].date()),
+            'high_52w':float(df['high'].iloc[-window:].max()),'low_52w':float(df['low'].iloc[-window:].min()),
+            'range_observations':window}
+    except (OSError,ValueError,TypeError,KeyError) as exc:
+        logger.warning(f'[perf] {symbol} ({layer}) unavailable: {exc}')
         return None
-    if df is None or len(df) < 2:
-        return None
-    if as_of is not None:
-        df = df.loc[:as_of]
-        if len(df) < 2:
-            return None
-    last_close = float(df["close"].iloc[-1])
-    prev_close = float(df["close"].iloc[-2])
-    change_pct = (last_close - prev_close) / prev_close * 100
-
-    # 52w = 252 trading days
-    window_52w = min(len(df), 252)
-    high_52w = float(df["high"].iloc[-window_52w:].max())
-    low_52w = float(df["low"].iloc[-window_52w:].min())
-
-    return {
-        "symbol": symbol,
-        "layer": layer,
-        "last_close": last_close,
-        "prev_close": prev_close,
-        "change_pct": change_pct,
-        "high_52w": high_52w,
-        "low_52w": low_52w,
-    }
 
 
-def collect_performance(
-    symbols: Optional[list[tuple[str, str]]] = None,
-    as_of: Optional[str] = None,
-) -> list[dict]:
-    """收集所有标的的 1d 涨跌幅 + 52w 数据"""
-    if symbols is None:
-        symbols = DEFAULT_SYMBOLS
-    results = []
-    for layer, sym in symbols:
-        r = compute_1d_change(sym, layer, as_of=as_of)
-        if r is not None:
-            results.append(r)
-    return results
+def collect_performance(symbols=None,as_of=None):
+    return [r for layer,symbol in (DEFAULT_SYMBOLS if symbols is None else symbols)
+            if (r:=compute_1d_change(symbol,layer,as_of=as_of)) is not None]
 
 
-def plot_performance_dashboard(
-    ax: plt.Axes,
-    symbols: Optional[list[tuple[str, str]]] = None,
-    top_n: Optional[int] = None,
-    as_of: Optional[str] = None,
-) -> plt.Axes:
-    """画 1 张 1d 涨跌幅 horizontal bar chart
+def _sorted_rows(results):
+    return sorted(results,key=lambda r:(r['metric_kind']!='price_quote_pct',
+        r['metric_kind'] if r['metric_kind']!='price_quote_pct' else '',-r['change_value']))
 
-    按涨跌幅降序 (涨在上, 跌在下), 颜色按方向
-    v0.6.8h hotfix 2: y-tick 只放 symbol (1 行), 中文名做 annotation 放 bar 末端
-    解决 20 标的时 y-tick 2 行 label 垂直重叠问题
-    """
-    results = collect_performance(symbols, as_of=as_of)
+
+def _change_text(row):
+    value=row['change_value']
+    number=f'{value:+.2f}' if value==0 or abs(value)>=.005 else f'{value:+.4g}'
+    return number+('' if row['change_unit']=='%' else ' ')+row['change_unit']
+
+
+def plot_performance_dashboard(ax,symbols=None,top_n=None,as_of=None):
+    """Price-quote percentage bars plus separate, unranked macro quote cards."""
+    configure_chart_font()
+    if top_n is not None and (type(top_n) is not int or top_n<1):
+        raise ValueError('top_n must be a positive integer')
+    results=collect_performance(symbols,as_of)
+    for old in list(getattr(ax,'_performance_panels',{}).get('macro',[])): old.remove()
+    previous=getattr(ax,'_performance_panels',{}).get('prices')
+    if previous is not None: previous.remove()
+    ax.clear(); ax.set_axis_off()
+    ax._performance_rows=results
+    panels={'prices':None,'macro':[]}; ax._performance_panels=panels
     if not results:
-        ax.text(0.5, 0.5, "无数据", ha="center", va="center", transform=ax.transAxes)
+        ax.text(.5,.5,'No quote data',ha='center',transform=ax.transAxes)
         return ax
-
-    # 按涨跌幅降序
-    results.sort(key=lambda r: r["change_pct"], reverse=True)
-
-    if top_n is not None and len(results) > top_n:
-        # 涨 top_n + 跌 top_n
-        top_up = results[:top_n]
-        top_dn = results[-top_n:]
-        results = top_up + top_dn
-        results.sort(key=lambda r: r["change_pct"], reverse=True)
-
-    labels_cn = [SYMBOL_CN_NAMES.get(r["symbol"], r["symbol"]) for r in results]
-    values = [r["change_pct"] for r in results]
-    colors = [COLOR_UP if v > 0 else COLOR_DOWN if v < 0 else COLOR_NEUTRAL for v in values]
-
-    # 横向 bar
-    y_pos = list(range(len(results)))
-    bars = ax.barh(y_pos, values, color=colors, alpha=0.85, edgecolor="white", linewidth=0.5)
-
-    # v0.6.8h hotfix 2: y-tick 只放 symbol (1 行, 短), 中文名 annotation 放 bar 末端
-    # 这样 y-tick 不会因为 2 行 label 在 16px/row 时垂直重叠
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels([r["symbol"] for r in results], fontsize=8, fontfamily="monospace")
-    ax.tick_params(axis="y", pad=4)
-
-    # 0% 参考线
-    ax.axvline(0, color=COLOR_NEUTRAL, linestyle="--", linewidth=0.8, alpha=0.6)
-
-    # X 轴格式: 百分比
-    def pct_fmt(x, _):
-        return f"{x:+.1f}%"
-    ax.xaxis.set_major_formatter(FuncFormatter(pct_fmt))
-    ax.xaxis.set_major_locator(MaxNLocator(nbins=6, steps=[1, 2, 5, 10]))
-    ax.tick_params(axis="x", labelsize=8)
-
-    # Bar 末端显示百分比 + 中文名
-    xmax = max(values) if values else 0
-    xmin = min(values) if values else 0
-    x_range = max(abs(xmax), abs(xmin), 0.5)
-    for i, (bar, val, name_cn) in enumerate(zip(bars, values, labels_cn)):
-        # 缩短中文名 (去掉括号注释, 比如 "黄金期货 (COMEX)" → "黄金期货")
-        name_short = name_cn.split(" (")[0]
-        if val >= 0:
-            # bar 右端: 百分比 + 短中文名
-            ax.text(val + x_range * 0.01, i, f"{val:+.2f}%  {name_short}",
-                    va="center", ha="left", fontsize=7, color="#333")
-        else:
-            # bar 左端: 短中文名 + 百分比 (中文名在左, 数字在右贴近 bar)
-            ax.text(val - x_range * 0.01, i, f"{name_short}  {val:+.2f}%",
-                    va="center", ha="right", fontsize=7, color="#333")
-
-    # 标题
-    ax.set_title(f"全标的 1d 涨跌幅总览 ({len(results)} 只)", fontsize=11, fontweight="bold", pad=8)
-    ax.set_xlabel("1d 涨跌幅", fontsize=9)
-    ax.grid(axis="x", alpha=0.3, linestyle=":", linewidth=0.5)
-    ax.set_axisbelow(True)
-
-    # 给右端 annotation 留空间
-    xlim_left, xlim_right = ax.get_xlim()
-    # 加宽 xlim 给 annotation 留位置
-    if xlim_right > 0:
-        ax.set_xlim(xlim_left, xlim_right * 1.35)
-    if xlim_left < 0:
-        ax.set_xlim(xlim_left * 1.35, xlim_right)
-
-    # 反转 Y 轴 (涨在上)
-    ax.invert_yaxis()
-
+    prices=sorted([r for r in results if r['metric_kind']=='price_quote_pct'],key=lambda r:-r['change_value'])
+    macro=[r for r in results if r['metric_kind']!='price_quote_pct']
+    if top_n is not None and len(prices)>2*top_n: prices=prices[:top_n]+prices[-top_n:]
+    card_columns=min(3,len(macro)) if macro else 1
+    card_rows=math.ceil(len(macro)/card_columns) if macro else 0
+    card_region=min(.55,.25*card_rows) if prices else .9
+    quote_dates=sorted({r['date'] for r in results})
+    date_text=quote_dates[0] if len(quote_dates)==1 else quote_dates[0]+' to '+quote_dates[-1]
+    ax.set_title('Quote summary（报价总览） | '+date_text,fontsize=11,fontweight='bold',pad=8)
+    if prices:
+        chart=ax.inset_axes([.20,card_region+.12,.77,.80-card_region])
+        panels['prices']=chart
+        values=[r['change_value'] for r in prices]
+        colors=[COLOR_UP if v>0 else COLOR_DOWN if v<0 else COLOR_NEUTRAL for v in values]
+        bars=chart.barh(range(len(prices)),values,color=colors,alpha=.85)
+        chart.set_yticks(range(len(prices)))
+        chart.set_yticklabels([instrument_label(r['symbol']) for r in prices],fontsize=9)
+        chart.invert_yaxis()
+        scale=max(max(abs(v) for v in values),.1)
+        for i,(row,value) in enumerate(zip(prices,values)):
+            chart.text(value+(.025*scale if value>=0 else -.025*scale),i,_change_text(row),
+                va='center',ha='left' if value>=0 else 'right',fontsize=9)
+        chart.set_xlim(min(0,min(values))-.3*scale,max(0,max(values))+.3*scale)
+        chart.axvline(0,color=COLOR_NEUTRAL,linestyle='--',linewidth=.8)
+        chart.xaxis.set_major_formatter(FuncFormatter(lambda value,_:f'{value:+.1f}%'))
+        chart.xaxis.set_major_locator(MaxNLocator(nbins=6,steps=[1,2,5,10]))
+        chart.tick_params(axis='x',labelsize=8)
+        chart.set_title(f'Price quote changes（价格报价变化） (%) | {len(prices)} instruments（标的）',fontsize=10,pad=5)
+        chart.set_xlabel('Adjacent quotes（相邻报价）; excludes distributions and roll costs\n不含分红与展期成本；各标的观察日期见表格',fontsize=8)
+        chart.grid(axis='x',alpha=.25,linestyle=':'); chart.set_axisbelow(True)
+    for i,row in enumerate(macro):
+        column=i%card_columns; line=i//card_columns
+        height=card_region/card_rows*.82
+        bottom=.015+(card_rows-1-line)*card_region/card_rows
+        card=ax.inset_axes([column/card_columns+.015,bottom,1/card_columns-.03,height])
+        card.set_axis_off()
+        card.add_patch(mpl.patches.Rectangle((0,0),1,1,transform=card.transAxes,
+            facecolor='#f3f6fa',edgecolor='#b8c6d7',linewidth=.8))
+        card.text(.04,.79,instrument_label(row['symbol']),fontsize=9,transform=card.transAxes)
+        card.text(.04,.52,f"Level（最新数值） {row['last_close']:,.3f} {row['level_unit']}",fontsize=10,fontweight='bold',transform=card.transAxes)
+        suffix='（基点）' if row['change_unit']=='bp' else '（点）' if row['change_unit'] in ('VIX points','index points') else ''
+        card.text(.04,.27,'Change（变化） '+_change_text(row)+suffix,fontsize=9,color='#174a7e',transform=card.transAxes)
+        card.text(.04,.06,row['previous_date']+' to '+row['date'],fontsize=7,transform=card.transAxes)
+        card._performance_row=row; panels['macro'].append(card)
     return ax
 
 
-def render_performance_table(
-    symbols: Optional[list[tuple[str, str]]] = None,
-    as_of: Optional[str] = None,
-) -> str:
-    """渲染中文 Google-Finance 风格表格 (markdown)
-
-    | 中文名 | 标的 | 现价 USD | 1d 涨跌幅 | 52w 高 | 52w 低 | 当日位置 |
-    |--------|------|----------|-----------|--------|--------|----------|
-    | 信息技术 | XLK | $234.56 | +1.23% | $240.00 | $180.00 | 73% |
-    ...
-    """
-    results = collect_performance(symbols, as_of=as_of)
-    if not results:
-        return "无数据"
-
-    results.sort(key=lambda r: r["change_pct"], reverse=True)
-
-    lines = [
-        "| 中文名 | 标的 | 现价 (USD) | 1d 涨跌幅 | 52w 高 | 52w 低 | 区间位置 |",
-        "|--------|------|-----------:|----------:|-------:|-------:|---------:|",
-    ]
-    for r in results:
-        name = SYMBOL_CN_NAMES.get(r["symbol"], r["symbol"])
-        last = r["last_close"]
-        pct = r["change_pct"]
-        hi = r["high_52w"]
-        lo = r["low_52w"]
-        # 区间位置 (0-100%): (last - low) / (high - low)
-        if hi > lo:
-            pos = (last - lo) / (hi - lo) * 100
-        else:
-            pos = 50.0
-        # 涨/跌 ASCII 标记 (GBK 兼容, 不用 emoji)
-        arrow = "▲" if pct > 0 else "▼" if pct < 0 else "─"
-        lines.append(
-            f"| {name} | `{r['symbol']}` | {last:,.2f} | {arrow} {pct:+.2f}% | {hi:,.2f} | {lo:,.2f} | {pos:.0f}% |"
-        )
-
-    return "\n".join(lines)
+def render_performance_table(symbols=None,as_of=None):
+    results=_sorted_rows(collect_performance(symbols,as_of))
+    if not results: return '无数据'
+    lines=['| 中文名 | 标的 | 最新数值 | 单位 | 相邻观察变化 | 观察日期 | 近252观察高 | 近252观察低 |',
+           '|---|---|---:|---|---:|---|---:|---:|']
+    for row in results:
+        name=SYMBOL_CN_NAMES.get(row['symbol'],row['symbol'])
+        digits=3 if row['level_unit']=='%' else 2
+        lines.append(f"| {name} | `{row['symbol']}` | {row['last_close']:,.{digits}f} | {row['level_unit']} | {_change_text(row)} | {row['previous_date']} → {row['date']} | {row['high_52w']:,.{digits}f} | {row['low_52w']:,.{digits}f} |")
+    lines.extend(['','变化按相邻可用报价计算，日期逐行列出。高低值与最新数值使用同一单位；历史观察不足252条时使用已有记录。',
+                  '价格报价百分比不等于含分红的投资总回报；收益率用bp，VIX和美元指数用各自点数，不能合并为同一种盈亏。'])
+    return '\n'.join(lines)
 
 
-def render_performance_table_html(
-    symbols: Optional[list[tuple[str, str]]] = None,
-    as_of: Optional[str] = None,
-) -> str:
-    """HTML 风格 (Google Finance 风, 涨绿跌红 inline color)"""
-    results = collect_performance(symbols, as_of=as_of)
-    if not results:
-        return "<p>无数据</p>"
-
-    results.sort(key=lambda r: r["change_pct"], reverse=True)
-
-    parts = [
-        '<table style="border-collapse: collapse; width: 100%; font-size: 13px;">',
-        '<thead><tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">',
-        '<th style="text-align: left; padding: 8px;">中文名</th>',
-        '<th style="text-align: left; padding: 8px;">标的</th>',
-        '<th style="text-align: right; padding: 8px;">现价 (USD)</th>',
-        '<th style="text-align: right; padding: 8px;">1d 涨跌幅</th>',
-        '<th style="text-align: right; padding: 8px;">52w 高</th>',
-        '<th style="text-align: right; padding: 8px;">52w 低</th>',
-        '<th style="text-align: right; padding: 8px;">区间位置</th>',
-        '</tr></thead><tbody>',
-    ]
-    for r in results:
-        name = SYMBOL_CN_NAMES.get(r["symbol"], r["symbol"])
-        last = r["last_close"]
-        pct = r["change_pct"]
-        hi = r["high_52w"]
-        lo = r["low_52w"]
-        pos = (last - lo) / (hi - lo) * 100 if hi > lo else 50.0
-        if pct > 0:
-            color = "#137333"  # Google green
-            bg = "#e6f4ea"
-        elif pct < 0:
-            color = "#c5221f"  # Google red
-            bg = "#fce8e6"
-        else:
-            color = "#5f6368"
-            bg = "#f8f9fa"
-        parts.append(
-            f'<tr style="border-bottom: 1px solid #eee;">'
-            f'<td style="padding: 6px 8px;">{name}</td>'
-            f'<td style="padding: 6px 8px;"><code>{r["symbol"]}</code></td>'
-            f'<td style="padding: 6px 8px; text-align: right;">{last:,.2f}</td>'
-            f'<td style="padding: 6px 8px; text-align: right; color: {color}; background: {bg}; font-weight: 500;">{pct:+.2f}%</td>'
-            f'<td style="padding: 6px 8px; text-align: right;">{hi:,.2f}</td>'
-            f'<td style="padding: 6px 8px; text-align: right;">{lo:,.2f}</td>'
-            f'<td style="padding: 6px 8px; text-align: right;">{pos:.0f}%</td>'
-            f'</tr>'
-        )
-    parts.append('</tbody></table>')
-    return "\n".join(parts)
+def render_performance_table_html(symbols=None,as_of=None):
+    results=_sorted_rows(collect_performance(symbols,as_of))
+    if not results: return '<p>无数据</p>'
+    headers=['中文名','标的','最新数值','单位','相邻观察变化','观察日期','近252观察高','近252观察低']
+    parts=['<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>']
+    parts.extend('<th style="padding:8px">'+h+'</th>' for h in headers)
+    parts.append('</tr></thead><tbody>')
+    for row in results:
+        value=row['change_value']
+        color=('#137333' if value>0 else '#c5221f' if value<0 else '#5f6368') if row['metric_kind']=='price_quote_pct' else '#174a7e'
+        digits=3 if row['level_unit']=='%' else 2
+        cells=[SYMBOL_CN_NAMES.get(row['symbol'],row['symbol']),row['symbol'],f"{row['last_close']:,.{digits}f}",
+               row['level_unit'],_change_text(row),row['previous_date']+' → '+row['date'],
+               f"{row['high_52w']:,.{digits}f}",f"{row['low_52w']:,.{digits}f}"]
+        parts.append('<tr>')
+        for i,cell in enumerate(cells):
+            style='padding:7px;border-bottom:1px solid #eee'+(f';color:{color}' if i==4 else '')
+            parts.append('<td style="'+style+'">'+escape(str(cell))+'</td>')
+        parts.append('</tr>')
+    parts.append('</tbody></table><p>变化按相邻可用报价；高低值与最新数值同单位。价格涨跌不是完整投资总回报。收益率bp、VIX点数、美元指数点数分别呈现；颜色只描述数值方向。</p>')
+    return '\n'.join(parts)

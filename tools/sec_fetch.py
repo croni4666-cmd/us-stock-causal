@@ -45,36 +45,15 @@ import json
 import time
 import logging
 import requests
+from src.http_safety import get_bounded, MAX_FILING_BYTES
 import pandas as pd
 from datetime import datetime, date
 from io import StringIO
 from typing import Optional, List, Dict, Any
 
-# === Clash proxy 探测 (跟 us-stock-causal 一致) ===
-def _setup_proxy():
-    """探测本地 Clash 代理端口, 跟 yfinance 同一套"""
-    import socket
-    for _p in [7897, 10808, 7890, 7891, 7892, 10809, 7899]:
-        try:
-            with socket.create_connection(("127.0.0.1", _p), timeout=0.4):
-                os.environ["HTTPS_PROXY"] = f"http://127.0.0.1:{_p}"
-                os.environ["HTTP_PROXY"]  = f"http://127.0.0.1:{_p}"
-                return _p
-        except (socket.timeout, ConnectionRefusedError, OSError):
-            continue
-    return None
-
-# 必须在 import edgar_parser 前 setup proxy
-_proxy_port = _setup_proxy()
-if _proxy_port:
-    logging.info(f"[sec_fetch] Clash proxy: 127.0.0.1:{_proxy_port}")
-
-# Increase read timeout globally (47MB iXBRL HTML files take >45s on slow SEC.gov)
-_orig_get = requests.Session.get
-def _get_patched(self, *args, **kwargs):
-    kwargs.setdefault('timeout', (15, 300))  # (connect, read) — 5 min read
-    return _orig_get(self, *args, **kwargs)
-requests.Session.get = _get_patched
+# Shared user-selected proxy policy; no second probe or requests monkeypatch.
+# Each bounded HTTP request below declares its own timeout.
+from src import proxy  # noqa: F401
 
 logging.basicConfig(level=logging.WARNING, format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
 log = logging.getLogger('sec_fetch')
@@ -91,7 +70,6 @@ COMPANY_FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 
 # === Cache (避免重复拉, 跨 session) ===
 _CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "sec_fetch")
-os.makedirs(_CACHE_DIR, exist_ok=True)
 
 
 # ============================================================================
@@ -108,11 +86,11 @@ def _load_ticker_map() -> Dict[str, str]:
             with open(cache_path) as f:
                 return json.load(f)
     log.info("拉 SEC 全部 ticker → CIK 映射 (~10K tickers, 218KB)")
-    r = requests.get(COMPANY_TICKERS_URL, headers=_HEADERS, timeout=(15, 30))
-    r.raise_for_status()
+    r = get_bounded(COMPANY_TICKERS_URL, headers=_HEADERS, timeout=(15, 30))
     raw = r.json()
     # raw 格式: {"0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."}, ...}
     ticker_map = {v["ticker"].upper(): str(v["cik_str"]).zfill(10) for v in raw.values()}
+    os.makedirs(_CACHE_DIR, exist_ok=True)
     with open(cache_path, "w") as f:
         json.dump(ticker_map, f)
     return ticker_map
@@ -158,8 +136,7 @@ def get_recent_filings(ticker: str, form_type: str = "10-Q", count: int = 4) -> 
           - url: 完整 SEC URL
     """
     cik = get_company_cik(ticker)
-    r = requests.get(SUBMISSIONS_URL.format(cik=cik), headers=_HEADERS, timeout=(15, 30))
-    r.raise_for_status()
+    r = get_bounded(SUBMISSIONS_URL.format(cik=cik), headers=_HEADERS, timeout=(15, 30))
     sub = r.json()
 
     recent = sub.get("filings", {}).get("recent", {})
@@ -325,9 +302,9 @@ def get_company_facts(ticker: str, use_cache: bool = True) -> Dict[str, Any]:
             with open(cache_path) as f:
                 return json.load(f)
     log.info(f"拉 {ticker} companyfacts (CIK={cik}, 5-10MB)")
-    r = requests.get(COMPANY_FACTS_URL.format(cik=cik), headers=_HEADERS, timeout=(15, 120))
-    r.raise_for_status()
+    r = get_bounded(COMPANY_FACTS_URL.format(cik=cik), headers=_HEADERS, timeout=(15, 120))
     data = r.json()
+    os.makedirs(_CACHE_DIR, exist_ok=True)
     with open(cache_path, "w") as f:
         json.dump(data, f)
     return data
@@ -432,7 +409,8 @@ def get_filing_text(
     if not filing or "url" not in filing:
         raise ValueError(f"{ticker} {year}Q{quarter} 找不到 filing")
 
-    html = requests.get(filing["url"], headers=_HEADERS, timeout=(15, 120)).text
+    html = get_bounded(filing["url"], headers=_HEADERS, timeout=(15, 120),
+                       max_bytes=MAX_FILING_BYTES).text
     # 简易 section 提取 (按 Item 标题切)
     import re
     pattern = rf'(<[^>]*>)*\s*Item\s+{section.replace("item_", "")}\.?\s*[\.\:](.*?)(?=(<[^>]*>)*\s*Item\s+\d)'
