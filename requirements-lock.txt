@@ -21,7 +21,7 @@ yfinance==1.5.1
 PyYAML==6.0.3
 loguru==0.7.3
 python-dotenv==1.2.2
-markdown==3.10.2
+markdown==3.11
 plyer==2.1.0
 pytest==9.1.1
 openbb==4.7.2
